@@ -1,0 +1,98 @@
+/**
+ * Design tokens — fuente única de verdad del color y del ritmo visual.
+ *
+ * Los valores de color NO son inventados: salen de muestrear las referencias
+ * de `docs/referencias/` con `bun run palette`. Si se retoca la dirección de
+ * arte, se retoca aquí y el sitio entero (DOM y escena 3D) sigue.
+ *
+ * La escena 3D lee estos mismos valores en tiempo de ejecución con
+ * `readCssColor()` (`src/lib/css-vars.ts`), así que no hay una segunda copia
+ * de la paleta en TypeScript.
+ */
+
+@theme {
+  /* ── Paleta ───────────────────────────────────────────────────────────
+     washi      fondo de las 13 referencias (85 % de los píxeles de 1.png)
+     shu        朱色 · el rojo de los toriis
+     sumi       墨 · tinta, cálida y no negra pura
+     sakura     桜 · primavera
+     kohaku     琥珀 · ámbar de los faroles de Gion
+     matcha     抹茶 · vegetal, bambú y cocina
+     ishi       石 · piedra del camino                                     */
+  --color-washi: #fffacd;
+  --color-washi-deep: #f6efbe;
+  --color-washi-fog: #fdf7d4;
+
+  --color-shu: #d82609;
+  --color-shu-soft: #c23323;
+  --color-shu-deep: #942d2d;
+
+  --color-sumi: #300500;
+  --color-sumi-soft: #6f3300;
+  --color-sumi-faint: #96725a;
+
+  --color-sakura: #eb81a5;
+  --color-sakura-pale: #ffdde8;
+  --color-sakura-blush: #ffccbc;
+
+  --color-kohaku: #ffd699;
+
+  --color-matcha: #556b2f;
+  --color-matcha-soft: #b4ccad;
+  --color-bambu: #a3b58e;
+  --color-bambu-pale: #b9d0a3;
+
+  --color-ishi: #ede6dd;
+  --color-ishi-deep: #c8bfaf;
+  --color-kami: #ffffff;
+
+  /* ── Tipografía ──────────────────────────────────────────────────────
+     Las tres familias las inyecta `src/styles/fonts.ts` con next/font.      */
+  --font-display: var(--font-one-jinja), 'Trebuchet MS', system-ui, sans-serif;
+  --font-brush: var(--font-gaze-nozarashi), 'Trebuchet MS', system-ui, sans-serif;
+  --font-kanji: var(--font-zen-mincho), 'Yu Mincho', 'Hiragino Mincho ProN', serif;
+  --font-body: var(--font-latin), system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* Escala tipográfica. El hero es deliberadamente enorme: la composición es
+     de cartel, el título es el otro protagonista junto al objeto 3D.         */
+  --text-hero: clamp(4rem, 16vw, 15rem);
+  --text-hero--line-height: 0.86;
+  --text-kanji: clamp(2.5rem, 7vw, 6rem);
+  --text-kanji--line-height: 1;
+
+  /* ── Ritmo ───────────────────────────────────────────────────────────
+     Un solo vocabulario de curvas para DOM y escena. GSAP las consume desde
+     `src/animation/presets.ts` (Fase 2).                                    */
+  --ease-washi: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-viento: cubic-bezier(0.33, 0, 0.15, 1);
+  --ease-piedra: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+:root {
+  /* ── Capas de profundidad, en unidades de mundo (Z de la cámara) ──────
+     Las cuatro capas del §5.1 del PLAN. La escena las lee para colocar cada
+     sistema de partículas por delante o por detrás del sujeto.              */
+  --depth-front: 2.5;
+  --depth-subject: 0;
+  --depth-mid: -12;
+  --depth-back: -60;
+
+  /* ── Parallax de cursor (§5.2 del PLAN) ──────────────────────────────
+     Sutil o no es parallax, es un efecto barato.                            */
+  --parallax-max: 0.035; /* 3.5 % del viewport */
+  --parallax-damping: 0.06;
+  --parallax-tilt: 2deg;
+
+  /* ── Cronometría del ambiente ────────────────────────────────────────  */
+  --fauna-min-gap: 20s;
+  --fauna-max-gap: 40s;
+  --idle-before-fauna: 20s;
+
+  /* ── Superficies de UI ───────────────────────────────────────────────  */
+  --surface-paper: color-mix(in srgb, var(--color-kami) 78%, var(--color-washi));
+  --surface-veil: color-mix(in srgb, var(--color-washi) 88%, transparent);
+  --border-hairline: color-mix(in srgb, var(--color-sumi) 14%, transparent);
+  --shadow-paper: 0 1px 2px color-mix(in srgb, var(--color-sumi) 10%, transparent),
+    0 12px 32px -12px color-mix(in srgb, var(--color-sumi) 22%, transparent);
+}

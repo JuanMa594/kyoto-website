@@ -1,0 +1,80 @@
+{
+  "meta": {
+    "title": "Kyoto — 京都",
+    "description": "A stone path through Kyoto: where it is, its landmarks, its seasons and its food."
+  },
+  "nav": {
+    "label": "Stations along the path",
+    "open": "Open navigation",
+    "close": "Close navigation",
+    "goTo": "Go to {station}",
+    "prev": "Previous station",
+    "next": "Next station",
+    "progress": "Path progress"
+  },
+  "ui": {
+    "skipToContent": "Skip to content",
+    "language": "Language",
+    "languageEs": "Español",
+    "languageEn": "English",
+    "audio": "Ambient sound",
+    "audioOn": "Turn sound on",
+    "audioOff": "Mute",
+    "stillMode": "静 mode (still)",
+    "stillModeHint": "Strips the ambience down: no petals, no wind, no wildlife.",
+    "quality": "Quality",
+    "qualityAuto": "Automatic",
+    "qualityHigh": "High",
+    "qualityMedium": "Medium",
+    "qualityLow": "Low",
+    "loading": "Laying the path…"
+  },
+  "stations": {
+    "inicio": {
+      "name": "Kyoto",
+      "tagline": "A thousand years of capital",
+      "summary": "Where the path begins."
+    },
+    "ubicacion": {
+      "name": "Location",
+      "tagline": "Where Kyoto is",
+      "summary": "In the heart of Honshū, in western Japan."
+    },
+    "eventos": {
+      "name": "Events",
+      "tagline": "The year in bloom",
+      "summary": "Cherry blossom season and the rest of the calendar."
+    },
+    "fushimi-inari": {
+      "name": "Fushimi Inari Taisha",
+      "tagline": "Ten thousand torii uphill",
+      "summary": "The vermilion trail climbing Mount Inari."
+    },
+    "kiyomizu-dera": {
+      "name": "Kiyomizu-dera",
+      "tagline": "The temple of pure water",
+      "summary": "Its wooden stage hanging over the hillside."
+    },
+    "gion": {
+      "name": "Gion",
+      "tagline": "Lanterns at dusk",
+      "summary": "Wooden alleys, tea houses and lit lanterns."
+    },
+    "gastronomia": {
+      "name": "Food",
+      "tagline": "The capital's kitchen",
+      "summary": "Kyō-ryōri: Kyoto's measured flavour."
+    }
+  },
+  "home": {
+    "eyebrow": "One continuous experience",
+    "title": "Kyoto",
+    "subtitle": "Follow the stone path.",
+    "enter": "Start the path"
+  },
+  "scaffold": {
+    "phase": "Phase 1 — Foundation",
+    "note": "The scene, the tokens and the path already exist. This station's content lands in its own phase.",
+    "sceneLabel": "Calibration scene: perspective camera, fog and procedural stones."
+  }
+}

@@ -1,0 +1,93 @@
+@import 'tailwindcss';
+@import './tokens.css';
+
+/* El canvas 3D vive detrás de todo el DOM y nunca se desmonta. El contenido
+   real (texto, enlaces, encabezados) existe siempre como DOM de verdad encima:
+   es lo que leen Google y los lectores de pantalla. */
+@layer base {
+  html {
+    background-color: var(--color-washi);
+    color: var(--color-sumi);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    font-family: var(--font-body);
+    min-height: 100dvh;
+    overscroll-behavior-y: none;
+  }
+
+  ::selection {
+    background-color: var(--color-sakura-pale);
+    color: var(--color-sumi);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-shu);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: -0.01em;
+  }
+}
+
+@layer components {
+  /* Kanji decorativo. Siempre acompañado de texto real en el idioma activo,
+     nunca como única fuente de información. */
+  .kanji {
+    font-family: var(--font-kanji);
+    font-size: var(--text-kanji);
+    line-height: var(--text-kanji--line-height);
+    letter-spacing: 0.04em;
+  }
+
+  .brush {
+    font-family: var(--font-brush);
+  }
+
+  /* Superficie de papel washi para tarjetas y paneles de UI. */
+  .paper {
+    background: var(--surface-paper);
+    border: 1px solid var(--border-hairline);
+    box-shadow: var(--shadow-paper);
+    border-radius: 0.75rem;
+  }
+
+  .skip-link {
+    position: fixed;
+    top: 0.5rem;
+    left: 0.5rem;
+    z-index: 100;
+    translate: 0 -150%;
+    padding: 0.5rem 0.9rem;
+    background: var(--color-sumi);
+    color: var(--color-washi);
+    border-radius: 0.5rem;
+    transition: translate 180ms var(--ease-washi);
+  }
+
+  .skip-link:focus-visible {
+    translate: 0 0;
+  }
+}
+
+/* Respeto al sistema: si la persona pidió menos movimiento, se lo damos antes
+   incluso de que cargue el JS. El modo 静 hace lo mismo pero a voluntad, desde
+   el store (`src/store/useKyotoStore.ts`). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

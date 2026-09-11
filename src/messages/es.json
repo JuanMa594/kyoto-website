@@ -1,0 +1,80 @@
+{
+  "meta": {
+    "title": "Kyoto — 京都",
+    "description": "Un camino de piedras por Kyoto: dónde queda, sus lugares, sus estaciones y su cocina."
+  },
+  "nav": {
+    "label": "Estaciones del camino",
+    "open": "Abrir navegación",
+    "close": "Cerrar navegación",
+    "goTo": "Ir a {station}",
+    "prev": "Estación anterior",
+    "next": "Estación siguiente",
+    "progress": "Avance del camino"
+  },
+  "ui": {
+    "skipToContent": "Saltar al contenido",
+    "language": "Idioma",
+    "languageEs": "Español",
+    "languageEn": "English",
+    "audio": "Sonido ambiental",
+    "audioOn": "Activar sonido",
+    "audioOff": "Silenciar",
+    "stillMode": "Modo 静 (quieto)",
+    "stillModeHint": "Reduce el ambiente al mínimo: sin pétalos, sin viento, sin fauna.",
+    "quality": "Calidad",
+    "qualityAuto": "Automática",
+    "qualityHigh": "Alta",
+    "qualityMedium": "Media",
+    "qualityLow": "Baja",
+    "loading": "Preparando el camino…"
+  },
+  "stations": {
+    "inicio": {
+      "name": "Kyoto",
+      "tagline": "Mil años de capital",
+      "summary": "El punto de partida del camino."
+    },
+    "ubicacion": {
+      "name": "Ubicación",
+      "tagline": "Dónde queda Kyoto",
+      "summary": "En el corazón de Honshū, al oeste de Japón."
+    },
+    "eventos": {
+      "name": "Eventos",
+      "tagline": "El año en flor",
+      "summary": "La temporada de sakura y el resto del calendario."
+    },
+    "fushimi-inari": {
+      "name": "Fushimi Inari Taisha",
+      "tagline": "Diez mil toriis cuesta arriba",
+      "summary": "El sendero rojo que sube por el monte Inari."
+    },
+    "kiyomizu-dera": {
+      "name": "Kiyomizu-dera",
+      "tagline": "El templo del agua pura",
+      "summary": "Su terraza de madera colgada sobre la ladera."
+    },
+    "gion": {
+      "name": "Gion",
+      "tagline": "Faroles al anochecer",
+      "summary": "Callejones de madera, té y linternas encendidas."
+    },
+    "gastronomia": {
+      "name": "Gastronomía",
+      "tagline": "La cocina de la capital",
+      "summary": "Kyō-ryōri: el sabor medido de Kyoto."
+    }
+  },
+  "home": {
+    "eyebrow": "Una experiencia continua",
+    "title": "Kyoto",
+    "subtitle": "Sigue el camino de piedras.",
+    "enter": "Empezar el camino"
+  },
+  "scaffold": {
+    "phase": "Fase 1 — Fundación",
+    "note": "La escena, los tokens y el camino ya existen. El contenido de esta estación llega en su fase.",
+    "sceneLabel": "Escena de calibración: cámara en perspectiva, niebla y piedras procedurales."
+  }
+}
