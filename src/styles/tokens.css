@@ -51,7 +51,7 @@
   --font-display: var(--font-one-jinja), 'Trebuchet MS', system-ui, sans-serif;
   --font-brush: var(--font-gaze-nozarashi), 'Trebuchet MS', system-ui, sans-serif;
   --font-kanji: var(--font-zen-mincho), 'Yu Mincho', 'Hiragino Mincho ProN', serif;
-  --font-body: var(--font-latin), system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-body: var(--font-gaze-nozarashi), 'Trebuchet MS', system-ui, sans-serif;
 
   /* Escala tipográfica. El hero es deliberadamente enorme: la composición es
      de cartel, el título es el otro protagonista junto al objeto 3D.         */

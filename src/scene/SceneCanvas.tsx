@@ -1,7 +1,7 @@
 'use client';
 
-import { Canvas } from '@react-three/fiber';
-import { useMemo } from 'react';
+import { Canvas, useThree } from '@react-three/fiber';
+import { useLayoutEffect, useMemo } from 'react';
 
 import { getStation } from '@/config/journey';
 import { scenePalette } from '@/lib/css-vars';
@@ -11,6 +11,25 @@ import {
   selectProfile,
   useKyotoStore,
 } from '@/store/useKyotoStore';
+
+/**
+ * Sin esto, la cámara del `<Canvas>` mira perfectamente horizontal (rotación
+ * identidad, eje -Z) en vez de inclinarse hacia el camino. El resultado era
+ * un horizonte a media pantalla y las piedras "flotando" en el centro del
+ * cuadro. Un `lookAt` hacia un punto delante y por debajo del origen basta
+ * para una inclinación de ~8°: sube el horizonte a ~1/4 de la pantalla y deja
+ * el camino ocupando la mitad inferior, sin llegar a mirar hacia abajo del
+ * todo. En la Fase 3 esto lo hereda el rig de scroll; aquí es fijo.
+ */
+function CameraAim() {
+  const camera = useThree((state) => state.camera);
+
+  useLayoutEffect(() => {
+    camera.lookAt(0, -1.05, -6);
+  }, [camera]);
+
+  return null;
+}
 
 /**
  * El único contexto WebGL del sitio. Regla dura del proyecto: nunca dos vivos a
@@ -43,6 +62,7 @@ export default function SceneCanvas() {
       }}
       camera={{ fov: 34, near: 0.1, far: 400, position: [0, 1.1, 9.5] }}
     >
+      <CameraAim />
       <FoundationScene station={station} palette={palette} profile={profile} />
     </Canvas>
   );

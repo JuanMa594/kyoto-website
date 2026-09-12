@@ -3,8 +3,9 @@ import { candidateVariables } from '@/styles/fonts-candidates';
 
 /**
  * Muestrario tipográfico — herramienta de decisión de la Fase 1, no una página
- * del sitio. Se borra en cuanto estén elegidas la japonesa de titulares y la
- * latina de lectura.
+ * del sitio. Titulares (One Jinja) y lectura (Gaze Nozarashi) ya están
+ * decididos; lo único que queda abierto es el kanji decorativo. Se borra en
+ * cuanto se elija entre Zen Old Mincho y Yuji Syuku.
  *
  * Las tres frases de prueba son las del PLAN: KYOTO / Sakura / Kiyomizu-dera,
  * porque mezclan versal grande, una palabra suave y un guion largo con acento.
@@ -40,8 +41,8 @@ const DISPLAY: Specimen[] = [
   {
     id: 'gaze-nozarashi',
     name: 'Gaze Nozarashi',
-    role: 'Pincelada',
-    font: 'var(--font-brush)',
+    role: 'Párrafos y pincelada',
+    font: 'var(--font-body)',
     note: 'Demo de Allouse.Studio. 233 glifos, sólo latín — cero kanji.',
   },
 ];
@@ -60,30 +61,6 @@ const KANJI: Specimen[] = [
     role: 'Kanji · alternativa',
     font: 'var(--font-yuji-syuku)',
     note: 'Trazo de pincel, más cerca del sumi de las referencias. OFL. 22 KB.',
-  },
-];
-
-const BODY: Specimen[] = [
-  {
-    id: 'mplus',
-    name: 'M PLUS Rounded 1c',
-    role: 'Lectura · propuesta',
-    font: 'var(--font-body)',
-    note: 'Redondeada y amable, cubre latín y japonés. OFL.',
-  },
-  {
-    id: 'rubik',
-    name: 'Rubik',
-    role: 'Lectura · alternativa',
-    font: 'var(--font-cand-rubik)',
-    note: 'Geométrica de esquinas suaves. Más neutra.',
-  },
-  {
-    id: 'baloo',
-    name: 'Baloo 2',
-    role: 'Lectura · alternativa',
-    font: 'var(--font-cand-baloo)',
-    note: 'Más rotunda y con más carácter; cansa antes en párrafo largo.',
   },
 ];
 
@@ -122,13 +99,14 @@ export default async function TypographyPage({
     <main id="contenido" className={`${candidateVariables} mx-auto max-w-4xl px-6 py-24`}>
       <h1 className="text-4xl">Muestrario tipográfico</h1>
       <p className="mt-3 max-w-prose opacity-70">
-        Decisión pendiente de la Fase 1: qué fuente lleva los kanji y cuál el texto de
-        lectura. Las dos fuentes que aportaste son de latín puro — no traen ningún
-        carácter japonés —, así que 京都 necesita una tercera familia sí o sí.
+        Titulares (One Jinja) y texto de lectura (Gaze Nozarashi) ya están decididos.
+        Como esas dos son de latín puro — no traen ningún carácter japonés —, 京都
+        necesita una tercera familia para el kanji decorativo, y esa es la decisión que
+        sigue pendiente.
       </p>
 
       <h2 className="mt-14 mb-4 text-sm tracking-[0.22em] uppercase opacity-55">
-        Las tuyas · display
+        Titulares y lectura · decididas
       </h2>
       <div className="grid gap-4">
         {DISPLAY.map((s) => (
@@ -142,15 +120,6 @@ export default async function TypographyPage({
       <div className="grid gap-4">
         {KANJI.map((s) => (
           <Block key={s.id} specimen={s} sample="京都 · 桜 · 伏見稲荷大社" />
-        ))}
-      </div>
-
-      <h2 className="mt-14 mb-4 text-sm tracking-[0.22em] uppercase opacity-55">
-        Texto de lectura · elegir una
-      </h2>
-      <div className="grid gap-4">
-        {BODY.map((s) => (
-          <Block key={s.id} specimen={s} sample={SAMPLE} />
         ))}
       </div>
     </main>

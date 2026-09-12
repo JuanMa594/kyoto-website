@@ -131,13 +131,31 @@ src/
   *Demo* con «All Rights Reserved».
 - **No uses `next/font/google` con familias que cubran japonés.** Google las
   sirve troceadas por `unicode-range` y next/font precarga *todos* los trozos:
-  M PLUS Rounded 1c metía **230 `<link rel=preload>`** en cada página. Con el
-  pipeline local de `bun run fonts`, las cuatro familias juntas pesan ~102 KB.
+  probamos M PLUS Rounded 1c como candidata a texto de lectura y metía **230
+  `<link rel=preload>`** en cada página. Se descartó (ver más abajo) y con el
+  pipeline local de `bun run fonts` las tres familias que sí se sirven pesan
+  ~78 KB en total (Yuji Syuku suma otros ~22 KB sólo en `/es/tipografia/`).
 - **`next dev` reescribe `AGENTS.md`** y crea `CLAUDE.md` si falta. Por eso este
   archivo empieza con `@AGENTS.md`: así el bloque de Next sigue vigente y esta
   guía no se pisa.
 - Los **postinstall de `@parcel/watcher` y `@swc/core` están bloqueados** por
   bun y no hacen falta. No los desbloquees sin motivo.
+- **La geometría del `<SceneRoot>` va en `style` inline, nunca en clases de
+  Tailwind.** En dev, Turbopack inyecta el CSS vía un chunk de JS aparte del
+  documento. Si el `ResizeObserver` interno de `@react-three/fiber` mide el
+  contenedor antes de que ese chunk se aplique, lo ve sin `fixed inset-0` — es
+  decir, sin tamaño — y el `<canvas>` queda clavado en 300×150 px (su tamaño
+  por defecto) hasta el próximo reflow real de la página entera. Un `style={{
+  position: 'fixed', inset: 0, ... }}` inline se aplica en el mismo commit que
+  crea el nodo, sin depender de ninguna hoja de estilos, así que no hay carrera
+  posible. Si el canvas alguna vez vuelve a verse en blanco al cargar, es lo
+  primero que hay que revisar.
+- **Sin un `lookAt` explícito, la cámara del `<Canvas>` mira perfectamente
+  horizontal** (rotación identidad, eje −Z), no hacia el suelo. Eso centraba el
+  horizonte a media pantalla y hacía que las piedras se vieran "flotando" en el
+  medio del cuadro. `CameraAim` en `SceneCanvas.tsx` aplica un `camera.lookAt`
+  fijo (~8° hacia abajo) para la escena de calibración; el rig de scroll de la
+  Fase 3 hereda el mismo criterio.
 
 ---
 
@@ -160,6 +178,10 @@ src/
 
 - **Fuente de kanji**: Zen Old Mincho (propuesta) vs Yuji Syuku. Comparar en
   `/es/tipografia/`.
-- **Fuente de lectura**: M PLUS Rounded 1c (propuesta) vs Rubik vs Baloo 2.
 - **Slugs por idioma**: hoy `/en/ubicacion` usa el slug español. Si se quieren
   slugs traducidos, se decide en la Fase 3 con `pathnames` de next-intl.
+
+Ya decididas: titulares con **One Jinja** y párrafos/texto de lectura con
+**Gaze Nozarashi** — son las dos fuentes de partida, no hubo comparación que
+hacer. Si algún texto necesita negrita, se resuelve con `font-weight` en CSS
+(el navegador la sintetiza; no hay un archivo Bold que subsetear).

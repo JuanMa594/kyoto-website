@@ -209,12 +209,14 @@ ahí en tiempo de ejecución para que no exista una segunda copia en TypeScript.
 ### Tipografía
 
 - **One Jinja** → títulos
-- **Gaze Nozarashi** → pinceladas y frases sueltas
+- **Gaze Nozarashi** → párrafos, texto de lectura, pinceladas y frases sueltas
 - **Zen Old Mincho** → kanji decorativo *(propuesta; alternativa: Yuji Syuku)*
-- **M PLUS Rounded 1c** → texto de lectura *(propuesta; alternativas: Rubik, Baloo 2)*
 
-Las cuatro se comparan lado a lado en `/es/tipografia/` con "KYOTO · Sakura ·
-Kiyomizu-dera", tal como estaba previsto.
+Titulares y lectura eran las dos familias de partida, no había nada que comparar
+ahí: One Jinja para títulos y Gaze Nozarashi para todo lo demás, negrita incluida
+vía `font-weight` en CSS si algún texto la necesita (no hay un archivo Bold que
+subsetear). Lo único que se compara en `/es/tipografia/` con "KYOTO · Sakura ·
+Kiyomizu-dera" es el kanji decorativo, entre Zen Old Mincho y Yuji Syuku.
 
 **Hallazgo de la Fase 1:** leyendo la tabla `cmap` de los dos archivos que aportó el
 usuario resultó que **ninguno de los dos tiene un solo carácter japonés**. One Jinja
@@ -407,7 +409,6 @@ buena medida rellenar contenido sobre una plantilla que ya funciona.
 |---|---|
 | Licencia de One Jinja y Gaze Nozarashi | ⚠️ Ambas son versiones **Demo** con "All Rights Reserved". `fsType = 0` permite incrustarlas técnicamente, pero si el sitio se publica con ánimo comercial hay que comprar licencia o sustituirlas. Detalle en `assets/fonts/LICENSES.md` |
 | Fuente de kanji | ⏳ Zen Old Mincho vs Yuji Syuku — comparar en `/es/tipografia/` |
-| Fuente de lectura | ⏳ M PLUS Rounded 1c vs Rubik vs Baloo 2 — misma página |
 | Slugs por idioma | ⏳ Hoy `/en/ubicacion` usa el slug español. Si se quieren traducidos, se resuelve en Fase 3 con `pathnames` de next-intl |
 | Pagoda, casas de Gion y platos | ⏳ Se resuelve en sus fases (ver §7) |
 | Profundidad del contenido | ⏳ ¿Tarjetas cortas o artículos largos? Define si se usa MDX o datos en TS |

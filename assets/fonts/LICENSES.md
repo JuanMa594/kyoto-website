@@ -9,8 +9,6 @@ Los archivos de `source/` son los originales. `bun run fonts` los subsetea a
 | `GazeNozarashi-Demo.ttf` | Gaze Nozarashi (Allouse.Studio) | ⚠️ «All Rights Reserved», versión **Demo** | Revisar antes de publicar |
 | `ZenOldMincho-Regular.ttf` | Zen Old Mincho | SIL OFL 1.1 (`ZenOldMincho-OFL.txt`) | Libre, incluida redistribución web |
 | `YujiSyuku-Regular.ttf` | Yuji Syuku | SIL OFL 1.1 (`YujiSyuku-OFL.txt`) | Libre, incluida redistribución web |
-| `MPLUSRounded1c-Regular.ttf` | Rounded M+ 1c | SIL OFL 1.1 (declarada en la tabla `name`) | Libre, incluida redistribución web |
-| `MPLUSRounded1c-Bold.ttf` | Rounded M+ 1c | SIL OFL 1.1 (declarada en la tabla `name`) | Libre, incluida redistribución web |
 
 ## Lo que hay que verificar de las dos fuentes Demo
 

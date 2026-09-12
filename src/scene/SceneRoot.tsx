@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import type { CSSProperties } from 'react';
 
 /**
  * El mundo. Vive en `app/[locale]/layout.tsx` y **nunca se desmonta**: cambiar
@@ -19,11 +20,28 @@ const SceneCanvas = dynamic(() => import('@/scene/SceneCanvas'), {
   loading: () => null,
 });
 
+/**
+ * La geometría (posición, tamaño, z-index) va en `style` inline y no en clases
+ * de Tailwind a propósito: un `style` se aplica al DOM en el mismo instante en
+ * que el nodo existe, sin depender de que cargue una hoja de estilos. En dev,
+ * Turbopack inyecta el CSS de Tailwind vía un chunk de JS aparte; si el
+ * `ResizeObserver` interno de R3F llega a medir este contenedor antes de que
+ * ese chunk se aplique, lo ve sin `fixed inset-0` — es decir, sin tamaño — y
+ * el `<canvas>` se queda clavado en 300×150 (su tamaño por defecto) hasta el
+ * próximo reflow real de la página. Con estilo inline no hay carrera posible.
+ */
+const FIXED_FULLSCREEN: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  zIndex: -10,
+};
+
 export function SceneRoot() {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed inset-0 -z-10 select-none"
+      className="pointer-events-none select-none"
+      style={FIXED_FULLSCREEN}
       data-scene-root=""
     >
       <SceneCanvas />
