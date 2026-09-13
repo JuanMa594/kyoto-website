@@ -65,6 +65,37 @@ export type SoundLayer =
   | 'ciudad'
   | 'fuego';
 
+/**
+ * Relieve del fondo. Va SIEMPRE a los costados: el centro del cuadro queda
+ * libre para el sujeto (el torii, el cerezo, la pagoda). La máscara lateral de
+ * `scene/systems/elevation.ts` lo garantiza por construcción, no por disciplina.
+ */
+export type HillProfile = 'ninguna' | 'suaves' | 'montanosa';
+
+export type Side = 'izquierda' | 'derecha';
+
+/** Tinte que se mezcla al fondo y a la niebla para que cada zona tenga su luz. */
+export interface SkyTint {
+  readonly color: string;
+  /** 0–1. Por encima de ~0.25 deja de leerse como washi. */
+  readonly amount: number;
+}
+
+/**
+ * El "preset de ambiente" de la estación: qué forma tiene el terreno, por qué
+ * lado se levanta y cuánto sube el camino. Es lo que evita que el fondo sea
+ * siempre el mismo. La decoración concreta (cerezos, toriis repetidos,
+ * machiya, chochin) llega en las fases 4–8 y se colgará de este mismo objeto.
+ */
+export interface StationEnvironment {
+  readonly hills: HillProfile;
+  /** Costados donde se levanta el relieve. Vacío = terreno llano. */
+  readonly hillSides: readonly Side[];
+  /** Cuánto sube el camino de cerca a lejos, en unidades de mundo. 0 = llano. */
+  readonly slope: number;
+  readonly skyTint?: SkyTint;
+}
+
 export interface StationPalette {
   /** Color del círculo en el sidebar (muestreado de `13.png`). */
   readonly halo: string;
@@ -100,6 +131,7 @@ export interface Station {
   readonly inSidebar: boolean;
   readonly palette: StationPalette;
   readonly ambient: StationAmbient;
+  readonly environment: StationEnvironment;
 }
 
 /**
@@ -117,6 +149,8 @@ export const JOURNEY: readonly Station[] = [
     pathT: 0,
     inSidebar: false,
     palette: { halo: '#FFFACD', accent: '#D82609', ground: '#EDE6DD' },
+    // Home: jardín llano. Sólo una colina insinuada a la izquierda, de fondo.
+    environment: { hills: 'suaves', hillSides: ['izquierda'], slope: 0 },
     ambient: {
       petals: 'media',
       petalKind: 'bambu',
@@ -136,6 +170,8 @@ export const JOURNEY: readonly Station[] = [
     pathT: 0.16,
     inSidebar: true,
     palette: { halo: '#FFFFFF', accent: '#C4181A', ground: '#F3EFE4' },
+    // Valle abierto: ondulación baja por los dos costados.
+    environment: { hills: 'suaves', hillSides: ['izquierda', 'derecha'], slope: 0 },
     ambient: {
       petals: 'baja',
       petalKind: 'ninguna',
@@ -155,6 +191,13 @@ export const JOURNEY: readonly Station[] = [
     pathT: 0.32,
     inSidebar: true,
     palette: { halo: '#FFCCBC', accent: '#EB81A5', ground: '#FFDDE8' },
+    // Sakura: relieve suave a la derecha; los cerezos van a los lados (Fase 7).
+    environment: {
+      hills: 'suaves',
+      hillSides: ['derecha'],
+      slope: 0,
+      skyTint: { color: '#EB81A5', amount: 0.1 },
+    },
     ambient: {
       petals: 'alta',
       petalKind: 'sakura',
@@ -174,14 +217,23 @@ export const JOURNEY: readonly Station[] = [
     pathT: 0.5,
     inSidebar: true,
     palette: { halo: '#EDE6DD', accent: '#D82609', ground: '#C8BFAF' },
+    // El monte Inari: relieve montañoso a ambos lados y el camino subiendo.
+    environment: {
+      hills: 'montanosa',
+      hillSides: ['izquierda', 'derecha'],
+      slope: 2.4,
+      skyTint: { color: '#D82609', amount: 0.14 },
+    },
     ambient: {
       petals: 'baja',
       petalKind: 'momiji',
       wind: 0.3,
       fauna: ['kitsune', 'ardilla', 'gorrion'],
       sounds: ['viento', 'grillos', 'pajaros'],
-      // Túnel de toriis: niebla corta, el camino se pierde escaleras arriba.
-      fog: { near: 8, far: 45 },
+      // Antes era 8/45 ("túnel"), pero a esa distancia la niebla se tragaba la
+      // montaña por completo. La sensación de subida la da ahora la pendiente
+      // del camino (`environment.slope`) y, en la Fase 6, los toriis repetidos.
+      fog: { near: 12, far: 95 },
     },
   },
   {
@@ -194,6 +246,8 @@ export const JOURNEY: readonly Station[] = [
     pathT: 0.66,
     inSidebar: true,
     palette: { halo: '#FFCCBC', accent: '#B1341F', ground: '#E8D6C3' },
+    // Ladera: el relieve sólo por la derecha, el camino sube un poco menos.
+    environment: { hills: 'montanosa', hillSides: ['derecha'], slope: 1.2 },
     ambient: {
       petals: 'media',
       petalKind: 'momiji',
@@ -213,6 +267,13 @@ export const JOURNEY: readonly Station[] = [
     pathT: 0.83,
     inSidebar: true,
     palette: { halo: '#FFD699', accent: '#942D2D', ground: '#D8C4A0' },
+    // Gion al anochecer: apenas la sombra de una colina a la derecha, luz ámbar.
+    environment: {
+      hills: 'suaves',
+      hillSides: ['derecha'],
+      slope: 0,
+      skyTint: { color: '#FFD699', amount: 0.16 },
+    },
     ambient: {
       petals: 'baja',
       petalKind: 'sakura',
@@ -233,6 +294,13 @@ export const JOURNEY: readonly Station[] = [
     pathT: 1,
     inSidebar: true,
     palette: { halo: '#B4CCAD', accent: '#556B2F', ground: '#CBD9B8' },
+    // Interior/cocina: terreno llano, sin relieve que distraiga del plato.
+    environment: {
+      hills: 'ninguna',
+      hillSides: [],
+      slope: 0,
+      skyTint: { color: '#B4CCAD', amount: 0.12 },
+    },
     ambient: {
       petals: 'ninguna',
       petalKind: 'ninguna',

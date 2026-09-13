@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-import type { StationSlug } from '@/config/journey';
+import { getStation, type StationEnvironment, type StationSlug } from '@/config/journey';
 import {
   QUALITY_PROFILES,
   resolveTier,
@@ -123,6 +123,18 @@ export const selectTier = (s: KyotoState): QualityTier =>
   resolveTier(s.qualitySetting, s.detectedTier);
 
 export const selectProfile = (s: KyotoState): QualityProfile => QUALITY_PROFILES[selectTier(s)];
+
+/**
+ * El preset de ambiente de la estación activa: relieve, pendiente y tinte de
+ * cielo.
+ *
+ * A propósito es un selector derivado y no un campo más del store. El ambiente
+ * ya está determinado por `activeStation` — guardarlo aparte sería una segunda
+ * copia que puede quedar desfasada, justo lo que `journey.ts` existe para
+ * evitar. Para leerlo: `useKyotoStore(selectEnvironment)`.
+ */
+export const selectEnvironment = (s: KyotoState): StationEnvironment =>
+  getStation(s.activeStation).environment;
 
 /**
  * La pregunta que se hace toda la escena: ¿puedo animar?

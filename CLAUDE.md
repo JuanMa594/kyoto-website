@@ -87,8 +87,11 @@ src/
 │   ├─ SceneCanvas.tsx         ← el único <Canvas>
 │   ├─ FoundationScene.tsx     ← escena de calibración de la Fase 1
 │   ├─ objects/Stone.tsx       ← piedra procedural
+│   ├─ systems/elevation.ts    ← ★ altura del terreno (función pura)
+│   ├─ systems/Terrain.tsx     ← malla del suelo, deformada por estación
+│   ├─ systems/StonePath.tsx   ← curva en S + piedras apoyadas en el terreno
 │   ├─ quality/tiers.ts        ← detección de tier + perfiles
-│   ├─ camera/ systems/        ← Fases 2–3 (ver sus README)
+│   ├─ camera/                 ← Fase 2 (ver su README)
 ├─ store/useKyotoStore.ts      ← Zustand: viaje, calidad, a11y, audio, cursor
 ├─ i18n/                       ← routing, request, navigation, params
 ├─ messages/{es,en}.json       ← textos
@@ -151,11 +154,56 @@ src/
   posible. Si el canvas alguna vez vuelve a verse en blanco al cargar, es lo
   primero que hay que revisar.
 - **Sin un `lookAt` explícito, la cámara del `<Canvas>` mira perfectamente
-  horizontal** (rotación identidad, eje −Z), no hacia el suelo. Eso centraba el
-  horizonte a media pantalla y hacía que las piedras se vieran "flotando" en el
-  medio del cuadro. `CameraAim` en `SceneCanvas.tsx` aplica un `camera.lookAt`
-  fijo (~8° hacia abajo) para la escena de calibración; el rig de scroll de la
-  Fase 3 hereda el mismo criterio.
+  horizontal** (rotación identidad, eje −Z), no hacia el suelo. `CameraAim` en
+  `SceneCanvas.tsx` aplica un `camera.lookAt` fijo (~6°) hacia el camino; el rig
+  de scroll de la Fase 3 hereda el mismo criterio.
+- **Altura de cámara e inclinación son dos mandos distintos.** La altura decide
+  dónde cae el camino en el cuadro; la inclinación decide dónde cae el
+  horizonte. Confundirlos lleva a "arreglar" lo uno rompiendo lo otro: inclinar
+  más para bajar las piedras sube el suelo y se come el cielo. Para bajar el
+  camino sin perder cielo hay que **subir la cámara**, no inclinarla.
+- **El suelo no debe leerse como un "piso".** En las referencias (`1.png`,
+  `3.png`, `5.png`) no hay plano de suelo: son objetos sobre el cartel crema con
+  mucho espacio libre alrededor. Por eso el terreno se mezcla en un 70 % con el
+  color de fondo (`groundColor` en `FoundationScene.tsx`): recibe sombra y
+  niebla, pero no compite por espacio con lo que se construya encima.
+
+---
+
+## Composición del cuadro (regla de tercios)
+
+El encuadre de la escena está calibrado a esta división, y **todo lo que se
+añada en las fases siguientes tiene que respetarla**:
+
+| Franja | Desde arriba | Qué vive ahí |
+|---|---|---|
+| Tercio superior | 0–30 % | Copas de cerezo, hojas al viento, nubes, garzas. **Se deja libre.** |
+| Tercio medio | 30–65 % | Texto, y la base de los objetos: troncos, pies de torii, faroles |
+| Tercio inferior | 65–100 % | El camino de piedras y, en la Fase 2, el musgo |
+
+Números concretos del encuadre actual (`SceneCanvas.tsx`): cámara en
+`(0, 4.2, 13)` mirando a `(0, 1.9, −9)` con `fov: 34`. Eso da una inclinación de
+~6° y deja el horizonte al **32 % desde arriba**.
+
+De ahí sale un presupuesto útil: un objeto plantado en el camino (z ≈ −6) puede
+medir hasta **~8,5 unidades de alto** antes de que su copa toque el borde
+superior. Un cerezo de 7 unidades queda con su copa al 17 % desde arriba, con
+aire de sobra. Si algún objeto necesita ser más alto, se sube la cámara — no se
+inclina.
+
+### El relieve nunca invade el centro
+
+Las colinas son **relieve del propio terreno**, no meshes puestos a ojo, y salen
+de `station.environment` (`journey.ts`). `sideMask()` en
+`scene/systems/elevation.ts` vale 0 en el pasillo central (|x| < 7), así que es
+**imposible por construcción** que una colina aparezca donde va el sujeto. Si
+hace falta cambiar el ancho del pasillo, se cambia ahí y se aplica a todas las
+estaciones a la vez.
+
+Cada estación declara su propio ambiente — llano, ondulado, montañoso, con
+pendiente, con tinte de cielo — para que el fondo no sea siempre el mismo. La
+decoración concreta de cada una (cerezos, toriis repetidos, machiya, chochin)
+llega en las fases 4–8 y se cuelga de ese mismo objeto.
 
 ---
 

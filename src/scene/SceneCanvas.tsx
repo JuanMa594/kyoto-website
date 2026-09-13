@@ -14,18 +14,29 @@ import {
 
 /**
  * Sin esto, la cámara del `<Canvas>` mira perfectamente horizontal (rotación
- * identidad, eje -Z) en vez de inclinarse hacia el camino. El resultado era
- * un horizonte a media pantalla y las piedras "flotando" en el centro del
- * cuadro. Un `lookAt` hacia un punto delante y por debajo del origen basta
- * para una inclinación de ~8°: sube el horizonte a ~1/4 de la pantalla y deja
- * el camino ocupando la mitad inferior, sin llegar a mirar hacia abajo del
- * todo. En la Fase 3 esto lo hereda el rig de scroll; aquí es fijo.
+ * identidad, eje -Z) en vez de inclinarse hacia el camino, y el horizonte
+ * queda a media pantalla. Un `lookAt` hacia un punto delante y por debajo del
+ * origen da una inclinación suave (~7°) hacia el camino.
+ *
+ * Dos mandos que conviene no confundir:
+ *   · **la altura de la cámara** decide dónde cae el camino en el cuadro
+ *     (más alta = las piedras bajan y los objetos altos entran mejor),
+ *   · **la inclinación** decide dónde cae el horizonte.
+ *
+ * Con `y = 4.2` y una inclinación de ~6°, el horizonte queda al 32 % desde
+ * arriba: el tercio superior entero libre para copas, hojas y garzas; el medio
+ * para el texto y las bases de los objetos; el camino en el tercio inferior.
+ *
+ * Ojo con inclinarla más: pasados los ~17° el horizonte se sale por el borde
+ * superior y se pierde el cielo — y con él, el sitio donde va la decoración.
+ * Por eso el `lookAt` apunta lejos (z = −9) y no al origen. En la Fase 3 el rig
+ * de scroll hereda estos mismos límites.
  */
 function CameraAim() {
   const camera = useThree((state) => state.camera);
 
   useLayoutEffect(() => {
-    camera.lookAt(0, -1.05, -6);
+    camera.lookAt(0, 1.9, -9);
   }, [camera]);
 
   return null;
@@ -60,7 +71,7 @@ export default function SceneCanvas() {
         alpha: false,
         powerPreference: 'high-performance',
       }}
-      camera={{ fov: 34, near: 0.1, far: 400, position: [0, 1.1, 9.5] }}
+      camera={{ fov: 34, near: 0.1, far: 400, position: [0, 4.2, 13] }}
     >
       <CameraAim />
       <FoundationScene station={station} palette={palette} profile={profile} />
