@@ -27,6 +27,18 @@ export function readCssNumber(name: string, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+/**
+ * Duraciones en **segundos**, que es la unidad de GSAP y la del bucle de la
+ * escena. El CSS puede escribirlas en `s` o en `ms` sin que nadie tenga que
+ * acordarse de convertirlas a mano.
+ */
+export function readCssSeconds(name: string, fallback: number): number {
+  const raw = readCssVar(name, `${fallback}s`).trim();
+  const parsed = Number.parseFloat(raw);
+  if (!Number.isFinite(parsed)) return fallback;
+  return raw.endsWith('ms') ? parsed / 1000 : parsed;
+}
+
 /** Vacía la caché. Sólo hace falta si algún día la paleta cambia en caliente. */
 export function clearCssVarCache(): void {
   cache.clear();

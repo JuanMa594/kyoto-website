@@ -67,6 +67,14 @@
   --ease-viento: cubic-bezier(0.33, 0, 0.15, 1);
   --ease-piedra: cubic-bezier(0.65, 0, 0.35, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Duraciones. `src/animation/presets.ts` las lee y las convierte en segundos
+     para GSAP, así que el DOM y la escena 3D comparten un mismo vocabulario de
+     tiempo: cambiar el ritmo del sitio es cambiar estas cuatro líneas.        */
+  --dur-rapido: 0.28s;
+  --dur-medio: 0.6s;
+  --dur-largo: 1.2s;
+  --dur-viaje: 1.8s;
 }
 
 :root {
@@ -88,6 +96,14 @@
   --fauna-min-gap: 20s;
   --fauna-max-gap: 40s;
   --idle-before-fauna: 20s;
+
+  /* El viento no sopla parejo: cada tanto llega una ráfaga que sube, se
+     sostiene y se va. Es lo que pide el PLAN ("viento que de un momento a otro
+     sopla") y lo que después hace respirar a los pétalos y al sonido.         */
+  --gust-min-gap: 8s;
+  --gust-max-gap: 20s;
+  --gust-attack: 1.1s;
+  --gust-release: 3.2s;
 
   /* ── Superficies de UI ───────────────────────────────────────────────  */
   --surface-paper: color-mix(in srgb, var(--color-kami) 78%, var(--color-washi));

@@ -2,6 +2,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getMessages, getTranslations } from 'next-intl/server';
 import type { ReactNode } from 'react';
 
+import { MotionEngine } from '@/animation/MotionEngine';
 import { EnvironmentProbe } from '@/components/EnvironmentProbe';
 import { staticLocale } from '@/i18n/params';
 import { routing } from '@/i18n/routing';
@@ -45,6 +46,9 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
         <NextIntlClientProvider locale={locale} messages={messages}>
           {/* Puente navegador ↔ store: calidad, reduced-motion, cursor, audio. */}
           <EnvironmentProbe />
+
+          {/* GSAP + Lenis bajo un solo reloj. Se apaga entero con el modo 静. */}
+          <MotionEngine />
 
           {/* La escena vive aquí, en el layout, y no se desmonta al cambiar de
               ruta. Es lo que permite que pasar de una sección a otra sea un

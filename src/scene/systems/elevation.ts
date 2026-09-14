@@ -1,4 +1,5 @@
 import type { StationEnvironment, HillProfile } from '@/config/journey';
+import { smoothstep } from '@/lib/procedural';
 
 /**
  * El relieve del terreno, como función pura.
@@ -34,11 +35,6 @@ const HILL_FULL_Z = -26;
 
 /** Distancia en la que el camino termina de ganar toda su pendiente. */
 const SLOPE_FULL_Z = -22;
-
-function smoothstep(edge0: number, edge1: number, x: number): number {
-  const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
-  return t * t * (3 - 2 * t);
-}
 
 /**
  * 0 en el centro, 1 en los costados — y sólo en los costados que la estación

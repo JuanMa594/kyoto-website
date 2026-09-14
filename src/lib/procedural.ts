@@ -42,6 +42,22 @@ export function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
+/** Recorta un valor a un rango. */
+export function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+/**
+ * Rampa suave entre dos bordes: 0 antes de `edge0`, 1 después de `edge1` y una
+ * curva con derivada nula en los dos extremos en medio. Es la misma función que
+ * GLSL trae de serie, y se usa en todo el proyecto para que nada arranque ni
+ * frene de golpe — el relieve del terreno, la envolvente de las ráfagas.
+ */
+export function smoothstep(edge0: number, edge1: number, x: number): number {
+  const t = clamp((x - edge0) / (edge1 - edge0), 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
 /**
  * Amortiguación independiente del framerate. Es la base del parallax de cursor:
  * la cámara persigue al objetivo con inercia, nunca 1:1.

@@ -3,7 +3,7 @@
 > Documento de referencia del proyecto. Consolida las decisiones tomadas en la fase de
 > definición. Si algo cambia, se actualiza aquí y no en la memoria de nadie.
 >
-> Estado: **Fase 1 implementada** — pendiente de revisión.
+> Estado: **Fase 2 en curso**, bloque 2A (motor). La Fase 1 quedó cerrada.
 > El estado vivo de las fases y las convenciones del repo están en `CLAUDE.md`.
 
 ---
@@ -94,7 +94,9 @@ un canvas vivo entre navegaciones es notablemente más difícil.
 | **PIXI.js** | Acotado | Sólo para páginas 2D puras (candidata: gastronomía). **Regla dura: nunca dos contextos WebGL vivos a la vez** |
 | **Motion** (ex Framer Motion) | Acotado | Sólo UI en DOM (sidebar, cards, enter/exit). GSAP manda en scroll y escena |
 | **canvas-confetti** | Sí | Para estallidos de pétalos al click vía `confetti.shapeFromPath()` |
-| **Lottie** | Sí, puntual | Para fauna vectorial animada (garzas), donde la geometría procedural no compensa |
+| **Lottie** | **Descartada en Fase 2** | Era la propuesta para la fauna. Un clip cerrado no puede caminar, posarse, detenerse ni perseguir a otro individuo — y eso es justo lo que pide §5.5. Además obliga a subir un `CanvasTexture` por individuo y por frame, y no existen animaciones libres de garza + ardilla + milano en un mismo estilo. La fauna se genera con geometría procedural (§7) |
+| **Howler** | **Descartada** | No tenemos ni un archivo de audio y la regla de assets aplica también al sonido: el ambiente se **sintetiza con la Web Audio API** (§7). Sin descargas, sin licencias, y reactivo — la ráfaga que mueve los pétalos es literalmente la que se oye |
+| **maath** | No entra | `damp()` y el PRNG ya viven en `src/lib/procedural.ts`, y el ruido de los pétalos se calcula en GLSL. Una dependencia menos |
 
 ---
 
@@ -105,22 +107,23 @@ Next.js 16 (App Router, static export) + React 19.2 + TypeScript 5.9
 Tailwind v4 + design tokens (CSS vars)
 next-intl                              → rutas /es y /en
 
-Lenis                                  → smooth scroll
-GSAP + ScrollTrigger + MotionPath      → camino, cámara, animaciones de scroll
+lenis 1.3                              → smooth scroll
+gsap 3.15 (ScrollTrigger, MotionPath)  → camino, cámara, animaciones de scroll
 Motion                                 → UI en DOM únicamente
 
 Three JS                               → Animaciones, interacciones 3D
 @react-three/fiber + @react-three/drei → escena persistente
 @react-three/postprocessing            → bloom, profundidad de campo, god rays
 @react-three/rapier                    → física puntual (faroles que se balancean)
-maath                                  → ruido simplex, utilidades matemáticas
 three (SVGLoader, ExtrudeGeometry)     → mapa extruido, geometría desde paths
 
 Zustand                                → estado del viaje, calidad, audio, a11y
-Howler / PositionalAudio de three      → ambiente sonoro
+Web Audio API (nativa, sin librería)   → ambiente sonoro sintetizado por código
 canvas-confetti                        → micro-celebraciones
-lottie-react                           → fauna vectorial (puntual)
 ```
+
+> `postprocessing@6.39` exige `three >= 0.168 < 0.187`. Es la segunda razón —
+> junto a `@types/three` — por la que `three` está clavado en 0.185.1.
 
 ---
 
@@ -169,11 +172,66 @@ una barra inferior o un gesto.
 ### 5.5 Ambiente
 
 - **Pétalos y hojas** en varias capas de profundidad, con viento direccional variable
-- **Fauna**: cada 20–40 s una silueta o varias de garzas cruzan el encuadre, pueden ser volando o inclusive caminando por donde se encuentra el usuario. No solamente tiene que ser una garza, también puede ser una ardilla, o que de un momento a otro una ardilla está persiguiendo (jugando) a otra (Estas animaciones de fauna también pueden ser con otros animales, y cada 20s de inactividad de scroll)
+- **Fauna**: cada 20–40 s una silueta o varias de garzas cruzan el encuadre, pueden ser volando o inclusive caminando por donde se encuentra el usuario. No solamente tiene que ser una garza, también puede ser una ardilla, o que de un momento a otro una ardilla está persiguiendo (jugando) a otra (Estas animaciones de fauna también pueden ser con otros animales, y cada 20s de inactividad de scroll). **Cómo se construye eso: §5.6**
 - **Bambú** que se mece con shader de viento
 - **Sonido ambiental** con toggle discreto (nunca autoplay): viento, agua, *fūrin*, un arroyo corriendo.
   Panning posicional según dónde esté el objeto en pantalla
 - **Modo 静 (quieto)**: reduce el ambiente al mínimo para quien lo prefiera
+
+### 5.6 La fauna: criatura y conducta son cosas separadas
+
+La fauna **no son clips**. Una especie aporta su cuerpo; el repertorio de
+conductas es común y se combina con cualquiera que lo admita. Por eso una garza
+no hace *una* cosa: el director puede encadenarle
+`cruzarVolando → posarse → caminar → picotear → alzarElVuelo` en un solo acto de
+quince segundos, y por eso dos ardillas pueden **perseguirse jugando** — la
+persecución no es una animación, es una ardilla siguiendo a otra con retardo y
+error.
+
+**Tres rigs procedurales cubren todo el bestiario.** Es lo que hace barata la
+variedad: añadir una especie es declarar proporciones, no dibujar nada.
+
+| Rig | Piezas | Especies |
+|---|---|---|
+| `BirdRig` | cuerpo, cuello articulado, dos alas ahusadas plegables, patas, cola | garza, milano, gorrión |
+| `QuadrupedRig` | cuerpo, cabeza, cuatro patas de dos segmentos, **cola de tubo sobre curva, con retardo respecto al cuerpo** | ardilla, gato, tanuki, kitsune |
+| `InsectRig` | dos o cuatro alas + cuerpo fino | mariposa, libélula, luciérnaga |
+
+**Bestiario.** El criterio es geográfico, no «japonés genérico»: el ciervo, por
+ejemplo, queda fuera porque es de Nara.
+
+| Especie | Por qué es de Kyoto | Dónde vive en el cuadro |
+|---|---|---|
+| **Garza** (aosagi / shirasagi) | Las del río Kamo, quietas en la orilla | Vuela por el tercio superior; **camina y picotea en el inferior** |
+| **Milano** (tobi) | Planean en círculo sobre las colinas del este | Sólo tercio superior, lejos; no aterriza nunca |
+| **Gorrión** (suzume) | En bandadas por los tejados | Bandada de 5–9; se posan en las piedras y despegan a la vez |
+| **Ardilla japonesa** (*Sciurus lis*) | Bosques de Higashiyama y Arashiyama | Suelo del tercio inferior; **es la que persigue a otra** |
+| **Gato** | Callejones de Gion y Pontochō | Suelo, paso lento, se sienta y se estira |
+| **Luciérnaga** (Genji-botaru) | Junio en el Shirakawa y el Kamo | Sólo en Gion, al anochecer |
+| **Mariposa / libélula** (ageha / akatombo) | Jardines y campo abierto | Capa delantera, cruzan cerca de la cámara |
+| **Tanuki** | Nocturno, en las colinas | Raro, sólo Gion |
+| **Uguisu** (ruiseñor japonés) | *El* sonido de la primavera en Kyoto | **No se ve: sólo existe como capa de audio** |
+| **Kitsune** | Mensajero de Inari | Aplazado a la **Fase 6**, entre los toriis |
+| **Carpa koi** | Estanques de templo | Aplazada hasta que haya **agua** en escena |
+
+**El director de fauna** (`scene/systems/fauna/FaunaDirector.tsx`) trabaja como
+un director de casting, no como un reproductor:
+
+- elige entre las especies que declara `station.ambient.fauna` en `journey.ts`
+  — la estación dice **qué especies**, nunca qué hacen;
+- lanza un acto cada **20–40 s** (`--fauna-min-gap` / `--fauna-max-gap`) y uno
+  extra a los **20 s sin scroll** (`--idle-before-fauna`);
+- mantiene como mucho **un acto aéreo y uno terrestre a la vez** en tier alto,
+  uno en medio, cero o uno en bajo, y nunca repite especie dos veces seguidas;
+- **respeta la regla de tercios**: lo aéreo arriba, lo terrestre abajo, y el
+  tercio medio sólo se cruza por detrás del sujeto (z < −8) para no tapar el
+  texto;
+- todo lo que pisa el suelo muestrea `terrainHeight()` — la misma función pura
+  que dibuja el terreno y apoya las piedras —, así que nada flota ni se hunde y
+  en Fushimi Inari los animales suben la cuesta de verdad;
+- las aves **derivan con la ráfaga** del `WindField`, y cada acto puede disparar
+  su capa de sonido (el graznido de la garza al cruzar);
+- con modo 静 o `prefers-reduced-motion`: **cero actos**.
 
 ---
 
@@ -266,8 +324,9 @@ instancia miles de veces y reacciona al input. Un dibujo estático no.
 | **Bambú** | `CylinderGeometry` instanciado + vertex shader de viento (seno + ruido) | R3F `<Instances>` + GLSL |
 | **Pétalos / hojas** | `InstancedMesh` con posición calculada **en el shader** → coste CPU ≈ 0, miles de partículas a 60 fps | R3F + shader |
 | **Faroles** | `LatheGeometry` para la acanaladura + material emisivo + bloom. Se balancean con física | R3F + postprocessing + rapier |
-| **Garzas** | Lottie sobre un `<Billboard>` que vuela por un `MotionPath` de GSAP | `lottie-react` + drei |
-| **Otros animales**| Lo dejo a consideración de la IA, pero que sea algo como lo explicado anteriormente.
+| **Garzas y demás fauna** | Geometría procedural con tres rigs (§5.6): cuerpos de revolución, alas ahusadas plegables y colas de `TubeGeometry` sobre curva. Silueta de tinta plana, animada por conducta — no por clip | R3F + three |
+| **Luciérnagas** | Puntos con material emisivo y pulso propio + bloom | R3F + postprocessing |
+| **Ambiente sonoro** | Sintetizado con la Web Audio API: ruido rosa filtrado para el viento (la frecuencia sigue al `WindField`), parciales con decaimiento para el *fūrin*, ráfagas cortas para los grillos, envolvente sobre oscilador ruidoso para el graznido | Web Audio nativa |
 | **Estallido de pétalos al click** | `confetti.shapeFromPath()` con la silueta de un pétalo | canvas-confetti |
 | **Mapa de Japón** | GeoJSON de prefecturas → `SVGLoader` → `ExtrudeGeometry` = mapa 3D extruido, Kyoto se eleva al hover | three + `d3-geo` |
 | **Agua / estanque** | `MeshReflectorMaterial` con distorsión | drei |
@@ -389,7 +448,10 @@ fase** para revisión antes de seguir.
 |---|---|---|---|
 | **0** | Definiciones | Este documento | ✅ |
 | **1** | Fundación | Scaffold Next+TS+Tailwind · tokens de diseño · pipeline de fuentes · `journey.ts` · Zustand + tiers + reduced-motion · i18n `/es` `/en` · `<SceneRoot>` con cámara en perspectiva y niebla | ✅ |
-| **2** | Motor de movimiento y ambiente | Lenis + GSAP · sistema de pétalos por capas de profundidad · viento · garzas · parallax de cursor · profundidad de campo · toggle de audio y modo quieto | ⏸ |
+| **2** | Motor de movimiento y ambiente | Se parte en tres bloques con parada propia, ver abajo | ⏳ |
+| **2A** | · Motor | Lenis + GSAP en un solo RAF · easings leídos de `tokens.css` · `WindField` con ráfagas · parallax de cursor · lectura en `/diagnostico` | ⏳ |
+| **2B** | · Ambiente | `PetalSystem` en `InstancedMesh` con la posición calculada en el shader, en tres capas de profundidad · profundidad de campo y bloom sólo en tier alto | ⏸ |
+| **2C** | · Vida | Los tres rigs de fauna · repertorio de conductas · `FaunaDirector` · motor de audio sintetizado · controles de sonido y modo 静 | ⏸ |
 | **3** | **El Camino** | Piedras procedurales · spline + MotionPath · cámara scroll-driven · sidebar radial (`13.png`) · transiciones entre rutas · nav móvil | ⏸ |
 | **4** | Home 京都 | Torii 3D, bambú, título tipográfico, composición del hero | ⏸ |
 | **5** | Ubicación 位置 | Mapa de Japón extruido e interactivo, zoom a Kyoto | ⏸ |
@@ -411,6 +473,8 @@ buena medida rellenar contenido sobre una plantilla que ya funciona.
 | Fuente de kanji | ⏳ Zen Old Mincho vs Yuji Syuku — comparar en `/es/tipografia/` |
 | Slugs por idioma | ⏳ Hoy `/en/ubicacion` usa el slug español. Si se quieren traducidos, se resuelve en Fase 3 con `pathnames` de next-intl |
 | Pagoda, casas de Gion y platos | ⏳ Se resuelve en sus fases (ver §7) |
+| Kitsune y carpa koi | ⏳ Aplazados: el zorro necesita el túnel de toriis (Fase 6) y la carpa necesita agua en escena. El resto del bestiario de §5.6 entra en la Fase 2C |
+| Giroscopio en iOS | ⚠️ `DeviceOrientationEvent.requestPermission()` exige un gesto y abre un diálogo del sistema. No se pide al vuelo: el parallax por giro queda listo pero apagado en iOS hasta que haya un interruptor explícito (Fase 2C / 9) |
 | Profundidad del contenido | ⏳ ¿Tarjetas cortas o artículos largos? Define si se usa MDX o datos en TS |
 | Dominio y hosting | ⏳ Fase 9 |
 | Assets de Canva | ⚠️ Con marca de agua. Sólo referencia, nunca producción |

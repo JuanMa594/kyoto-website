@@ -3,6 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
+import { getLenis } from '@/animation/gsap';
+import { PARALLAX } from '@/scene/camera/CameraRig';
+import { WIND } from '@/scene/systems/WindField';
 import type { QualitySetting } from '@/scene/quality/tiers';
 import {
   selectAudioAudible,
@@ -22,6 +25,75 @@ import {
 
 const SETTINGS: QualitySetting[] = ['auto', 'high', 'medium', 'low'];
 
+interface MotionReadout {
+  fps: number;
+  sceneClock: number;
+  windAngle: number;
+  windStrength: number;
+  windGust: number;
+  parallaxX: number;
+  parallaxY: number;
+  pointerX: number;
+  pointerY: number;
+  progress: number;
+  smoothScroll: boolean;
+}
+
+/**
+ * Lectura en vivo del motor. Se muestrea con `requestAnimationFrame` y sólo se
+ * vuelca a estado cuatro veces por segundo: el viento y el parallax cambian
+ * sesenta veces por segundo, y pintarlos a esa velocidad costaría más que la
+ * escena entera.
+ *
+ * El **reloj de escena** es la lectura importante: sólo avanza cuando el
+ * `<Canvas>` dibuja de verdad. Si se queda clavado mientras los FPS del
+ * navegador siguen en 60, es que el bucle está en `demand` — modo 静 o
+ * `prefers-reduced-motion` —, no que la escena se haya roto.
+ */
+function useMotionReadout(active: boolean): MotionReadout | null {
+  const [readout, setReadout] = useState<MotionReadout | null>(null);
+
+  useEffect(() => {
+    if (!active) return;
+
+    let raf = 0;
+    let frames = 0;
+    let last = performance.now();
+
+    const sample = (now: number) => {
+      frames += 1;
+
+      if (now - last >= 250) {
+        const { pointer, pathProgress } = useKyotoStore.getState();
+
+        setReadout({
+          fps: Math.round((frames * 1000) / (now - last)),
+          sceneClock: WIND.time,
+          windAngle: (((WIND.angle * 180) / Math.PI) % 360 + 360) % 360,
+          windStrength: WIND.strength,
+          windGust: WIND.gust,
+          parallaxX: PARALLAX.x,
+          parallaxY: PARALLAX.y,
+          pointerX: pointer.x,
+          pointerY: pointer.y,
+          progress: pathProgress,
+          smoothScroll: getLenis() !== null,
+        });
+
+        frames = 0;
+        last = now;
+      }
+
+      raf = window.requestAnimationFrame(sample);
+    };
+
+    raf = window.requestAnimationFrame(sample);
+    return () => window.cancelAnimationFrame(raf);
+  }, [active]);
+
+  return readout;
+}
+
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-6 border-b border-[color:var(--border-hairline)] py-2">
@@ -39,6 +111,8 @@ export function DiagnosticsPanel() {
   // pinta nada del store.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  const motion = useMotionReadout(mounted);
 
   const detectedTier = useKyotoStore((s) => s.detectedTier);
   const qualitySetting = useKyotoStore((s) => s.qualitySetting);
@@ -75,6 +149,44 @@ export function DiagnosticsPanel() {
           <Row label="Escala de partículas" value={particleScale.toFixed(2)} />
           <Row label="Bucle de render" value={motionAllowed ? 'always' : 'demand'} />
         </dl>
+      </section>
+
+      <section className="paper px-5 py-4">
+        <h2 className="mb-2 text-lg">Movimiento y ambiente</h2>
+        <dl>
+          <Row label="FPS (bucle del navegador)" value={motion ? String(motion.fps) : '—'} />
+          <Row
+            label="Reloj de escena"
+            value={motion ? `${motion.sceneClock.toFixed(1)} s` : '—'}
+          />
+          <Row label="Scroll suave (Lenis)" value={motion?.smoothScroll ? 'activo' : 'apagado'} />
+          <Row
+            label="Avance del camino"
+            value={motion ? `${(motion.progress * 100).toFixed(1)} %` : '—'}
+          />
+          <Row
+            label="Viento · dirección"
+            value={motion ? `${motion.windAngle.toFixed(0)}°` : '—'}
+          />
+          <Row
+            label="Viento · intensidad"
+            value={motion ? motion.windStrength.toFixed(3) : '—'}
+          />
+          <Row label="Viento · ráfaga" value={motion ? motion.windGust.toFixed(3) : '—'} />
+          <Row
+            label="Puntero"
+            value={motion ? `${motion.pointerX.toFixed(2)} · ${motion.pointerY.toFixed(2)}` : '—'}
+          />
+          <Row
+            label="Parallax (unidades)"
+            value={motion ? `${motion.parallaxX.toFixed(3)} · ${motion.parallaxY.toFixed(3)}` : '—'}
+          />
+        </dl>
+        <p className="mt-3 text-xs opacity-55">
+          El reloj de escena sólo corre cuando el canvas dibuja: si se detiene con los FPS
+          altos, el bucle está en «demand» (modo 静 o reduced-motion), no roto. La ráfaga
+          llega sola cada 8–20 s.
+        </p>
       </section>
 
       <section className="paper px-5 py-4">

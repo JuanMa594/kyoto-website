@@ -18,6 +18,32 @@
     overscroll-behavior-y: none;
   }
 
+  /* Lenis. El scroll suave se aplica sobre el scroll real del documento —no
+     sobre un contenedor traspuesto—, así que basta con desactivar el
+     `scroll-behavior` nativo mientras está vivo para que los dos no peleen. Las
+     clases las pone y las quita el propio Lenis: si el modo 静 apaga el motor,
+     desaparecen solas y vuelve el scroll de siempre. */
+  html.lenis,
+  html.lenis body {
+    height: auto;
+  }
+
+  .lenis.lenis-smooth {
+    scroll-behavior: auto !important;
+  }
+
+  .lenis.lenis-smooth [data-lenis-prevent] {
+    overscroll-behavior: contain;
+  }
+
+  .lenis.lenis-stopped {
+    overflow: hidden;
+  }
+
+  .lenis.lenis-smooth iframe {
+    pointer-events: none;
+  }
+
   ::selection {
     background-color: var(--color-sakura-pale);
     color: var(--color-sumi);

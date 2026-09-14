@@ -82,6 +82,11 @@ src/
 │       ├─ tipografia/         ← muestrario (herramienta, se borra tras decidir)
 │       └─ diagnostico/        ← panel de instrumentos (se recicla en Fase 9)
 ├─ config/journey.ts           ← ★ fuente única de verdad
+├─ animation/                  ← orquestación (Fase 2A)
+│   ├─ gsap.ts                 ← GSAP + Lenis bajo un solo rAF
+│   ├─ presets.ts              ← curvas de tokens.css → easings de GSAP
+│   ├─ useScrollScene.ts       ← scroll → `pathProgress` del store
+│   └─ MotionEngine.tsx        ← enciende/apaga el motor desde el layout
 ├─ scene/                      ← el mundo R3F
 │   ├─ SceneRoot.tsx           ← se monta en el layout y NUNCA se desmonta
 │   ├─ SceneCanvas.tsx         ← el único <Canvas>
@@ -90,8 +95,10 @@ src/
 │   ├─ systems/elevation.ts    ← ★ altura del terreno (función pura)
 │   ├─ systems/Terrain.tsx     ← malla del suelo, deformada por estación
 │   ├─ systems/StonePath.tsx   ← curva en S + piedras apoyadas en el terreno
+│   ├─ systems/WindField.ts    ← ★ un solo viento, con ráfagas (Fase 2A)
+│   ├─ systems/WindDriver.tsx  ← lo hace avanzar dentro del <Canvas>
 │   ├─ quality/tiers.ts        ← detección de tier + perfiles
-│   ├─ camera/                 ← Fase 2 (ver su README)
+│   ├─ camera/CameraRig.tsx    ← encuadre base + parallax de cursor
 ├─ store/useKyotoStore.ts      ← Zustand: viaje, calidad, a11y, audio, cursor
 ├─ i18n/                       ← routing, request, navigation, params
 ├─ messages/{es,en}.json       ← textos
@@ -154,9 +161,21 @@ src/
   posible. Si el canvas alguna vez vuelve a verse en blanco al cargar, es lo
   primero que hay que revisar.
 - **Sin un `lookAt` explícito, la cámara del `<Canvas>` mira perfectamente
-  horizontal** (rotación identidad, eje −Z), no hacia el suelo. `CameraAim` en
-  `SceneCanvas.tsx` aplica un `camera.lookAt` fijo (~6°) hacia el camino; el rig
-  de scroll de la Fase 3 hereda el mismo criterio.
+  horizontal** (rotación identidad, eje −Z), no hacia el suelo. `CameraRig` en
+  `scene/camera/CameraRig.tsx` aplica un `camera.lookAt` fijo (~6°) hacia el
+  camino; el rig de scroll de la Fase 3 hereda el mismo criterio. El encuadre
+  entero (posición, objetivo y fov) vive en `CAMERA_BASE`, en ese archivo: el
+  `<Canvas>` lo importa en vez de tener su propia copia.
+- **Lenis y GSAP comparten un único `requestAnimationFrame`.** Lenis arranca con
+  `autoRaf: false` y lo hace avanzar `gsap.ticker`. Si alguien le añade su
+  propio bucle, el scroll se actualiza dos veces por frame y aparece el temblor
+  de un píxel. Va con `lagSmoothing(0)` mientras el motor vive, y al apagarlo se
+  restaura el valor por defecto de GSAP. Todo eso está en `animation/gsap.ts`.
+- **El viento y el parallax no viven en el store.** Cambian sesenta veces por
+  segundo; meterlos en Zustand serían sesenta renders por segundo. Son objetos
+  mutables de módulo (`WIND`, `PARALLAX`) con un único escritor cada uno, y se
+  leen dentro de `useFrame` o en un uniform. El store guarda sólo lo que cambia
+  a ritmo humano.
 - **Altura de cámara e inclinación son dos mandos distintos.** La altura decide
   dónde cae el camino en el cuadro; la inclinación decide dónde cae el
   horizonte. Confundirlos lleva a "arreglar" lo uno rompiendo lo otro: inclinar
@@ -181,7 +200,7 @@ añada en las fases siguientes tiene que respetarla**:
 | Tercio medio | 30–65 % | Texto, y la base de los objetos: troncos, pies de torii, faroles |
 | Tercio inferior | 65–100 % | El camino de piedras y, en la Fase 2, el musgo |
 
-Números concretos del encuadre actual (`SceneCanvas.tsx`): cámara en
+Números concretos del encuadre actual (`CAMERA_BASE`, en `camera/CameraRig.tsx`): cámara en
 `(0, 4.2, 13)` mirando a `(0, 1.9, −9)` con `fov: 34`. Eso da una inclinación de
 ~6° y deja el horizonte al **32 % desde arriba**.
 
@@ -212,8 +231,10 @@ llega en las fases 4–8 y se cuelga de ese mismo objeto.
 | # | Fase | Estado |
 |---|---|---|
 | 0 | Definiciones (`docs/PLAN.md`) | ✅ |
-| 1 | Fundación: scaffold, tokens, fuentes, `journey.ts`, store, i18n, `<SceneRoot>` | ✅ pendiente de revisión |
-| 2 | Motor de movimiento y ambiente (Lenis + GSAP, pétalos, viento, fauna, parallax, audio) | ⏸ |
+| 1 | Fundación: scaffold, tokens, fuentes, `journey.ts`, store, i18n, `<SceneRoot>` | ✅ |
+| 2A | Motor: Lenis + GSAP, `WindField` con ráfagas, parallax de cursor | ✅ pendiente de revisión |
+| 2B | Ambiente: pétalos por capas en el shader, profundidad de campo | ⏸ |
+| 2C | Vida: rigs de fauna + `FaunaDirector` + audio sintetizado + controles | ⏸ |
 | 3 | El Camino (piedras sobre spline, cámara con scroll, sidebar radial) | ⏸ |
 | 4 | Home 京都 | ⏸ |
 | 5 | Ubicación 位置 | ⏸ |
