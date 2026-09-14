@@ -3,7 +3,7 @@
 > Documento de referencia del proyecto. Consolida las decisiones tomadas en la fase de
 > definición. Si algo cambia, se actualiza aquí y no en la memoria de nadie.
 >
-> Estado: **Fase 2 en curso**, bloque 2A (motor). La Fase 1 quedó cerrada.
+> Estado: **Fase 2 en curso**, bloque 2B (ambiente) implementado. 2A cerrado.
 > El estado vivo de las fases y las convenciones del repo están en `CLAUDE.md`.
 
 ---
@@ -327,6 +327,7 @@ instancia miles de veces y reacciona al input. Un dibujo estático no.
 | **Garzas y demás fauna** | Geometría procedural con tres rigs (§5.6): cuerpos de revolución, alas ahusadas plegables y colas de `TubeGeometry` sobre curva. Silueta de tinta plana, animada por conducta — no por clip | R3F + three |
 | **Luciérnagas** | Puntos con material emisivo y pulso propio + bloom | R3F + postprocessing |
 | **Ambiente sonoro** | Sintetizado con la Web Audio API: ruido rosa filtrado para el viento (la frecuencia sigue al `WindField`), parciales con decaimiento para el *fūrin*, ráfagas cortas para los grillos, envolvente sobre oscilador ruidoso para el graznido | Web Audio nativa |
+| **Pétalos y hojas** | Contorno paramétrico triangulado en abanico (pétalo de cerezo con su muesca, arce de cinco lóbulos por el valor absoluto de cos(2.5θ), hoja lanceolada de bambú) + `InstancedMesh` con la posición calculada **en el vertex shader** | R3F + GLSL |
 | **Estallido de pétalos al click** | `confetti.shapeFromPath()` con la silueta de un pétalo | canvas-confetti |
 | **Mapa de Japón** | GeoJSON de prefecturas → `SVGLoader` → `ExtrudeGeometry` = mapa 3D extruido, Kyoto se eleva al hover | three + `d3-geo` |
 | **Agua / estanque** | `MeshReflectorMaterial` con distorsión | drei |
@@ -449,8 +450,8 @@ fase** para revisión antes de seguir.
 | **0** | Definiciones | Este documento | ✅ |
 | **1** | Fundación | Scaffold Next+TS+Tailwind · tokens de diseño · pipeline de fuentes · `journey.ts` · Zustand + tiers + reduced-motion · i18n `/es` `/en` · `<SceneRoot>` con cámara en perspectiva y niebla | ✅ |
 | **2** | Motor de movimiento y ambiente | Se parte en tres bloques con parada propia, ver abajo | ⏳ |
-| **2A** | · Motor | Lenis + GSAP en un solo RAF · easings leídos de `tokens.css` · `WindField` con ráfagas · parallax de cursor · lectura en `/diagnostico` | ⏳ |
-| **2B** | · Ambiente | `PetalSystem` en `InstancedMesh` con la posición calculada en el shader, en tres capas de profundidad · profundidad de campo y bloom sólo en tier alto | ⏸ |
+| **2A** | · Motor | Lenis + GSAP en un solo RAF · easings leídos de `tokens.css` · `WindField` con ráfagas · parallax de cursor · lectura en `/diagnostico` | ✅ |
+| **2B** | · Ambiente | `PetalSystem` en `InstancedMesh` con la posición calculada en el shader, en tres capas de profundidad · profundidad de campo en tier alto | ⏳ |
 | **2C** | · Vida | Los tres rigs de fauna · repertorio de conductas · `FaunaDirector` · motor de audio sintetizado · controles de sonido y modo 静 | ⏸ |
 | **3** | **El Camino** | Piedras procedurales · spline + MotionPath · cámara scroll-driven · sidebar radial (`13.png`) · transiciones entre rutas · nav móvil | ⏸ |
 | **4** | Home 京都 | Torii 3D, bambú, título tipográfico, composición del hero | ⏸ |
@@ -474,6 +475,7 @@ buena medida rellenar contenido sobre una plantilla que ya funciona.
 | Slugs por idioma | ⏳ Hoy `/en/ubicacion` usa el slug español. Si se quieren traducidos, se resuelve en Fase 3 con `pathnames` de next-intl |
 | Pagoda, casas de Gion y platos | ⏳ Se resuelve en sus fases (ver §7) |
 | Kitsune y carpa koi | ⏳ Aplazados: el zorro necesita el túnel de toriis (Fase 6) y la carpa necesita agua en escena. El resto del bestiario de §5.6 entra en la Fase 2C |
+| Bloom | ⏳ Aplazado de 2B a **2C**. Sobre un fondo washi (`#FFFACD`, luminancia ~0,97) un bloom por umbral ilumina el fondo entero. Entra con las luciérnagas y los faroles, que son lo que de verdad tiene que brillar |
 | Giroscopio en iOS | ⚠️ `DeviceOrientationEvent.requestPermission()` exige un gesto y abre un diálogo del sistema. No se pide al vuelo: el parallax por giro queda listo pero apagado en iOS hasta que haya un interruptor explícito (Fase 2C / 9) |
 | Profundidad del contenido | ⏳ ¿Tarjetas cortas o artículos largos? Define si se usa MDX o datos en TS |
 | Dominio y hosting | ⏳ Fase 9 |

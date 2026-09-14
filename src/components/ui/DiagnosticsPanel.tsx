@@ -4,7 +4,9 @@ import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { getLenis } from '@/animation/gsap';
+import { getStation } from '@/config/journey';
 import { PARALLAX } from '@/scene/camera/CameraRig';
+import { petalCountFor, petalLayers, petalTotal } from '@/scene/systems/petals';
 import { WIND } from '@/scene/systems/WindField';
 import type { QualitySetting } from '@/scene/quality/tiers';
 import {
@@ -134,6 +136,18 @@ export function DiagnosticsPanel() {
     return <p className="paper px-5 py-4 text-sm opacity-70">{t('loading')}</p>;
   }
 
+  // Las mismas funciones que usa el sistema de partículas: el panel no
+  // reimplementa la cuenta, la pregunta. Si dijeran cosas distintas, una de las
+  // dos estaría mintiendo.
+  const station = getStation(activeStation);
+  const petals = {
+    total: petalTotal(station, particleScale),
+    byLayer: petalLayers().map((layer) => ({
+      name: layer.name,
+      count: petalCountFor(layer, station, particleScale),
+    })),
+  };
+
   return (
     <div className="grid gap-6">
       <section className="paper px-5 py-4">
@@ -180,6 +194,15 @@ export function DiagnosticsPanel() {
           <Row
             label="Parallax (unidades)"
             value={motion ? `${motion.parallaxX.toFixed(3)} · ${motion.parallaxY.toFixed(3)}` : '—'}
+          />
+          <Row label="Hoja que cae" value={station.ambient.petalKind} />
+          <Row
+            label="Pétalos vivos"
+            value={
+              petals.total > 0
+                ? `${petals.total} · ${petals.byLayer.map((l) => `${l.name} ${l.count}`).join(' · ')}`
+                : '0'
+            }
           />
         </dl>
         <p className="mt-3 text-xs opacity-55">

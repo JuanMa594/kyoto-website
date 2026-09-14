@@ -9,9 +9,15 @@
   sesenta renders. Es un objeto de módulo que sólo escribe `WindDriver`.
 - `WindDriver.tsx` — **Fase 2A**. Lo hace avanzar dentro del `<Canvas>`, para
   que comparta reloj con el frame que se está dibujando.
-- `PetalSystem` — **Fase 2B**. Pétalos y hojas en `InstancedMesh` con la
-  posición calculada en el shader (coste CPU ≈ 0), en varias capas de Z: por
-  delante y por detrás del sujeto. Lee el viento de `WIND`.
+- `PetalSystem.tsx` + `petals.ts` — **Fase 2B**. Pétalos y hojas en
+  `InstancedMesh` con **toda la posición calculada en el vertex shader**: la CPU
+  sólo sube cinco uniforms por capa, así que cuesta lo mismo mover setenta que
+  trescientos. Tres capas de Z — la de delante cruza entre la cámara y el
+  sujeto. Lo único que la CPU aporta es la **integral del viento**, porque el
+  shader conoce la ráfaga de este frame pero no su historia.
+  `petals.ts` es puro y sin React a propósito: la cuenta de pétalos la comparten
+  el sistema y el panel de `/diagnostico`, y si cada uno la calculara por su
+  cuenta acabarían diciendo cosas distintas.
 - `fauna/` — **Fase 2C**. `FaunaDirector` elige especie y conducta entre las que
   declara `station.ambient.fauna`, cada 20–40 s y tras ~20 s sin scroll. Ver
   §5.6 del PLAN.

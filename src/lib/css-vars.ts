@@ -57,7 +57,10 @@ export function scenePalette() {
     ishi: readCssVar('--color-ishi', '#ede6dd'),
     ishiDeep: readCssVar('--color-ishi-deep', '#c8bfaf'),
     bambu: readCssVar('--color-bambu', '#a3b58e'),
+    bambuPale: readCssVar('--color-bambu-pale', '#b9d0a3'),
     sakura: readCssVar('--color-sakura', '#eb81a5'),
+    sakuraPale: readCssVar('--color-sakura-pale', '#ffdde8'),
+    kohaku: readCssVar('--color-kohaku', '#ffd699'),
   };
 }
 

@@ -92,11 +92,15 @@ src/
 │   ├─ SceneCanvas.tsx         ← el único <Canvas>
 │   ├─ FoundationScene.tsx     ← escena de calibración de la Fase 1
 │   ├─ objects/Stone.tsx       ← piedra procedural
+│   ├─ objects/PetalGeometry.ts← pétalo, arce y hoja de bambú por contorno
+│   ├─ PostProcessing.tsx      ← profundidad de campo (sólo tier alto)
 │   ├─ systems/elevation.ts    ← ★ altura del terreno (función pura)
 │   ├─ systems/Terrain.tsx     ← malla del suelo, deformada por estación
 │   ├─ systems/StonePath.tsx   ← curva en S + piedras apoyadas en el terreno
 │   ├─ systems/WindField.ts    ← ★ un solo viento, con ráfagas (Fase 2A)
 │   ├─ systems/WindDriver.tsx  ← lo hace avanzar dentro del <Canvas>
+│   ├─ systems/PetalSystem.tsx ← ★ pétalos: posición calculada en el shader
+│   ├─ systems/petals.ts       ← capas, densidad y colores (puro, sin React)
 │   ├─ quality/tiers.ts        ← detección de tier + perfiles
 │   ├─ camera/CameraRig.tsx    ← encuadre base + parallax de cursor
 ├─ store/useKyotoStore.ts      ← Zustand: viaje, calidad, a11y, audio, cursor
@@ -176,6 +180,20 @@ src/
   mutables de módulo (`WIND`, `PARALLAX`) con un único escritor cada uno, y se
   leen dentro de `useFrame` o en un uniform. El store guarda sólo lo que cambia
   a ritmo humano.
+- **Un backtick dentro de un shader cierra el template literal.** Los GLSL se
+  escriben como template strings (`` const VERTEX = /* glsl */ `…` ``), así que
+  un comentario del tipo `// el fract() recicla` con el nombre entre backticks
+  —la costumbre del resto del proyecto— termina la cadena en mitad del shader
+  y TypeScript se queja de una coma que falta veinte líneas más abajo. Dentro
+  de un shader, los nombres van sin comillas.
+- **Un `ShaderMaterial` propio no hereda la niebla.** Hay que mezclarle
+  `UniformsLib.fog` con `UniformsUtils.merge`, ponerle `fog: true` e incluir
+  los chunks `fog_pars_vertex` / `fog_vertex` / `fog_pars_fragment` /
+  `fog_fragment`. Sin eso el renderer no encuentra dónde escribir el color ni
+  las distancias, y las partículas del fondo se ven nítidas sobre una escena
+  con bruma. Lo mismo con `colorspace_fragment`: sin él los colores salen
+  lavados respecto del resto de la escena, porque three guarda los colores en
+  lineal y es ese chunk el que los devuelve a sRGB.
 - **Altura de cámara e inclinación son dos mandos distintos.** La altura decide
   dónde cae el camino en el cuadro; la inclinación decide dónde cae el
   horizonte. Confundirlos lleva a "arreglar" lo uno rompiendo lo otro: inclinar
@@ -232,8 +250,8 @@ llega en las fases 4–8 y se cuelga de ese mismo objeto.
 |---|---|---|
 | 0 | Definiciones (`docs/PLAN.md`) | ✅ |
 | 1 | Fundación: scaffold, tokens, fuentes, `journey.ts`, store, i18n, `<SceneRoot>` | ✅ |
-| 2A | Motor: Lenis + GSAP, `WindField` con ráfagas, parallax de cursor | ✅ pendiente de revisión |
-| 2B | Ambiente: pétalos por capas en el shader, profundidad de campo | ⏸ |
+| 2A | Motor: Lenis + GSAP, `WindField` con ráfagas, parallax de cursor | ✅ |
+| 2B | Ambiente: pétalos por capas en el shader, profundidad de campo | ✅ pendiente de revisión |
 | 2C | Vida: rigs de fauna + `FaunaDirector` + audio sintetizado + controles | ⏸ |
 | 3 | El Camino (piedras sobre spline, cámara con scroll, sidebar radial) | ⏸ |
 | 4 | Home 京都 | ⏸ |

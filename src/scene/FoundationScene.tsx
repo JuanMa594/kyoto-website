@@ -6,6 +6,7 @@ import { Color } from 'three';
 import type { Station } from '@/config/journey';
 import type { ScenePalette } from '@/lib/css-vars';
 import type { QualityProfile } from '@/scene/quality/tiers';
+import { PetalSystem } from '@/scene/systems/PetalSystem';
 import { StonePath } from '@/scene/systems/StonePath';
 import { Terrain } from '@/scene/systems/Terrain';
 
@@ -85,6 +86,11 @@ export function FoundationScene({ station, palette, profile }: FoundationScenePr
       />
 
       <StonePath environment={station.environment} color={palette.ishi} profile={profile} />
+
+      {/* Lo que cae del cielo en esta zona, según `station.ambient`: sakura en
+          eventos, momiji en los templos, hojas de bambú en la home. Cruzan por
+          delante y por detrás del sujeto — es la capa que da la profundidad. */}
+      <PetalSystem station={station} palette={palette} />
     </>
   );
 }

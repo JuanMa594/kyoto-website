@@ -1,6 +1,7 @@
 'use client';
 
 import { Canvas } from '@react-three/fiber';
+import dynamic from 'next/dynamic';
 import { useMemo } from 'react';
 
 import { getStation } from '@/config/journey';
@@ -13,6 +14,15 @@ import {
   selectProfile,
   useKyotoStore,
 } from '@/store/useKyotoStore';
+
+/**
+ * La profundidad de campo pesa unos cuantos kilobytes y sólo la usa el tier
+ * alto, así que viaja en su propio chunk: una máquina modesta ni la descarga.
+ */
+const PostProcessing = dynamic(() => import('@/scene/PostProcessing'), {
+  ssr: false,
+  loading: () => null,
+});
 
 /**
  * El único contexto WebGL del sitio. Regla dura del proyecto: nunca dos vivos a
@@ -53,6 +63,8 @@ export default function SceneCanvas() {
       <WindDriver base={station.ambient.wind} enabled={motionAllowed} />
 
       <FoundationScene station={station} palette={palette} profile={profile} />
+
+      {profile.postprocessing && <PostProcessing />}
     </Canvas>
   );
 }
