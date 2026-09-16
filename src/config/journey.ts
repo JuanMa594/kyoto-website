@@ -58,13 +58,15 @@ export type Density = 'ninguna' | 'baja' | 'media' | 'alta';
  */
 export type FaunaKind =
   | 'garza'
+  | 'milano'
   | 'gorrion'
   | 'mariposa'
   | 'libelula'
   | 'ardilla'
-  | 'kitsune'
   | 'gato'
+  | 'tanuki'
   | 'luciernaga'
+  | 'kitsune'
   | 'carpa';
 
 /** Capas de audio ambiental. Nunca suenan todas a la vez ni todo el tiempo. */
@@ -241,7 +243,7 @@ export const JOURNEY: readonly Station[] = [
       petals: 'baja',
       petalKind: 'momiji',
       wind: 0.3,
-      fauna: ['kitsune', 'ardilla', 'gorrion'],
+      fauna: ['milano', 'ardilla', 'gorrion'],
       sounds: ['viento', 'grillos', 'pajaros'],
       // Antes era 8/45 ("túnel"), pero a esa distancia la niebla se tragaba la
       // montaña por completo. La sensación de subida la da ahora la pendiente
@@ -267,7 +269,7 @@ export const JOURNEY: readonly Station[] = [
       petals: 'baja',
       petalKind: 'momiji',
       wind: 0.35,
-      fauna: ['ardilla', 'garza'],
+      fauna: ['ardilla', 'garza', 'milano'],
       sounds: ['arroyo', 'viento', 'pajaros'],
       fog: { near: 24, far: 160 },
     },
@@ -293,7 +295,7 @@ export const JOURNEY: readonly Station[] = [
       petals: 'baja',
       petalKind: 'sakura',
       wind: 0.15,
-      fauna: ['gato', 'luciernaga'],
+      fauna: ['gato', 'luciernaga', 'tanuki'],
       sounds: ['ciudad', 'arroyo', 'fuego'],
       // Callejón al anochecer: el encuadre se cierra.
       fog: { near: 10, far: 55 },

@@ -82,6 +82,9 @@ src/
 │       ├─ tipografia/         ← muestrario (herramienta, se borra tras decidir)
 │       └─ diagnostico/        ← panel de instrumentos (se recicla en Fase 9)
 ├─ config/journey.ts           ← ★ fuente única de verdad
+├─ audio/                      ← ambiente sonoro sintetizado (Fase 2C)
+│   ├─ engine.ts               ← Web Audio: lechos, eventos y voces de fauna
+│   └─ AmbientAudio.tsx        ← puente store ↔ motor; nunca antes de un gesto
 ├─ animation/                  ← orquestación (Fase 2A)
 │   ├─ gsap.ts                 ← GSAP + Lenis bajo un solo rAF
 │   ├─ presets.ts              ← curvas de tokens.css → easings de GSAP
@@ -93,6 +96,7 @@ src/
 │   ├─ FoundationScene.tsx     ← escena de calibración de la Fase 1
 │   ├─ objects/Stone.tsx       ← piedra procedural
 │   ├─ objects/PetalGeometry.ts← pétalo, arce y hoja de bambú por contorno
+│   ├─ objects/fauna/          ← los tres rigs: ave, cuadrúpedo, insecto
 │   ├─ PostProcessing.tsx      ← profundidad de campo (sólo tier alto)
 │   ├─ systems/elevation.ts    ← ★ altura del terreno (función pura)
 │   ├─ systems/Terrain.tsx     ← malla del suelo, deformada por estación
@@ -101,8 +105,10 @@ src/
 │   ├─ systems/WindDriver.tsx  ← lo hace avanzar dentro del <Canvas>
 │   ├─ systems/PetalSystem.tsx ← ★ pétalos: posición calculada en el shader
 │   ├─ systems/petals.ts       ← capas, densidad y colores (puro, sin React)
+│   ├─ systems/fauna/          ← ★ bestiario, conductas, casting y director
 │   ├─ quality/tiers.ts        ← detección de tier + perfiles
-│   ├─ camera/CameraRig.tsx    ← encuadre base + parallax de cursor
+│   ├─ camera/framing.ts       ← ★ encuadre y regla de tercios en unidades
+│   ├─ camera/CameraRig.tsx    ← aplica el encuadre + parallax de cursor
 ├─ store/useKyotoStore.ts      ← Zustand: viaje, calidad, a11y, audio, cursor
 ├─ i18n/                       ← routing, request, navigation, params
 ├─ messages/{es,en}.json       ← textos
@@ -219,6 +225,18 @@ src/
   temblor va ahora envuelto en un `sin(PI · progreso)`, que vale 0 justo en los
   dos empalmes. Al cambiar de tramo, comprobar siempre que el valor de salida de
   uno es el de entrada del siguiente.
+- **Un material creado por individuo es una fuga.** La fauna monta y desmonta
+  actos cada veinte segundos, y una bandada son nueve gorriones: crear los
+  materiales dentro de cada criatura significa abandonar miles de programas de
+  GPU en una sesión larga, porque un material sólo se libera si alguien llama a
+  `dispose()`. Van en una caché por especie (`rigParts.ts`). La excepción es la
+  luciérnaga, que necesita opacidad propia para titilar por su cuenta: ésa sí
+  crea material por individuo, y lo libera al terminar el acto.
+- **Lo que un animal hace se deduce de su trayectoria, no se declara aparte.**
+  Rumbo, cabeceo, alabeo, velocidad y hasta si está en el aire salen de muestrear
+  la propia curva (`poseFor`). En cuanto una bandera como "va volando" se lleva
+  por separado, en la primera transición dice una cosa y la posición otra — y se
+  ve al instante: un ave moviendo las patas en el aire.
 - **Altura de cámara e inclinación son dos mandos distintos.** La altura decide
   dónde cae el camino en el cuadro; la inclinación decide dónde cae el
   horizonte. Confundirlos lleva a "arreglar" lo uno rompiendo lo otro: inclinar
@@ -276,8 +294,8 @@ llega en las fases 4–8 y se cuelga de ese mismo objeto.
 | 0 | Definiciones (`docs/PLAN.md`) | ✅ |
 | 1 | Fundación: scaffold, tokens, fuentes, `journey.ts`, store, i18n, `<SceneRoot>` | ✅ |
 | 2A | Motor: Lenis + GSAP, `WindField` con ráfagas, parallax de cursor | ✅ |
-| 2B | Ambiente: pétalos por capas en el shader, profundidad de campo | ✅ pendiente de revisión |
-| 2C | Vida: rigs de fauna + `FaunaDirector` + audio sintetizado + controles | ⏸ |
+| 2B | Ambiente: pétalos por capas en el shader, profundidad de campo | ✅ |
+| 2C | Vida: rigs de fauna + `FaunaDirector` + audio sintetizado + controles | ✅ pendiente de revisión |
 | 3 | El Camino (piedras sobre spline, cámara con scroll, sidebar radial) | ⏸ |
 | 4 | Home 京都 | ⏸ |
 | 5 | Ubicación 位置 | ⏸ |

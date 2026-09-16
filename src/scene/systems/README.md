@@ -18,9 +18,16 @@
   `petals.ts` es puro y sin React a propósito: la cuenta de pétalos la comparten
   el sistema y el panel de `/diagnostico`, y si cada uno la calculara por su
   cuenta acabarían diciendo cosas distintas.
-- `fauna/` — **Fase 2C**. `FaunaDirector` elige especie y conducta entre las que
-  declara `station.ambient.fauna`, cada 20–40 s y tras ~20 s sin scroll. Ver
-  §5.6 del PLAN.
+- `fauna/` — **Fase 2C**. Cuatro piezas, tres de ellas puras y comprobables sin
+  navegador:
+  - `bestiary.ts` — qué es cada especie: rig, proporciones, colores, repertorio.
+  - `behaviors.ts` — el repertorio, como funciones puras del tiempo a una
+    posición. Rumbo, alabeo, esfuerzo y si está en el aire **se deducen** de la
+    propia trayectoria.
+  - `casting.ts` — las reglas del director: cadencia, aforo, variedad.
+  - `FaunaDirector.tsx` — la parte que React necesita: reloj, estado y mallas.
+
+  Ver §5.6 del PLAN.
 
 Todos leen la densidad efectiva de `selectParticleScale()` del store, que ya
 combina el tier de calidad, `prefers-reduced-motion` y el modo 静.

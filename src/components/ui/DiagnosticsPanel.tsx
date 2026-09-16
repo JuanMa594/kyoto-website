@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { getLenis } from '@/animation/gsap';
+import { audioReadout } from '@/audio/engine';
 import { getStation } from '@/config/journey';
 import { PARALLAX } from '@/scene/camera/CameraRig';
 import {
@@ -14,6 +15,7 @@ import {
   petalTotal,
   PETAL_SURGE,
 } from '@/scene/systems/petals';
+import { FAUNA_STAGE } from '@/scene/systems/fauna/casting';
 import { WIND } from '@/scene/systems/WindField';
 import type { QualitySetting } from '@/scene/quality/tiers';
 import {
@@ -49,6 +51,13 @@ interface MotionReadout {
   surge: number;
   petalsNow: number;
   petalsByLayer: string;
+  faunaLive: string;
+  faunaTotal: number;
+  faunaNextIn: number;
+  audioRunning: boolean;
+  audioLayers: string;
+  audioLast: string;
+  audioLastAgo: number;
 }
 
 /**
@@ -84,6 +93,7 @@ function useMotionReadout(active: boolean): MotionReadout | null {
         const station = getStation(state.activeStation);
         const scale = selectParticleScale(state);
         const surge = PETAL_SURGE.value;
+        const audio = audioReadout();
 
         setReadout({
           fps: Math.round((frames * 1000) / (now - last)),
@@ -102,6 +112,13 @@ function useMotionReadout(active: boolean): MotionReadout | null {
           petalsByLayer: petalLayers()
             .map((layer) => `${layer.name} ${petalPresentCount(layer, station, scale, surge)}`)
             .join(' · '),
+          faunaLive: FAUNA_STAGE.live.join(' · ') || '—',
+          faunaTotal: FAUNA_STAGE.total,
+          faunaNextIn: FAUNA_STAGE.nextIn,
+          audioRunning: audio.running,
+          audioLayers: audio.layers,
+          audioLast: audio.lastEvent,
+          audioLastAgo: audio.secondsAgo,
         });
 
         frames = 0;
@@ -225,6 +242,11 @@ export function DiagnosticsPanel() {
             label="Pétalos en el aire"
             value={motion && motion.petalsNow > 0 ? `${motion.petalsNow} · ${motion.petalsByLayer}` : '0'}
           />
+          <Row label="Fauna en escena" value={motion?.faunaLive ?? '—'} />
+          <Row
+            label="Próximo acto"
+            value={motion ? `en ${Math.round(motion.faunaNextIn)} s · ${motion.faunaTotal} en total` : '—'}
+          />
         </dl>
         <p className="mt-3 text-xs opacity-55">
           El reloj de escena sólo corre cuando el canvas dibuja: si se detiene con los FPS
@@ -263,6 +285,19 @@ export function DiagnosticsPanel() {
           <Row label="prefers-reduced-motion" value={String(systemReducedMotion)} />
           <Row label="Audio desbloqueado (gesto)" value={String(audioUnlocked)} />
           <Row label="Suena ahora mismo" value={String(audible)} />
+        </dl>
+
+        <dl className="mt-3">
+          <Row label="Motor de audio" value={motion?.audioRunning ? 'sonando' : 'en silencio'} />
+          <Row label="Capas de la zona" value={motion?.audioLayers ?? '—'} />
+          <Row
+            label="Último sonido"
+            value={
+              motion && motion.audioLast !== '—'
+                ? `${motion.audioLast} · hace ${Math.round(motion.audioLastAgo)} s`
+                : '—'
+            }
+          />
         </dl>
 
         <div className="mt-4 flex flex-wrap gap-3">

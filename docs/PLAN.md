@@ -3,7 +3,7 @@
 > Documento de referencia del proyecto. Consolida las decisiones tomadas en la fase de
 > definición. Si algo cambia, se actualiza aquí y no en la memoria de nadie.
 >
-> Estado: **Fase 2 en curso**, bloque 2B (ambiente) implementado. 2A cerrado.
+> Estado: **Fase 2 completa** — 2A motor, 2B ambiente y 2C vida implementados.
 > El estado vivo de las fases y las convenciones del repo están en `CLAUDE.md`.
 
 ---
@@ -458,10 +458,10 @@ fase** para revisión antes de seguir.
 |---|---|---|---|
 | **0** | Definiciones | Este documento | ✅ |
 | **1** | Fundación | Scaffold Next+TS+Tailwind · tokens de diseño · pipeline de fuentes · `journey.ts` · Zustand + tiers + reduced-motion · i18n `/es` `/en` · `<SceneRoot>` con cámara en perspectiva y niebla | ✅ |
-| **2** | Motor de movimiento y ambiente | Se parte en tres bloques con parada propia, ver abajo | ⏳ |
+| **2** | Motor de movimiento y ambiente | Se parte en tres bloques con parada propia, ver abajo | ✅ |
 | **2A** | · Motor | Lenis + GSAP en un solo RAF · easings leídos de `tokens.css` · `WindField` con ráfagas · parallax de cursor · lectura en `/diagnostico` | ✅ |
-| **2B** | · Ambiente | `PetalSystem` en `InstancedMesh` con la posición calculada en el shader, en tres capas de profundidad · profundidad de campo en tier alto | ⏳ |
-| **2C** | · Vida | Los tres rigs de fauna · repertorio de conductas · `FaunaDirector` · motor de audio sintetizado · controles de sonido y modo 静 | ⏸ |
+| **2B** | · Ambiente | `PetalSystem` en `InstancedMesh` con la posición calculada en el shader, en tres capas de profundidad · profundidad de campo en tier alto | ✅ |
+| **2C** | · Vida | Los tres rigs de fauna · repertorio de conductas · `FaunaDirector` · motor de audio sintetizado · controles de sonido y modo 静 | ✅ |
 | **3** | **El Camino** | Piedras procedurales · spline + MotionPath · cámara scroll-driven · sidebar radial (`13.png`) · transiciones entre rutas · nav móvil | ⏸ |
 | **4** | Home 京都 | Torii 3D, bambú, título tipográfico, composición del hero | ⏸ |
 | **5** | Ubicación 位置 | Mapa de Japón extruido e interactivo, zoom a Kyoto | ⏸ |
@@ -483,6 +483,7 @@ buena medida rellenar contenido sobre una plantilla que ya funciona.
 | Fuente de kanji | ⏳ Zen Old Mincho vs Yuji Syuku — comparar en `/es/tipografia/` |
 | Slugs por idioma | ⏳ Hoy `/en/ubicacion` usa el slug español. Si se quieren traducidos, se resuelve en Fase 3 con `pathnames` de next-intl |
 | Pagoda, casas de Gion y platos | ⏳ Se resuelve en sus fases (ver §7) |
+| Gastronomía y ubicación, sin fauna o con una sola | ⏳ Gastronomía declara sólo `carpa`, que está aplazada, así que **no tiene fauna visible**; ubicación declara sólo `libelula` y repite especie siempre. Las dos se resuelven añadiendo una especie a su `ambient.fauna` en `journey.ts` — decisión de contenido, no de código |
 | Kitsune y carpa koi | ⏳ Aplazados: el zorro necesita el túnel de toriis (Fase 6) y la carpa necesita agua en escena. El resto del bestiario de §5.6 entra en la Fase 2C |
 | Bloom | ⏳ Aplazado de 2B a **2C**. Sobre un fondo washi (`#FFFACD`, luminancia ~0,97) un bloom por umbral ilumina el fondo entero. Entra con las luciérnagas y los faroles, que son lo que de verdad tiene que brillar |
 | Giroscopio en iOS | ⚠️ `DeviceOrientationEvent.requestPermission()` exige un gesto y abre un diálogo del sistema. No se pide al vuelo: el parallax por giro queda listo pero apagado en iOS hasta que haya un interruptor explícito (Fase 2C / 9) |

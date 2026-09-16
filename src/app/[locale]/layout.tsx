@@ -3,7 +3,9 @@ import { getMessages, getTranslations } from 'next-intl/server';
 import type { ReactNode } from 'react';
 
 import { MotionEngine } from '@/animation/MotionEngine';
+import { AmbientAudio } from '@/audio/AmbientAudio';
 import { EnvironmentProbe } from '@/components/EnvironmentProbe';
+import { AmbientControls } from '@/components/ui/AmbientControls';
 import { staticLocale } from '@/i18n/params';
 import { routing } from '@/i18n/routing';
 import { SceneRoot } from '@/scene/SceneRoot';
@@ -50,12 +52,18 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
           {/* GSAP + Lenis bajo un solo reloj. Se apaga entero con el modo 静. */}
           <MotionEngine />
 
+          {/* Ambiente sonoro sintetizado. Nunca suena antes de un gesto. */}
+          <AmbientAudio />
+
           {/* La escena vive aquí, en el layout, y no se desmonta al cambiar de
               ruta. Es lo que permite que pasar de una sección a otra sea un
               desplazamiento por el camino y no un corte. */}
           <SceneRoot />
 
           {children}
+
+          {/* Los dos mandos del ambiente, siempre a la vista. */}
+          <AmbientControls />
         </NextIntlClientProvider>
       </body>
     </html>

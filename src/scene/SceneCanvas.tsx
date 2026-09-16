@@ -6,7 +6,8 @@ import { useMemo } from 'react';
 
 import { getStation } from '@/config/journey';
 import { scenePalette } from '@/lib/css-vars';
-import { CAMERA_BASE, CameraRig } from '@/scene/camera/CameraRig';
+import { CameraRig } from '@/scene/camera/CameraRig';
+import { CAMERA_BASE } from '@/scene/camera/framing';
 import { FoundationScene } from '@/scene/FoundationScene';
 import { WindDriver } from '@/scene/systems/WindDriver';
 import {

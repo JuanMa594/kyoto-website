@@ -6,6 +6,7 @@ import { Color } from 'three';
 import type { Station } from '@/config/journey';
 import type { ScenePalette } from '@/lib/css-vars';
 import type { QualityProfile } from '@/scene/quality/tiers';
+import { FaunaDirector } from '@/scene/systems/fauna/FaunaDirector';
 import { PetalSystem } from '@/scene/systems/PetalSystem';
 import { StonePath } from '@/scene/systems/StonePath';
 import { Terrain } from '@/scene/systems/Terrain';
@@ -91,6 +92,10 @@ export function FoundationScene({ station, palette, profile }: FoundationScenePr
           eventos, momiji en los templos, hojas de bambú en la home. Cruzan por
           delante y por detrás del sujeto — es la capa que da la profundidad. */}
       <PetalSystem station={station} palette={palette} />
+
+      {/* La vida del cuadro: quién sale y qué hace lo decide el director a
+          partir de las especies que declara la estación. */}
+      <FaunaDirector station={station} palette={palette} profile={profile} />
     </>
   );
 }

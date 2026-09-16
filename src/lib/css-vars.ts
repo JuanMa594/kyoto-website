@@ -54,6 +54,8 @@ export function scenePalette() {
     washiFog: readCssVar('--color-washi-fog', '#fdf7d4'),
     shu: readCssVar('--color-shu', '#d82609'),
     sumi: readCssVar('--color-sumi', '#300500'),
+    sumiSoft: readCssVar('--color-sumi-soft', '#6f3300'),
+    sumiFaint: readCssVar('--color-sumi-faint', '#96725a'),
     ishi: readCssVar('--color-ishi', '#ede6dd'),
     ishiDeep: readCssVar('--color-ishi-deep', '#c8bfaf'),
     bambu: readCssVar('--color-bambu', '#a3b58e'),

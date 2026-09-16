@@ -6,16 +6,18 @@ import { Vector3, type PerspectiveCamera } from 'three';
 
 import { readCssNumber } from '@/lib/css-vars';
 import { clamp, damp } from '@/lib/procedural';
+import { CAMERA_BASE } from '@/scene/camera/framing';
 import { selectMotionAllowed, useKyotoStore } from '@/store/useKyotoStore';
 
 /**
  * El encuadre, y el parallax de cursor que lo reencuadra.
  *
- * **El encuadre base vive aquí**, no en `<Canvas>`: la posición, el punto al
- * que mira y el campo de visión son un mismo ajuste y tenerlos repartidos en
- * dos archivos es cómo se acaba con una cámara que mira a un sitio distinto del
- * que dice el comentario. En la Fase 3 este objeto dejará de ser constante y lo
- * escribirá el spline del camino; el parallax seguirá sumándose encima igual.
+ * **El encuadre base vive en `framing.ts`**, junto a la matemática que traduce
+ * la regla de tercios a unidades de mundo: la posición, el punto al que mira y
+ * el campo de visión son un mismo ajuste, y repartirlos entre archivos es cómo
+ * se acaba con una cámara que mira a un sitio distinto del que dice el
+ * comentario. En la Fase 3 ese encuadre dejará de ser constante y lo escribirá
+ * el spline del camino; el parallax seguirá sumándose encima igual.
  *
  * Sin un `lookAt` explícito la cámara miraría perfectamente horizontal
  * (rotación identidad, eje −Z) y el horizonte quedaría a media pantalla. Con
@@ -43,18 +45,6 @@ import { selectMotionAllowed, useKyotoStore } from '@/store/useKyotoStore';
  *     convierte a la constante de una exponencial para que la amortiguación no
  *     dependa del framerate real.
  */
-
-export interface CameraFraming {
-  position: [number, number, number];
-  target: [number, number, number];
-  fov: number;
-}
-
-export const CAMERA_BASE: CameraFraming = {
-  position: [0, 4.2, 13],
-  target: [0, 1.9, -9],
-  fov: 34,
-};
 
 /**
  * Desplazamiento actual del parallax, en unidades de mundo. Mismo criterio que

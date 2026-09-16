@@ -2,7 +2,7 @@
 
 import { DepthOfField, EffectComposer } from '@react-three/postprocessing';
 
-import { CAMERA_BASE } from '@/scene/camera/CameraRig';
+import { CAMERA_BASE } from '@/scene/camera/framing';
 
 /**
  * Profundidad de campo. **Sólo en tier alto** (`profile.postprocessing`), y por
