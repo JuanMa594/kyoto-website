@@ -171,7 +171,16 @@ una barra inferior o un gesto.
 
 ### 5.5 Ambiente
 
-- **Pétalos y hojas** en varias capas de profundidad, con viento direccional variable
+- **Pétalos y hojas** en varias capas de profundidad, con viento direccional variable.
+  La densidad **no es la misma en todas las zonas ni constante en el tiempo**: en
+  reposo, la sakura de eventos está al 100 % del presupuesto —es el único momento
+  del año en que la ciudad está de verdad cubierta—, la home al 35 % y los tres
+  lugares al 20 %, que es un fondo pasivo para que el aire no esté muerto mientras
+  se lee. **Cada ráfaga de viento dobla esa densidad** y la devuelve despacio a la
+  calma: la zona respira en vez de mantener un goteo plano. El tope en el 100 %
+  hace que en eventos la ráfaga no cambie la cantidad, sólo la velocidad y la
+  dirección. En las zonas pasivas, además, la capa más cercana a la cámara lleva un
+  20 % menos, porque es la que se cruza con el título y el texto
 - **Fauna**: cada 20–40 s una silueta o varias de garzas cruzan el encuadre, pueden ser volando o inclusive caminando por donde se encuentra el usuario. No solamente tiene que ser una garza, también puede ser una ardilla, o que de un momento a otro una ardilla está persiguiendo (jugando) a otra (Estas animaciones de fauna también pueden ser con otros animales, y cada 20s de inactividad de scroll). **Cómo se construye eso: §5.6**
 - **Bambú** que se mece con shader de viento
 - **Sonido ambiental** con toggle discreto (nunca autoplay): viento, agua, *fūrin*, un arroyo corriendo.
@@ -327,7 +336,7 @@ instancia miles de veces y reacciona al input. Un dibujo estático no.
 | **Garzas y demás fauna** | Geometría procedural con tres rigs (§5.6): cuerpos de revolución, alas ahusadas plegables y colas de `TubeGeometry` sobre curva. Silueta de tinta plana, animada por conducta — no por clip | R3F + three |
 | **Luciérnagas** | Puntos con material emisivo y pulso propio + bloom | R3F + postprocessing |
 | **Ambiente sonoro** | Sintetizado con la Web Audio API: ruido rosa filtrado para el viento (la frecuencia sigue al `WindField`), parciales con decaimiento para el *fūrin*, ráfagas cortas para los grillos, envolvente sobre oscilador ruidoso para el graznido | Web Audio nativa |
-| **Pétalos y hojas** | Contorno paramétrico triangulado en abanico (pétalo de cerezo con su muesca, arce de cinco lóbulos por el valor absoluto de cos(2.5θ), hoja lanceolada de bambú) + `InstancedMesh` con la posición calculada **en el vertex shader** | R3F + GLSL |
+| **Pétalos y hojas** | Densidad por zona con pico en cada ráfaga. Contorno paramétrico triangulado en abanico (pétalo de cerezo con su muesca, arce de cinco lóbulos por el valor absoluto de cos(2.5θ), hoja lanceolada de bambú) + `InstancedMesh` con la posición calculada **en el vertex shader** | R3F + GLSL |
 | **Estallido de pétalos al click** | `confetti.shapeFromPath()` con la silueta de un pétalo | canvas-confetti |
 | **Mapa de Japón** | GeoJSON de prefecturas → `SVGLoader` → `ExtrudeGeometry` = mapa 3D extruido, Kyoto se eleva al hover | three + `d3-geo` |
 | **Agua / estanque** | `MeshReflectorMaterial` con distorsión | drei |

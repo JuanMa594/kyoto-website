@@ -36,7 +36,20 @@ export type StationGroup = 'inicio' | 'ubicacion' | 'eventos' | 'lugares' | 'gas
 /** Qué cae del cielo en esta zona. */
 export type PetalKind = 'sakura' | 'momiji' | 'bambu' | 'ninguna';
 
-/** Densidad nominal en tier alto; los tiers medio y bajo la escalan. Ver `src/scene/quality`. */
+/**
+ * Cuánto ambiente tiene una zona, en tier alto; los tiers medio y bajo lo
+ * escalan (ver `src/scene/quality`).
+ *
+ * Los valores son **fracciones del presupuesto máximo**, no cantidades
+ * absolutas, y están calibrados para que el cuadro no se sature antes de que
+ * lleguen los objetos 3D de las fases 4–8: `alta` = 100 % (sólo la sakura de
+ * eventos, que es el momento del año en que la ciudad está literalmente
+ * cubierta), `media` = 35 %, `baja` = 20 % — un ambiente pasivo, de fondo. La
+ * tabla concreta vive en `scene/systems/petals.ts`.
+ *
+ * Con cada ráfaga de viento la densidad sube hasta el doble de la base y vuelve
+ * despacio: la zona respira en vez de mantener un goteo constante.
+ */
 export type Density = 'ninguna' | 'baja' | 'media' | 'alta';
 
 /**
@@ -249,7 +262,9 @@ export const JOURNEY: readonly Station[] = [
     // Ladera: el relieve sólo por la derecha, el camino sube un poco menos.
     environment: { hills: 'montanosa', hillSides: ['derecha'], slope: 1.2 },
     ambient: {
-      petals: 'media',
+      // Los tres lugares comparten ambiente pasivo: aquí el protagonista es el
+      // sitio —la terraza, los toriis, el callejón—, no lo que cae del cielo.
+      petals: 'baja',
       petalKind: 'momiji',
       wind: 0.35,
       fauna: ['ardilla', 'garza'],

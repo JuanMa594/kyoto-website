@@ -1,6 +1,7 @@
 'use client';
 
 import { useFrame } from '@react-three/fiber';
+import { gsap } from 'gsap';
 import { useEffect, useMemo, useRef } from 'react';
 import {
   Color,
@@ -11,30 +12,52 @@ import {
   UniformsUtils,
   Vector3,
   type BufferGeometry,
+  type InstancedMesh,
 } from 'three';
 
+import { registerPresets } from '@/animation/presets';
 import type { Station } from '@/config/journey';
-import type { ScenePalette } from '@/lib/css-vars';
+import { readCssSeconds, type ScenePalette } from '@/lib/css-vars';
 import { mulberry32 } from '@/lib/procedural';
 import { petalGeometry } from '@/scene/objects/PetalGeometry';
 import { WIND } from '@/scene/systems/WindField';
 import { selectParticleScale, useKyotoStore } from '@/store/useKyotoStore';
 
-import { petalColors, petalCountFor, petalLayers, type PetalLayer } from './petals';
+import {
+  petalAllocation,
+  petalColors,
+  petalDrawCount,
+  petalLayers,
+  petalPresence,
+  PETAL_FADE_BAND,
+  PETAL_SURGE,
+  type PetalLayer,
+} from './petals';
 
 /**
  * Pétalos y hojas, en tres capas de profundidad.
  *
  * **Toda la animación ocurre en el vertex shader.** La CPU no toca una sola
- * posición por frame: sube cinco uniforms por capa y se desentiende. Por eso da
- * igual que haya setenta pétalos o trescientos — el coste es el mismo puñado de
- * draw calls, y el presupuesto se gasta en que se vean bien, no en moverlos.
+ * posición por frame: sube un puñado de uniforms por capa y se desentiende. Por
+ * eso da igual que haya setenta pétalos o trescientos — el coste es el mismo
+ * puñado de draw calls, y el presupuesto se gasta en que se vean bien, no en
+ * moverlos.
  *
- * Lo único que la CPU sí tiene que hacer es **integrar el viento**: el shader
- * conoce la ráfaga de este frame pero no su historia, así que el
- * desplazamiento acumulado (`uDrift`) se suma aquí y se manda ya resuelto. Se
- * mantiene envuelto al ancho de la capa para que no crezca sin freno y acabe
- * comiéndose la precisión del float.
+ * Lo que la CPU sí tiene que integrar son las magnitudes con **memoria**, que
+ * el shader no puede reconstruir porque sólo conoce este frame:
+ *
+ *   · `uDrift`, el desplazamiento acumulado del viento;
+ *   · `uFallPhase`, lo que lleva caído cada pétalo. Y aquí está el detalle que
+ *     no es obvio: la caída **no** puede escribirse como `tiempo × velocidad`
+ *     si la velocidad cambia con la ráfaga, porque al cambiar el factor salta
+ *     todo el producto y los pétalos se teletransportan. Se integra la fase y
+ *     se manda ya sumada, que es continua por construcción.
+ *
+ * La densidad tampoco es fija: en reposo cada zona tiene la suya —el 100 % sólo
+ * en la sakura de eventos, el resto ambientes pasivos— y **cada ráfaga la sube
+ * hasta el doble**, con vuelta lenta a la calma. Los pétalos de más no aparecen
+ * de golpe: el shader compara el índice de cada instancia con la densidad
+ * actual y los hace entrar y salir encogiendo.
  *
  * Las tres capas no son decorativas: la de delante cruza **entre la cámara y el
  * sujeto** —es la que de verdad vende la profundidad, y la que el desenfoque de
@@ -44,18 +67,21 @@ import { petalColors, petalCountFor, petalLayers, type PetalLayer } from './peta
 
 const VERTEX = /* glsl */ `
   uniform float uTime;
+  uniform float uFallPhase;
   uniform float uDrift;
   uniform float uDriftZ;
   uniform float uStrength;
+  uniform float uDensity;
+  uniform float uFadeBand;
   uniform vec3 uCenter;
   uniform vec3 uSize;
-  uniform float uFall;
   uniform float uSpin;
   uniform float uScale;
 
   attribute vec3 aOffset;
   attribute float aSeed;
   attribute float aScale;
+  attribute float aIndex;
 
   varying float vShade;
 
@@ -81,7 +107,7 @@ const VERTEX = /* glsl */ `
 
     // 0 = acaba de entrar por arriba, 1 = sale por abajo. El fract() hace el
     // ciclo infinito sin que nadie tenga que reciclar nada desde la CPU.
-    float life = fract(aOffset.y + uTime * uFall * (0.65 + 0.7 * seed));
+    float life = fract(aOffset.y + uFallPhase * (0.65 + 0.7 * seed));
 
     float x01 = fract(aOffset.x + uDrift / uSize.x);
     float z01 = fract(aOffset.z + uDriftZ / uSize.z);
@@ -95,8 +121,12 @@ const VERTEX = /* glsl */ `
       uCenter.z + (z01 - 0.5) * uSize.z
     );
 
-    // Entran y salen encogiendo. Sin esto se ve el salto de abajo a arriba.
-    float fade = smoothstep(0.0, 0.06, life) * (1.0 - smoothstep(0.88, 1.0, life));
+    // Entran y salen encogiendo por los dos motivos: porque terminan su caída,
+    // y porque la densidad de la zona sube o baja con la ráfaga. Sin esto se
+    // vería el salto de abajo a arriba y el estallido al empezar a soplar.
+    float ciclo = smoothstep(0.0, 0.06, life) * (1.0 - smoothstep(0.88, 1.0, life));
+    float presente = 1.0 - smoothstep(uDensity, uDensity + uFadeBand, aIndex);
+    float fade = ciclo * presente;
 
     float angle = uTime * uSpin * (0.5 + seed) + seed * 6.283;
     mat3 spin = axisRotation(vec3(0.4 + seed * 0.6, 1.0, 0.25 - seed * 0.5), angle);
@@ -135,40 +165,101 @@ const FRAGMENT = /* glsl */ `
 /** Cuánto empuja el viento a los pétalos, por unidad de viento y segundo. */
 const DRIFT_SCALE = 2.6;
 
+/** Cuánto acelera la caída en el pico de la ráfaga. */
+const GUST_FALL_BOOST = 0.4;
+
+/** Histéresis de la ráfaga: entra por arriba y sale por abajo, sin parpadeos. */
+const GUST_ON = 0.15;
+const GUST_OFF = 0.07;
+
+/**
+ * El que decide cuándo la zona se llena y cuándo vuelve a su calma.
+ *
+ * Vigila el mismo `WIND` que mueve los pétalos —una sola fuente de viento para
+ * todo el sitio— y traduce sus ráfagas en una tween de GSAP sobre la densidad.
+ * Que sea una tween y no una copia de la envolvente del viento es deliberado:
+ * **la vuelta tiene que ser más lenta que la ráfaga**. El aire se calma antes
+ * que el aire lleno de hojas, y copiar la curva del viento daría un corte
+ * antinatural justo cuando deja de soplar.
+ *
+ * Las curvas son las de `tokens.css` —`viento` para subir, `washi` para
+ * volver— y los tiempos, los mismos tokens que gobiernan la ráfaga del viento.
+ */
+function GustSurge() {
+  const gusting = useRef(false);
+
+  useEffect(() => {
+    // Las curvas con nombre las registra el motor de movimiento al arrancar,
+    // pero con `prefers-reduced-motion` ese motor no existe y aquí seguiría
+    // habiendo pétalos. Es idempotente.
+    registerPresets();
+
+    return () => {
+      gsap.killTweensOf(PETAL_SURGE);
+      PETAL_SURGE.value = 0;
+    };
+  }, []);
+
+  useFrame(() => {
+    const gust = WIND.gust;
+    const next = gusting.current ? gust > GUST_OFF : gust > GUST_ON;
+    if (next === gusting.current) return;
+
+    gusting.current = next;
+    gsap.killTweensOf(PETAL_SURGE);
+    gsap.to(
+      PETAL_SURGE,
+      next
+        ? { value: 1, duration: readCssSeconds('--gust-attack', 1.1), ease: 'viento' }
+        : { value: 0, duration: readCssSeconds('--gust-release', 3.2), ease: 'washi' },
+    );
+  });
+
+  return null;
+}
+
 interface LayerProps {
   layer: PetalLayer;
   station: Station;
   palette: ScenePalette;
-  count: number;
+  particleScale: number;
+  allocation: number;
 }
 
-function PetalLayerMesh({ layer, station, palette, count }: LayerProps) {
+function PetalLayerMesh({ layer, station, palette, particleScale, allocation }: LayerProps) {
   const kind = station.ambient.petalKind;
+  const mesh = useRef<InstancedMesh>(null);
 
   const geometry = useMemo<BufferGeometry>(() => {
     const geo = petalGeometry(kind);
 
     // Semilla estable por capa: el reparto es el mismo en cada carga, que es lo
     // que permite comparar dos capturas al calibrar.
-    const random = mulberry32(layer.name.length * 977 + count);
-    const offsets = new Float32Array(count * 3);
-    const seeds = new Float32Array(count);
-    const scales = new Float32Array(count);
+    const random = mulberry32(layer.name.length * 977 + allocation);
+    const offsets = new Float32Array(allocation * 3);
+    const seeds = new Float32Array(allocation);
+    const scales = new Float32Array(allocation);
+    const indices = new Float32Array(allocation);
 
-    for (let i = 0; i < count; i += 1) {
+    for (let i = 0; i < allocation; i += 1) {
       offsets[i * 3] = random();
       offsets[i * 3 + 1] = random();
       offsets[i * 3 + 2] = random();
       seeds[i] = random();
       scales[i] = 0.7 + random() * 0.6;
+      // Posición en la cola de la densidad. Como las posiciones ya son
+      // aleatorias, los que entran con la ráfaga salen repartidos por todo el
+      // cuadro y no en un bloque.
+      indices[i] = allocation > 1 ? i / (allocation - 1) : 0;
     }
 
     geo.setAttribute('aOffset', new InstancedBufferAttribute(offsets, 3));
     geo.setAttribute('aSeed', new InstancedBufferAttribute(seeds, 1));
     geo.setAttribute('aScale', new InstancedBufferAttribute(scales, 1));
+    geo.setAttribute('aIndex', new InstancedBufferAttribute(indices, 1));
 
     return geo;
-  }, [kind, count, layer.name]);
+  }, [kind, allocation, layer.name]);
 
   const material = useMemo(() => {
     const [light, dark] = petalColors(kind, palette);
@@ -177,12 +268,14 @@ function PetalLayerMesh({ layer, station, palette, count }: LayerProps) {
       UniformsLib.fog,
       {
         uTime: { value: 0 },
+        uFallPhase: { value: 0 },
         uDrift: { value: 0 },
         uDriftZ: { value: 0 },
         uStrength: { value: 0 },
+        uDensity: { value: 1 },
+        uFadeBand: { value: PETAL_FADE_BAND },
         uCenter: { value: null },
         uSize: { value: null },
-        uFall: { value: layer.fall },
         uSpin: { value: layer.spin },
         uScale: { value: layer.scale },
         uLight: { value: null },
@@ -212,32 +305,44 @@ function PetalLayerMesh({ layer, station, palette, count }: LayerProps) {
       transparent: false,
       side: DoubleSide,
     });
-  }, [kind, palette, layer.center, layer.size, layer.fall, layer.spin, layer.scale]);
+  }, [kind, palette, layer.center, layer.size, layer.spin, layer.scale]);
 
   useEffect(() => () => geometry.dispose(), [geometry]);
   useEffect(() => () => material.dispose(), [material]);
 
   const drift = useRef({ x: 0, z: 0 });
+  const fallPhase = useRef(0);
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.1);
 
-    // El viento se integra aquí y se manda ya sumado. Se envuelve al tamaño de
-    // la capa: si creciera sin límite, en una sesión larga el float del shader
-    // perdería resolución y los pétalos empezarían a dar tirones.
+    // Las dos magnitudes con memoria. El desplazamiento se envuelve al tamaño
+    // de la capa: si creciera sin límite, en una sesión larga el float del
+    // shader perdería resolución y los pétalos darían tirones.
     drift.current.x = (drift.current.x + WIND.x * dt * DRIFT_SCALE) % layer.size[0];
     drift.current.z = (drift.current.z + WIND.z * dt * DRIFT_SCALE * 0.35) % layer.size[2];
+    fallPhase.current += layer.fall * (1 + WIND.gust * GUST_FALL_BOOST) * dt;
 
     const uniforms = material.uniforms;
     uniforms.uTime!.value = WIND.time;
+    uniforms.uFallPhase!.value = fallPhase.current;
     uniforms.uDrift!.value = drift.current.x;
     uniforms.uDriftZ!.value = drift.current.z;
     uniforms.uStrength!.value = WIND.strength;
+    uniforms.uDensity!.value = petalPresence(station, PETAL_SURGE.value);
+
+    // Los que no están presentes ni siquiera entran en el draw call: el
+    // `uDensity` de arriba sólo se encarga del puñado que está a medio
+    // desvanecer en el borde.
+    if (mesh.current) {
+      mesh.current.count = petalDrawCount(layer, station, particleScale, PETAL_SURGE.value);
+    }
   });
 
   return (
     <instancedMesh
-      args={[geometry, material, count]}
+      ref={mesh}
+      args={[geometry, material, allocation]}
       // La geometría base mide un dedo y vive en el origen, así que el frustum
       // la daría por fuera de cuadro y se llevaría por delante todas las
       // instancias: sus posiciones reales sólo existen dentro del shader.
@@ -259,17 +364,20 @@ export function PetalSystem({ station, palette }: PetalSystemProps) {
 
   return (
     <>
+      <GustSurge />
+
       {layers.map((layer) => {
-        const count = petalCountFor(layer, station, particleScale);
-        if (count <= 0) return null;
+        const allocation = petalAllocation(layer, station, particleScale);
+        if (allocation <= 0) return null;
 
         return (
           <PetalLayerMesh
-            key={`${layer.name}-${station.ambient.petalKind}-${count}`}
+            key={`${layer.name}-${station.ambient.petalKind}-${allocation}`}
             layer={layer}
             station={station}
             palette={palette}
-            count={count}
+            particleScale={particleScale}
+            allocation={allocation}
           />
         );
       })}

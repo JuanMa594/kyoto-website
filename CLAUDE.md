@@ -194,6 +194,14 @@ src/
   con bruma. Lo mismo con `colorspace_fragment`: sin él los colores salen
   lavados respecto del resto de la escena, porque three guarda los colores en
   lineal y es ese chunk el que los devuelve a sRGB.
+- **Una posición periódica no puede escribirse como `tiempo × velocidad` si la
+  velocidad cambia.** Los pétalos caen con `fract(offset + fase)`. Mientras la
+  velocidad era constante, `fase = tiempo × velocidad` valía; en cuanto la
+  ráfaga la acelera, cambiar el factor mueve de golpe **todo** el producto y las
+  partículas se teletransportan. La fase se integra en la CPU
+  (`fase += velocidad(t) · dt`) y se manda ya sumada al shader, que es continua
+  por construcción. Lo mismo vale para el desplazamiento del viento (`uDrift`) y
+  para cualquier cosa que en la Fase 2C avance a velocidad variable.
 - **Altura de cámara e inclinación son dos mandos distintos.** La altura decide
   dónde cae el camino en el cuadro; la inclinación decide dónde cae el
   horizonte. Confundirlos lleva a "arreglar" lo uno rompiendo lo otro: inclinar

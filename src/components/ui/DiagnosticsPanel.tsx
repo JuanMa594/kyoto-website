@@ -6,7 +6,14 @@ import { useTranslations } from 'next-intl';
 import { getLenis } from '@/animation/gsap';
 import { getStation } from '@/config/journey';
 import { PARALLAX } from '@/scene/camera/CameraRig';
-import { petalCountFor, petalLayers, petalTotal } from '@/scene/systems/petals';
+import {
+  petalBaseFraction,
+  petalPresentCount,
+  petalLayers,
+  petalPeakFraction,
+  petalTotal,
+  PETAL_SURGE,
+} from '@/scene/systems/petals';
 import { WIND } from '@/scene/systems/WindField';
 import type { QualitySetting } from '@/scene/quality/tiers';
 import {
@@ -39,6 +46,9 @@ interface MotionReadout {
   pointerY: number;
   progress: number;
   smoothScroll: boolean;
+  surge: number;
+  petalsNow: number;
+  petalsByLayer: string;
 }
 
 /**
@@ -66,7 +76,14 @@ function useMotionReadout(active: boolean): MotionReadout | null {
       frames += 1;
 
       if (now - last >= 250) {
-        const { pointer, pathProgress } = useKyotoStore.getState();
+        const state = useKyotoStore.getState();
+        const { pointer, pathProgress } = state;
+
+        // La densidad sube y baja con cada ráfaga, así que la cuenta de pétalos
+        // se muestrea aquí y no en el render: es un valor vivo, no un ajuste.
+        const station = getStation(state.activeStation);
+        const scale = selectParticleScale(state);
+        const surge = PETAL_SURGE.value;
 
         setReadout({
           fps: Math.round((frames * 1000) / (now - last)),
@@ -80,6 +97,11 @@ function useMotionReadout(active: boolean): MotionReadout | null {
           pointerY: pointer.y,
           progress: pathProgress,
           smoothScroll: getLenis() !== null,
+          surge,
+          petalsNow: petalTotal(station, scale, surge),
+          petalsByLayer: petalLayers()
+            .map((layer) => `${layer.name} ${petalPresentCount(layer, station, scale, surge)}`)
+            .join(' · '),
         });
 
         frames = 0;
@@ -140,13 +162,8 @@ export function DiagnosticsPanel() {
   // reimplementa la cuenta, la pregunta. Si dijeran cosas distintas, una de las
   // dos estaría mintiendo.
   const station = getStation(activeStation);
-  const petals = {
-    total: petalTotal(station, particleScale),
-    byLayer: petalLayers().map((layer) => ({
-      name: layer.name,
-      count: petalCountFor(layer, station, particleScale),
-    })),
-  };
+  const petalBase = petalBaseFraction(station);
+  const petalPeak = petalPeakFraction(station);
 
   return (
     <div className="grid gap-6">
@@ -197,18 +214,23 @@ export function DiagnosticsPanel() {
           />
           <Row label="Hoja que cae" value={station.ambient.petalKind} />
           <Row
-            label="Pétalos vivos"
-            value={
-              petals.total > 0
-                ? `${petals.total} · ${petals.byLayer.map((l) => `${l.name} ${l.count}`).join(' · ')}`
-                : '0'
-            }
+            label="Densidad de la zona"
+            value={`${Math.round(petalBase * 100)} % en calma → ${Math.round(petalPeak * 100)} % en ráfaga`}
+          />
+          <Row
+            label="Avance de la ráfaga"
+            value={motion ? `${Math.round(motion.surge * 100)} %` : '—'}
+          />
+          <Row
+            label="Pétalos en el aire"
+            value={motion && motion.petalsNow > 0 ? `${motion.petalsNow} · ${motion.petalsByLayer}` : '0'}
           />
         </dl>
         <p className="mt-3 text-xs opacity-55">
           El reloj de escena sólo corre cuando el canvas dibuja: si se detiene con los FPS
           altos, el bucle está en «demand» (modo 静 o reduced-motion), no roto. La ráfaga
-          llega sola cada 8–20 s.
+          llega sola cada 8–20 s: mira subir la intensidad del viento y, detrás, la cuenta
+          de pétalos.
         </p>
       </section>
 
