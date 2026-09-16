@@ -124,7 +124,16 @@ function advanceGust(delta: number): number {
       if (progress >= 1) enterPhase('baja', release * (0.8 + random() * 0.5));
       // Un temblor pequeño mientras aguanta: una racha sostenida y perfectamente
       // plana no existe, y se nota enseguida.
-      return peak * (0.93 + 0.07 * Math.sin(WIND.time * 6.3));
+      //
+      // El `sin(PI · progreso)` que lo envuelve no es adorno: vale 0 al entrar y
+      // al salir de la fase, así que el temblor **empieza y termina justo en el
+      // valor que traía la envolvente**. Sin esa ventana, el temblor arrancaba
+      // en un punto cualquiera de su ciclo y la ráfaga daba un escalón de hasta
+      // el 14 % en un solo frame — un tirón simultáneo de todos los pétalos.
+      return (
+        peak *
+        (1 - 0.07 * Math.sin(Math.PI * progress) * (0.5 + 0.5 * Math.sin(WIND.time * 6.3)))
+      );
 
     case 'baja':
       if (progress >= 1) {

@@ -202,6 +202,23 @@ src/
   (`fase += velocidad(t) · dt`) y se manda ya sumada al shader, que es continua
   por construcción. Lo mismo vale para el desplazamiento del viento (`uDrift`) y
   para cualquier cosa que en la Fase 2C avance a velocidad variable.
+- **Envolver una coordenada con `fract()` sólo es invisible si su borde queda
+  fuera de cuadro.** Los pétalos circulan por una caja: al salir por un lado
+  reaparecen por el otro. De lado funciona, porque la caja es más ancha que el
+  encuadre y el salto ocurre donde nadie mira. **En profundidad no**: el borde
+  cercano y el lejano están siempre en pantalla, así que dar la vuelta ahí es un
+  salto de varias unidades hacia la cámara, con su cambio de tamaño de golpe —
+  se veía como un teletransporte cada pocos segundos. La regla: una magnitud se
+  puede acumular y envolver **sólo** si su costura cae fuera del cuadro; si no,
+  o se desvanece en el borde o no se acumula (los pétalos usan en Z un vaivén
+  acotado, no una deriva). Vale igual para la fauna de la Fase 2C.
+- **Una envolvente por tramos tiene que empalmar en el valor, no sólo en la
+  forma.** La ráfaga del viento pasa por cuatro fases y el temblor de la fase
+  «sostiene» arrancaba en un punto cualquiera de su ciclo: la intensidad daba un
+  escalón del 14 % en un frame y todos los pétalos se movían a la vez. El
+  temblor va ahora envuelto en un `sin(PI · progreso)`, que vale 0 justo en los
+  dos empalmes. Al cambiar de tramo, comprobar siempre que el valor de salida de
+  uno es el de entrada del siguiente.
 - **Altura de cámara e inclinación son dos mandos distintos.** La altura decide
   dónde cae el camino en el cuadro; la inclinación decide dónde cae el
   horizonte. Confundirlos lleva a "arreglar" lo uno rompiendo lo otro: inclinar

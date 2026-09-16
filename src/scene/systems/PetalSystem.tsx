@@ -69,7 +69,7 @@ const VERTEX = /* glsl */ `
   uniform float uTime;
   uniform float uFallPhase;
   uniform float uDrift;
-  uniform float uDriftZ;
+  uniform float uDepthSway;
   uniform float uStrength;
   uniform float uDensity;
   uniform float uFadeBand;
@@ -110,7 +110,6 @@ const VERTEX = /* glsl */ `
     float life = fract(aOffset.y + uFallPhase * (0.65 + 0.7 * seed));
 
     float x01 = fract(aOffset.x + uDrift / uSize.x);
-    float z01 = fract(aOffset.z + uDriftZ / uSize.z);
 
     float sway = sin(uTime * (0.6 + seed * 0.9) + seed * 31.4) * (0.25 + uStrength * 1.1);
     float bob = cos(uTime * (0.5 + seed * 0.7) + seed * 17.3) * 0.12;
@@ -118,7 +117,8 @@ const VERTEX = /* glsl */ `
     vec3 place = vec3(
       uCenter.x + (x01 - 0.5) * uSize.x + sway,
       uCenter.y + (0.5 - life) * uSize.y + bob,
-      uCenter.z + (z01 - 0.5) * uSize.z
+      // La profundidad NO envuelve, y es a propósito: ver uDepthSway.
+      uCenter.z + (aOffset.z - 0.5) * uSize.z + uDepthSway
     );
 
     // Entran y salen encogiendo por los dos motivos: porque terminan su caída,
@@ -126,7 +126,11 @@ const VERTEX = /* glsl */ `
     // vería el salto de abajo a arriba y el estallido al empezar a soplar.
     float ciclo = smoothstep(0.0, 0.06, life) * (1.0 - smoothstep(0.88, 1.0, life));
     float presente = 1.0 - smoothstep(uDensity, uDensity + uFadeBand, aIndex);
-    float fade = ciclo * presente;
+    // El lado sí envuelve, porque el viento tiene que poder empujar sin fin.
+    // A 16:9 ese borde cae holgadamente fuera de cuadro, pero en una pantalla
+    // muy ancha entraría, así que también se desvanece ahí.
+    float borde = smoothstep(0.0, 0.03, x01) * (1.0 - smoothstep(0.97, 1.0, x01));
+    float fade = ciclo * presente * borde;
 
     float angle = uTime * uSpin * (0.5 + seed) + seed * 6.283;
     mat3 spin = axisRotation(vec3(0.4 + seed * 0.6, 1.0, 0.25 - seed * 0.5), angle);
@@ -164,6 +168,19 @@ const FRAGMENT = /* glsl */ `
 
 /** Cuánto empuja el viento a los pétalos, por unidad de viento y segundo. */
 const DRIFT_SCALE = 2.6;
+
+/**
+ * Cuánto acerca o aleja el viento a los pétalos, en unidades de mundo.
+ *
+ * Es un **vaivén acotado, no un desplazamiento que se acumule**, y ésa es toda
+ * la diferencia. La deriva lateral puede acumularse porque al llegar al borde
+ * de la caja el pétalo reaparece por el otro lado, y ese borde queda fuera de
+ * cuadro. En profundidad no hay tal cosa: el borde cercano y el lejano están
+ * siempre en pantalla, así que dar la vuelta ahí significa que el pétalo salta
+ * varias unidades hacia la cámara o hacia el fondo, cambiando de tamaño de
+ * golpe. Eso es lo que se veía como un teletransporte.
+ */
+const DEPTH_SWAY = 1;
 
 /** Cuánto acelera la caída en el pico de la ráfaga. */
 const GUST_FALL_BOOST = 0.4;
@@ -270,7 +287,7 @@ function PetalLayerMesh({ layer, station, palette, particleScale, allocation }: 
         uTime: { value: 0 },
         uFallPhase: { value: 0 },
         uDrift: { value: 0 },
-        uDriftZ: { value: 0 },
+        uDepthSway: { value: 0 },
         uStrength: { value: 0 },
         uDensity: { value: 1 },
         uFadeBand: { value: PETAL_FADE_BAND },
@@ -310,24 +327,24 @@ function PetalLayerMesh({ layer, station, palette, particleScale, allocation }: 
   useEffect(() => () => geometry.dispose(), [geometry]);
   useEffect(() => () => material.dispose(), [material]);
 
-  const drift = useRef({ x: 0, z: 0 });
+  const drift = useRef(0);
   const fallPhase = useRef(0);
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.1);
 
-    // Las dos magnitudes con memoria. El desplazamiento se envuelve al tamaño
-    // de la capa: si creciera sin límite, en una sesión larga el float del
-    // shader perdería resolución y los pétalos darían tirones.
-    drift.current.x = (drift.current.x + WIND.x * dt * DRIFT_SCALE) % layer.size[0];
-    drift.current.z = (drift.current.z + WIND.z * dt * DRIFT_SCALE * 0.35) % layer.size[2];
+    // Las dos magnitudes con memoria. La deriva lateral se envuelve al ancho de
+    // la capa: si creciera sin límite, en una sesión larga el float del shader
+    // perdería resolución y los pétalos darían tirones.
+    drift.current = (drift.current + WIND.x * dt * DRIFT_SCALE) % layer.size[0];
     fallPhase.current += layer.fall * (1 + WIND.gust * GUST_FALL_BOOST) * dt;
 
     const uniforms = material.uniforms;
     uniforms.uTime!.value = WIND.time;
     uniforms.uFallPhase!.value = fallPhase.current;
-    uniforms.uDrift!.value = drift.current.x;
-    uniforms.uDriftZ!.value = drift.current.z;
+    uniforms.uDrift!.value = drift.current;
+    // La profundidad no se integra: es el viento de este frame y nada más.
+    uniforms.uDepthSway!.value = WIND.z * DEPTH_SWAY;
     uniforms.uStrength!.value = WIND.strength;
     uniforms.uDensity!.value = petalPresence(station, PETAL_SURGE.value);
 
