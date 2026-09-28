@@ -205,14 +205,51 @@ tres maneras de darle vida:
 
 | Cuerpo | Cómo se mueve | Especies |
 |---|---|---|
-| `modelo` | Malla sin esqueleto. **El shader dobla regiones** —cola desde la grupa, cada pata desde la cadera, cuello desde el pecho, alas desde el hombro— con los ángulos que ya calcula la conducta | garza, milano, gorrión, ardilla, gato, tanuki |
-| `animado` | Esqueleto y vuelo propios del modelo; la conducta marca el ritmo del aleteo | mariposa, libélula |
+| `modelo` | Malla sin esqueleto. **El shader dobla regiones** —cola desde la grupa, cada pata desde la cadera, cuello desde el pecho, alas desde el hombro— con los ángulos que ya calcula la conducta | garza, milano, gorrión, ardilla, gato, tanuki, libélula |
+| `animado` | Esqueleto y vuelo propios del modelo; la conducta marca el ritmo del aleteo | mariposa |
 | `luz` | Un punto que late con halo: a ocho píxeles, la forma no se ve | luciérnaga |
 
 Casi ningún modelo traía esqueleto, así que la opción de «vincular alas, cola y
 patas a los nodos» no existía: no hay nodos. La deformación por regiones es la
 técnica estándar para animar mallas sin huesos, y las regiones de cada especie se
 calibraron sobre una rejilla del modelo normalizado (`bestiary.ts`).
+
+**Cada especie tiene su marcha**, porque a veinte píxeles lo que distingue a un
+animal de otro es cómo mueve las patas:
+
+| Marcha | Cómo se mueven las patas | Cuerpo | Especies |
+|---|---|---|---|
+| `paso` | Izquierda y derecha alternas | Leve sube y baja | garza |
+| `trote` | Diagonales a la vez (delantera izquierda con trasera derecha) | Firme | gato, tanuki |
+| `galope` | Las dos delanteras juntas, las dos traseras juntas, a contratiempo | **Despega** media zancada y cabecea | ardilla |
+| `brinco` | Todas a la vez | Saltito a cada zancada | gorrión |
+
+La zancada se integra con la velocidad (`fase += velocidad · dt / largo de
+zancada`), así que los pies no patinan: acelera la conducta y aceleran las
+patas. Y la amplitud es grande a propósito —hasta ±50° en la ardilla—: con
+ángulos realistas, un gato a veinte píxeles no mueve las patas a ojos de nadie.
+
+**La cola de la ardilla cambia de forma, no sólo de ángulo.** Parada la lleva
+enroscada en «?» sobre el lomo; corriendo, estirada detrás, ondeando con cada
+salto. Girarla entera desde la base no la estira nunca —sólo la sube o la
+baja—, así que tiene una segunda articulación a media cola (`tail.curl`): la
+base va hacia atrás y la mitad final se dobla al revés. Se estira al arrancar y
+se enrosca en cada frenazo.
+
+**El milano monta el viento.** Planea casi siempre, pero el aire no es parejo:
+gana y pierde altura en oleajes de 7 y 15 s —con el pico arriba al subir y
+abajo al bajar, que sale solo de la trayectoria—, y **la misma ráfaga que
+arrastra los pétalos lo levanta** (`ridesWind`) y lo mece de ala a ala. Cada
+nueve segundos y medio da una tanda de tres o cuatro aletazos lentos y vuelve a
+planear. Todo cabe en el tercio superior: entre el 3 y el 22 % desde arriba en
+el peor caso.
+
+**La libélula bate con el shader, no con su clip.** El modelo traía esqueleto y
+una animación, pero la animación sólo desplazaba el esqueleto entero: las alas no
+se movían nunca y el insecto cruzaba la pantalla «como una foto». Ahora es un
+modelo estático; sus cuatro alas baten en V rígida desde el hombro a 14 ciclos
+por segundo, y el cuerpo se pinta con el rojo de la paleta (akatombo) y las alas
+con un washi translúcido.
 
 **La garza no vuela: vadea.** El modelo está de pie y con las alas plegadas. En
 vez de un vuelo que no puede hacer, entra andando por la orilla, se para dos
@@ -501,7 +538,7 @@ buena medida rellenar contenido sobre una plantilla que ya funciona.
 | Kitsune | ⏳ Aplazado a la Fase 6, entre los toriis. El modelo está en `assets/models/source/` |
 | Carpa koi | ⏳ Aplazada hasta que haya agua: un estanque en alguno de los templos o en la home. El koi que había es un asset de Animal Crossing y **no se puede publicar**; se hará uno propio (los peces son el caso de libro de la deformación en el shader) |
 | **Créditos de los modelos** | ⚠️ Garza y gorrión son CC BY: **antes de publicar tiene que existir una sección de créditos visible**. Detalle en `assets/models/LICENSES.md` (Fase 9) |
-| Peso de la fauna | ⏳ ~1,1 MB en total; cada estación sólo carga su elenco. La mariposa se lleva 620 KB (esqueleto de 192 huesos que el simplificador no consigue bajar de 16.000 triángulos), y las posiciones de los modelos estáticos van sin cuantizar para que el shader vea coordenadas reales. Las dos cosas son candidatas a recorte en la Fase 9 |
+| Peso de la fauna | ⏳ ~0,96 MB en total; cada estación sólo carga su elenco. La mariposa se lleva 620 KB (esqueleto de 192 huesos que el simplificador no consigue bajar de 16.000 triángulos), y las posiciones de los modelos estáticos van sin cuantizar para que el shader vea coordenadas reales. Las dos cosas son candidatas a recorte en la Fase 9 |
 | Bloom | ⏳ Aplazado de 2B a **2C**. Sobre un fondo washi (`#FFFACD`, luminancia ~0,97) un bloom por umbral ilumina el fondo entero. Entra con las luciérnagas y los faroles, que son lo que de verdad tiene que brillar |
 | Giroscopio en iOS | ⚠️ `DeviceOrientationEvent.requestPermission()` exige un gesto y abre un diálogo del sistema. No se pide al vuelo: el parallax por giro queda listo pero apagado en iOS hasta que haya un interruptor explícito (Fase 2C / 9) |
 | Profundidad del contenido | ⏳ ¿Tarjetas cortas o artículos largos? Define si se usa MDX o datos en TS |

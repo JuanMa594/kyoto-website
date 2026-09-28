@@ -41,6 +41,7 @@ import {
   KHRMeshQuantization,
 } from '@gltf-transform/extensions';
 import {
+  compactPrimitive,
   dedup,
   prune,
   quantize,
@@ -64,6 +65,14 @@ interface StaticJob {
   triangles: number;
   /** Giro en Y, en grados, que lleva el morro del original a +X. */
   yaw: number;
+  /** Giro previo en X, en grados, para modelos que vienen tumbados. */
+  pitch?: number;
+  /**
+   * Opacidad de las piezas planas (las alas). Si se indica, el color de vértice
+   * lleva canal alfa: las alas quedan translúcidas y el cuerpo opaco, en una
+   * sola malla. La escena distingue las dos por ese alfa para pintarlas.
+   */
+  translucentFlat?: number;
 }
 
 interface AnimatedJob {
@@ -75,12 +84,6 @@ interface AnimatedJob {
   /** Giro previo en X, en grados, para modelos que vienen tumbados. */
   pitch?: number;
   textureSize: number;
-  /**
-   * Las mallas planas (alas) y las gruesas (cuerpo) salen con materiales
-   * distintos, llamados `ala` y `cuerpo`, para que la escena pueda pintarlas
-   * por separado. Sólo hace falta en modelos cuyos materiales no lo distinguen.
-   */
-  splitWings?: boolean;
 }
 
 type Job = StaticJob | AnimatedJob;
@@ -100,7 +103,10 @@ const JOBS: Job[] = [
   { kind: 'estatico', source: 'fauna/Cactus wren by Poly by Google - 6b7Ul6MeLrJ.glb', output: 'fauna/gorrion.glb', triangles: 1200, yaw: 90 },
   // Papilio xuthus: la ageha, la especie japonesa exacta.
   { kind: 'animado', source: 'fauna/cc0___swallowtail_butterfly_papilio_xuthus.glb', output: 'fauna/mariposa.glb', triangles: 6000, yaw: 180, textureSize: 256 },
-  { kind: 'animado', source: 'fauna/dragonfly7687.glb', output: 'fauna/libelula.glb', triangles: 6000, yaw: 90, pitch: -90, textureSize: 256, splitWings: true },
+  // La libélula no trae aleteo —su único clip desplaza la armadura entera—, así
+  // que se trata como estática y el shader le bate las alas. Viene tumbada de
+  // canto: primero se acuesta (X) y luego se orienta (Y).
+  { kind: 'estatico', source: 'fauna/dragonfly7687.glb', output: 'fauna/libelula.glb', triangles: 3000, yaw: -90, pitch: 90, translucentFlat: 0.38 },
 ];
 
 /* ── Utilidades ─────────────────────────────────────────────────────────── */
@@ -173,10 +179,15 @@ async function processStatic(io: NodeIO, job: StaticJob): Promise<Document> {
   const positions: number[] = [];
   const colors: number[] = [];
   const indices: number[] = [];
+  // Canales de color: con alas translúcidas, RGBA; si no, RGB.
+  const CH = job.translucentFlat !== undefined ? 4 : 3;
 
   const yaw = (job.yaw * Math.PI) / 180;
   const cos = Math.cos(yaw);
   const sin = Math.sin(yaw);
+  const pitch = ((job.pitch ?? 0) * Math.PI) / 180;
+  const cp = Math.cos(pitch);
+  const sp = Math.sin(pitch);
 
   for (const scene of source.getRoot().listScenes()) {
     const nodes: ReturnType<typeof scene.listChildren> = [];
@@ -202,6 +213,15 @@ async function processStatic(io: NodeIO, job: StaticJob): Promise<Document> {
         if (texture && !decoded.has(texture)) decoded.set(texture, await decode(texture));
         const image = texture ? decoded.get(texture) ?? null : null;
 
+        // Una pieza casi plana es un ala.
+        let alpha = 1;
+        if (job.translucentFlat !== undefined) {
+          const lo = position.getMin([]);
+          const hi = position.getMax([]);
+          const extents = [0, 1, 2].map((c) => hi[c]! - lo[c]!).sort((a, b) => a - b);
+          if (extents[0]! < extents[2]! * 0.12) alpha = job.translucentFlat;
+        }
+
         const base = positions.length / 3;
         const p = [0, 0, 0];
         const t = [0, 0];
@@ -210,8 +230,10 @@ async function processStatic(io: NodeIO, job: StaticJob): Promise<Document> {
         for (let i = 0; i < position.getCount(); i += 1) {
           position.getElement(i, p);
           const [wx, wy, wz] = transformPoint(world, p[0]!, p[1]!, p[2]!);
-          // Giro en Y: el morro pasa a +X.
-          positions.push(wx * cos + wz * sin, wy, -wx * sin + wz * cos);
+          // Primero se acuesta (giro en X), luego el morro pasa a +X (giro en Y).
+          const ty = wy * cp - wz * sp;
+          const tz = wy * sp + wz * cp;
+          positions.push(wx * cos + tz * sin, ty, -wx * sin + tz * cos);
 
           let rgb: [number, number, number] = [factor[0]!, factor[1]!, factor[2]!];
           if (image && uv) {
@@ -224,6 +246,7 @@ async function processStatic(io: NodeIO, job: StaticJob): Promise<Document> {
             rgb = [rgb[0] * vc[0]!, rgb[1] * vc[1]!, rgb[2] * vc[2]!];
           }
           colors.push(...rgb);
+          if (CH === 4) colors.push(alpha);
         }
 
         const idx = prim.getIndices();
@@ -269,9 +292,9 @@ async function processStatic(io: NodeIO, job: StaticJob): Promise<Document> {
   }
   for (const list of groups.values()) {
     if (list.length < 2) continue;
-    const avg = [0, 0, 0];
-    for (const i of list) for (let c = 0; c < 3; c += 1) avg[c]! += colors[i * 3 + c]!;
-    for (const i of list) for (let c = 0; c < 3; c += 1) colors[i * 3 + c] = avg[c]! / list.length;
+    const avg = [0, 0, 0, 0];
+    for (const i of list) for (let c = 0; c < CH; c += 1) avg[c]! += colors[i * CH + c]!;
+    for (const i of list) for (let c = 0; c < CH; c += 1) colors[i * CH + c] = avg[c]! / list.length;
   }
 
   const doc = new Document();
@@ -279,7 +302,7 @@ async function processStatic(io: NodeIO, job: StaticJob): Promise<Document> {
   const prim = doc
     .createPrimitive()
     .setAttribute('POSITION', doc.createAccessor().setType('VEC3').setArray(new Float32Array(positions)).setBuffer(buffer))
-    .setAttribute('COLOR_0', doc.createAccessor().setType('VEC3').setArray(new Float32Array(colors)).setBuffer(buffer))
+    .setAttribute('COLOR_0', doc.createAccessor().setType(CH === 4 ? 'VEC4' : 'VEC3').setArray(new Float32Array(colors)).setBuffer(buffer))
     .setIndices(doc.createAccessor().setType('SCALAR').setArray(new Uint32Array(indices)).setBuffer(buffer))
     .setMaterial(doc.createMaterial('piel').setRoughnessFactor(0.9).setMetallicFactor(0));
   const mesh = doc.createMesh(job.output).addPrimitive(prim);
@@ -294,10 +317,55 @@ async function processStatic(io: NodeIO, job: StaticJob): Promise<Document> {
   );
 
   for (const mesh of doc.getRoot().listMeshes()) {
-    for (const primitive of mesh.listPrimitives()) smoothNormals(doc, primitive);
+    for (const primitive of mesh.listPrimitives()) {
+      dropFins(doc, primitive);
+      smoothNormals(doc, primitive);
+    }
   }
 
   return doc;
+}
+
+/**
+ * Quita las **aletas**: pares de triángulos con los mismos tres vértices y
+ * orientación opuesta.
+ *
+ * El simplificador las deja al colapsar zonas finas (orejas, dedos, bigotes): una
+ * lámina de grosor cero que sobresale del cuerpo con una cara hacia cada lado.
+ * No aportan superficie —las dos caras se tapan entre sí— y sí dos defectos: se
+ * ven como púas, y en el vértice de la punta, que sólo tocan ellas, las dos
+ * normales se anulan al promediarse. Una normal de longitud cero da NaN en el
+ * shader, y la profundidad de campo esparce ese píxel en un cuadrado negro:
+ * eran los «puntos negros» del gato. Se quitan las dos caras del par; la
+ * superficie de alrededor queda intacta.
+ */
+function dropFins(doc: Document, primitive: Primitive): void {
+  const indices = primitive.getIndices();
+  if (!indices) return;
+
+  const count = new Map<string, number>();
+  const keyOf = (t: number) =>
+    [indices.getScalar(t), indices.getScalar(t + 1), indices.getScalar(t + 2)]
+      .sort((a, b) => a - b)
+      .join(',');
+  for (let t = 0; t < indices.getCount(); t += 3) {
+    const key = keyOf(t);
+    count.set(key, (count.get(key) ?? 0) + 1);
+  }
+
+  const kept: number[] = [];
+  for (let t = 0; t < indices.getCount(); t += 3) {
+    if (count.get(keyOf(t))! > 1) continue;
+    kept.push(indices.getScalar(t), indices.getScalar(t + 1), indices.getScalar(t + 2));
+  }
+  const dropped = indices.getCount() / 3 - kept.length / 3;
+  if (dropped === 0) return;
+
+  const buffer = doc.getRoot().listBuffers()[0]!;
+  primitive.setIndices(doc.createAccessor().setType('SCALAR').setArray(new Uint32Array(kept)).setBuffer(buffer));
+  // Los vértices que sólo usaban las aletas quedan sueltos: fuera.
+  compactPrimitive(primitive);
+  console.log(`    ${dropped} triángulos de aletas quitados`);
 }
 
 /**
@@ -344,7 +412,14 @@ function smoothNormals(doc: Document, primitive: Primitive): void {
   }
 
   for (let i = 0; i < normals.length; i += 3) {
-    const length = Math.hypot(normals[i]!, normals[i + 1]!, normals[i + 2]!) || 1;
+    const length = Math.hypot(normals[i]!, normals[i + 1]!, normals[i + 2]!);
+    // Red de seguridad: si aun así las caras se anulan, una normal cualquiera
+    // pero válida. Una de longitud cero es un NaN en el shader —un píxel negro
+    // que la profundidad de campo convierte en un cuadrado—.
+    if (length < 1e-12) {
+      normals.set([0, 1, 0], i);
+      continue;
+    }
     normals[i]! /= length;
     normals[i + 1]! /= length;
     normals[i + 2]! /= length;
@@ -420,22 +495,6 @@ function restBounds(doc: Document): { min: number[]; max: number[] } {
 async function processAnimated(io: NodeIO, job: AnimatedJob): Promise<Document> {
   const doc = await io.read(join(SOURCE_DIR, job.source));
   const root = doc.getRoot();
-
-  // Las alas se reconocen por su forma: una malla casi plana.
-  if (job.splitWings) {
-    const wing = doc.createMaterial('ala').setBaseColorFactor([1, 1, 1, 1]);
-    const body = doc.createMaterial('cuerpo').setBaseColorFactor([1, 1, 1, 1]);
-    for (const mesh of root.listMeshes()) {
-      for (const prim of mesh.listPrimitives()) {
-        const position = prim.getAttribute('POSITION');
-        if (!position) continue;
-        const lo = position.getMin([]);
-        const hi = position.getMax([]);
-        const extents = [0, 1, 2].map((c) => hi[c]! - lo[c]!).sort((a, b) => a - b);
-        prim.setMaterial(extents[0]! < extents[2]! * 0.12 ? wing : body);
-      }
-    }
-  }
 
   // El giro se aplica en un nodo raíz nuevo y no en los vértices: los huesos
   // guardan su pose de reposo respecto de la malla, y tocar la malla sin tocar

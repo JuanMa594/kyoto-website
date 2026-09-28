@@ -4,9 +4,7 @@ import { useGLTF } from '@react-three/drei';
 import { useEffect, useMemo, useRef } from 'react';
 import {
   AnimationMixer,
-  Color,
   DoubleSide,
-  MeshStandardMaterial,
   type Group,
   type Material,
   type Mesh,
@@ -16,12 +14,12 @@ import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js
 
 import type { ScenePalette } from '@/lib/css-vars';
 import type { FaunaAct } from '@/scene/systems/fauna/behaviors';
-import { modelUrl, type SpeciesSpec } from '@/scene/systems/fauna/bestiary';
+import { modelUrl } from '@/scene/systems/fauna/bestiary';
 
 import { useFaunaFrame } from './rigParts';
 
 /**
- * Los insectos: modelos con esqueleto y **su propio vuelo animado**.
+ * Modelos con esqueleto y **su propio vuelo animado** (hoy, la mariposa).
  *
  * Aquí no hace falta deformar nada: el clip del modelo ya bate las alas. Lo
  * único que se ata a la conducta es el **ritmo** —el clip corre más deprisa
@@ -40,58 +38,26 @@ interface SkinnedCreatureProps {
   palette: ScenePalette;
 }
 
-/**
- * Materiales propios para los modelos que llegan en blanco (la libélula): el
- * cuerpo del color de la especie y las alas como papel translúcido. Uno por
- * especie y para toda la sesión, igual que en el resto de la fauna.
- */
-const paintCache = new Map<SpeciesSpec, { palette: ScenePalette; body: Material; wing: Material }>();
-
-function paintFor(spec: SpeciesSpec, palette: ScenePalette) {
-  const cached = paintCache.get(spec);
-  if (cached && cached.palette === palette) return cached;
-
-  const paint = {
-    palette,
-    body: new MeshStandardMaterial({ color: new Color(palette[spec.body]), roughness: 0.55, metalness: 0 }),
-    wing: new MeshStandardMaterial({
-      color: new Color(palette[spec.accent]),
-      roughness: 0.3,
-      metalness: 0,
-      transparent: true,
-      opacity: 0.42,
-      depthWrite: false,
-      side: DoubleSide,
-    }),
-  };
-  paintCache.set(spec, paint);
-  return paint;
-}
-
 export function SkinnedCreature({ act, member, palette }: SkinnedCreatureProps) {
   const spec = act.spec;
   const gltf = useGLTF(modelUrl(spec.model!), false, true);
 
   const scene = useMemo(() => {
     const copy = cloneSkinned(gltf.scene) as Object3D;
-    const paint = paintFor(spec, palette);
 
     copy.traverse((object) => {
       const mesh = object as Mesh;
       if (!mesh.isMesh) return;
       // Las alas se ven por las dos caras; un ala vista desde abajo no puede
       // desaparecer.
-      const original = mesh.material as Material;
-      if (original.name === 'ala') mesh.material = paint.wing;
-      else if (original.name === 'cuerpo') mesh.material = paint.body;
-      else original.side = DoubleSide;
+      (mesh.material as Material).side = DoubleSide;
       // Un esqueleto que se mueve no cabe en la caja de reposo: sin esto, three
       // lo descartaría al salir de ella aunque siga en cuadro.
       mesh.frustumCulled = false;
     });
 
     return copy;
-  }, [gltf, spec, palette]);
+  }, [gltf]);
 
   const mixer = useMemo(() => new AnimationMixer(scene), [scene]);
 

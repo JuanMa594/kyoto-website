@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import type { BufferGeometry, Group, Mesh } from 'three';
 
 import type { ScenePalette } from '@/lib/css-vars';
+import { WIND } from '@/scene/systems/WindField';
 import type { FaunaAct } from '@/scene/systems/fauna/behaviors';
 import { modelUrl } from '@/scene/systems/fauna/bestiary';
 
@@ -58,8 +59,16 @@ export function ModelCreature({ act, member, palette }: ModelCreatureProps) {
   // Un material por individuo —cada uno lleva su propia zancada—, todos con el
   // mismo programa de GPU. Se libera al terminar el acto.
   const { material, uniforms } = useMemo(
-    () => createDeformMaterial(profile, { washi: palette.washi, ink: palette.sumi }),
-    [profile, palette],
+    () =>
+      createDeformMaterial(profile, {
+        washi: palette.washi,
+        ink: palette.sumi,
+        // Los modelos que llegan en blanco se pintan desde la paleta.
+        paint: spec.translucentWings
+          ? { body: palette[spec.body], wing: palette[spec.accent] }
+          : undefined,
+      }),
+    [profile, palette, spec],
   );
   useEffect(() => () => material.dispose(), [material]);
 
@@ -71,12 +80,15 @@ export function ModelCreature({ act, member, palette }: ModelCreatureProps) {
   const deformPose = useMemo(createDeformPose, []);
 
   useFaunaFrame(act, member, group, (pose, delta, seconds) => {
-    const body = animate(spec, pose, seconds, delta, member, memory, deformPose);
+    const body = animate(spec, pose, seconds, delta, member, memory, deformPose, WIND.gust);
     applyDeformPose(uniforms, deformPose, profile);
 
     if (tilt.current) {
       tilt.current.rotation.z = body.pitch;
       tilt.current.rotation.x = body.bank;
+      // El brinco del galope o del saltito —o lo que sube el viento—, en
+      // largos de cuerpo.
+      tilt.current.position.y = body.lift;
     }
 
     if (spec.flightModel && groundMesh.current && flightMesh.current) {

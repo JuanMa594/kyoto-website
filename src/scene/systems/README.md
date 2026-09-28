@@ -21,7 +21,8 @@
 - `fauna/` — **Fase 2C**. Cuatro piezas, tres de ellas puras y comprobables sin
   navegador:
   - `bestiary.ts` — qué es cada especie: modelo, tamaño, **regiones que se
-    doblan** (cola, patas, cuello, alas), repertorio.
+    doblan** (cola, patas, cuello, alas), marcha (paso, trote, galope o
+    brinco), repertorio.
   - `behaviors.ts` — el repertorio, como funciones puras del tiempo a una
     posición. Rumbo, alabeo, esfuerzo y si está en el aire **se deducen** de la
     propia trayectoria.

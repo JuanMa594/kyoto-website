@@ -22,6 +22,10 @@ export interface AnimMemory {
   stride: number;
   flap: number;
   tailSwing: number;
+  /** 0 cola enroscada (parado), 1 estirada detrás (corriendo). */
+  tailStream: number;
+  /** Altura que le ha dado el viento, en largos de cuerpo, ya amortiguada. */
+  windLift: number;
   neckYaw: number;
   sit: number;
   still: number;
@@ -30,21 +34,34 @@ export interface AnimMemory {
 }
 
 export function createAnimMemory(): AnimMemory {
-  return { stride: 0, flap: 0, tailSwing: 0, neckYaw: 0, sit: 0, still: 0, stillTime: 0 };
+  return {
+    stride: 0,
+    flap: 0,
+    tailSwing: 0,
+    tailStream: 0,
+    windLift: 0,
+    neckYaw: 0,
+    sit: 0,
+    still: 0,
+    stillTime: 0,
+  };
 }
 
 /** Lo que el rig aplica al cuerpo entero, fuera del shader. */
 export interface BodyPose {
   pitch: number;
   bank: number;
+  /** Cuánto se levanta el cuerpo del suelo en este instante, en largos de cuerpo. */
+  lift: number;
 }
 
 const TAU = Math.PI * 2;
 
 /**
  * Un paso de animación. `delta` es el tiempo de este frame; `seconds`, el reloj
- * del acto. Las fases se **integran** —nunca `tiempo × frecuencia`—, porque la
- * frecuencia cambia con la velocidad y ese producto saltaría entero.
+ * del acto; `gust`, la ráfaga del viento en este instante (0–1, `WIND.gust`).
+ * Las fases se **integran** —nunca `tiempo × frecuencia`—, porque la frecuencia
+ * cambia con la velocidad y ese producto saltaría entero.
  */
 export function animate(
   spec: SpeciesSpec,
@@ -54,10 +71,12 @@ export function animate(
   member: number,
   memory: AnimMemory,
   out: DeformPose,
+  gust = 0,
 ): BodyPose {
   const profile = spec.deform!;
   const air = pose.airborne;
-  const quadruped = profile.pairs === 2;
+  const quadruped = profile.gait === 'trote' || profile.gait === 'galope';
+  const bounding = profile.gait === 'galope' || profile.gait === 'brinco';
 
   // Cuánto avanza en largos de cuerpo por segundo: la misma velocidad es un
   // paseo para una garza y una carrera para una ardilla.
@@ -70,31 +89,73 @@ export function animate(
   const still = memory.still;
   memory.stillTime = still > 0.8 ? memory.stillTime + delta : 0;
 
-  // ── Patas ───────────────────────────────────────────────────────────────
+  // ── Patas y cuerpo ──────────────────────────────────────────────────────
+  // Un ciclo completo por cada paso o salto recorrido: las patas van al ritmo
+  // al que el animal avanza de verdad, así que nunca patinan.
   memory.stride = (memory.stride + (TAU * pose.speed * delta) / (profile.stride * spec.size)) % TAU;
   out.stridePhase = memory.stride;
   out.legAmplitude = profile.legSwing * moving;
   out.tuck = air;
+
+  // En galope y a saltitos el cuerpo **despega** media zancada y cae la otra
+  // media: es lo que se ve de una ardilla o de un gorrión a veinte píxeles.
+  // Al paso, sólo el leve sube y baja de cada apoyo.
+  // El galope cabecea: morro arriba al despegar, abajo al caer.
+  const rock = profile.gait === 'galope' ? Math.cos(memory.stride) * 0.16 * moving : 0;
+  // Cabecear alrededor del pecho baja el extremo que cae: sin compensarlo, las
+  // manos se hunden en el suelo al aterrizar. El pie más alejado del pivote
+  // anda a unos 0,3 largos, así que se sube el cuerpo lo que ese pie baja.
+  const lift =
+    (bounding
+      ? profile.hop * Math.max(0, Math.sin(memory.stride)) * moving
+      : 0.012 * Math.abs(Math.sin(memory.stride)) * moving) +
+    0.3 * Math.abs(Math.sin(rock));
 
   // ── Cola: persigue al cuerpo con retardo ────────────────────────────────
   const tailTarget =
     -pose.bank * 1.4 + Math.sin(seconds * 2.1 + member * 1.7) * (0.08 + 0.12 * moving);
   memory.tailSwing = damp(memory.tailSwing, tailTarget, 6, delta);
   out.tailSwing = memory.tailSwing;
-  out.tailLift = quadruped
-    ? Math.sin(memory.stride) * 0.14 * moving + still * (spec.sitsUp ? 0.25 : 0.05)
-    : // Los pájaros sacuden la cola de vez en cuando, y la bajan al volar.
+
+  if (quadruped) {
+    // Acompaña al salto: se levanta al despegar y ondea al caer.
+    out.tailLift = Math.sin(memory.stride) * 0.16 * moving + still * (spec.sitsUp ? 0.25 : 0.05);
+  } else if (profile.wings?.style === 'zumbido') {
+    // El abdomen de la libélula sube y baja al volar suspendida.
+    out.tailLift = Math.sin(seconds * 2.3 + member * 1.9) * 0.1;
+  } else {
+    // Los pájaros sacuden la cola de vez en cuando, y la bajan al volar.
+    out.tailLift =
       Math.max(0, Math.sin(seconds * 1.6 + member * 2.3)) ** 10 * 0.35 * (1 - air) - air * 0.1;
+  }
+  // La ardilla corre con la cola **estirada** detrás, ondeando con cada salto,
+  // y la enrosca al pararse. Cuenta como parada cualquier frenazo por debajo
+  // de dos cuerpos por segundo: sus paradas duran medio segundo, y con un
+  // umbral más bajo la cola se quedaba a medio enroscar, en gancho. Se estira
+  // algo más rápido de lo que se recoge.
+  if (profile.tail?.curl) {
+    const target = smoothstep(0.4, 2, pace) * (1 - air);
+    memory.tailStream = damp(memory.tailStream, target, target > memory.tailStream ? 6 : 4.5, delta);
+    const stream = memory.tailStream;
+    // Dos ondas con retardo creciente —base, luego punta—: una ola que recorre
+    // la cola hacia atrás, en vez de un palo que sube y baja.
+    out.tailLift =
+      stream * (0.75 + 0.14 * Math.sin(memory.stride - 0.9)) +
+      (1 - stream) * still * (spec.sitsUp ? 0.25 : 0.05);
+    out.tailCurl = -stream * (0.65 + 0.22 * Math.sin(memory.stride - 2.1));
+  } else {
+    out.tailCurl = 0;
+  }
   // El milano gobierna con la cola: la tuerce hacia dentro de la curva.
-  out.tailRoll = air * pose.bank * 0.5;
+  out.tailRoll = profile.wings?.style === 'planeo' ? air * pose.bank * 0.5 : 0;
 
   // ── Cuello y cabeza ─────────────────────────────────────────────────────
   if (quadruped) {
-    // Olfatea parado —golpes cortos de hocico— y cabecea al trote.
+    // Olfatea parado —golpes cortos de hocico— y cabecea con cada zancada.
     out.neckPitch =
       -still * (0.12 + 0.08 * Math.sin(seconds * 9 + member)) +
-      Math.sin(memory.stride * 2) * 0.05 * moving;
-  } else if (profile.stride > 0.3) {
+      Math.sin(memory.stride * 2) * 0.06 * moving;
+  } else if (profile.gait === 'paso') {
     // La garza: cabeceo adelante-atrás con cada paso, y quieta, espera con el
     // cuello tenso hasta que golpea. Esperas largas, golpes secos.
     //
@@ -105,9 +166,11 @@ export function animate(
     const waited = memory.stillTime - 1.5;
     const strike = waited > 0 ? Math.max(0, Math.sin(waited * 1.3)) ** 14 : 0;
     out.neckPitch = Math.sin(memory.stride) * 0.07 * moving - still * (0.28 + 0.85 * strike);
-  } else {
+  } else if (profile.gait === 'brinco') {
     // Pájaro pequeño: picotazos rápidos y seguidos.
     out.neckPitch = -still * Math.max(0, Math.sin(seconds * 5.2 + member)) ** 3 * 0.9;
+  } else {
+    out.neckPitch = 0;
   }
   const lookTarget = still * Math.sin(seconds * 0.7 + member * 2) * 0.45;
   memory.neckYaw = damp(memory.neckYaw, lookTarget, 3, delta);
@@ -118,21 +181,48 @@ export function animate(
   out.sit = memory.sit;
 
   // ── Alas ────────────────────────────────────────────────────────────────
-  if (profile.wings) {
-    if (profile.pairs === 1 && profile.legSwing === 0) {
-      // Planeador: diedro leve que respira, y más cuando alabea.
-      out.wingLift = 0.07 + 0.05 * Math.sin(seconds * 0.45 + member) + Math.abs(pose.bank) * 0.12;
-    } else {
-      // Pájaro posado que vuela: las alas se abren a golpes, rápidos.
-      memory.flap = (memory.flap + TAU * 8 * (0.6 + pose.effort) * delta) % TAU;
-      out.wingLift = air * (0.15 + 1.1 * Math.max(0, Math.sin(memory.flap)));
-    }
-  } else {
+  const wings = profile.wings;
+  if (!wings) {
     out.wingLift = 0;
+  } else if (wings.style === 'planeo') {
+    // Planeador: diedro leve que respira, y más cuando alabea. Cada nueve
+    // segundos y medio, una tanda de aletazos lentos y hondos —tres o cuatro—
+    // para recuperar altura, y vuelta a planear. La tanda va envuelta en un
+    // seno que vale 0 al empezar y al acabar: las alas entran y salen del
+    // planeo sin saltos.
+    const cycle = (seconds + 4 + member * 3.1) % 9.5;
+    const burst = cycle < 1.7 ? Math.sin((Math.PI * cycle) / 1.7) : 0;
+    memory.flap = (memory.flap + TAU * wings.beat * delta) % TAU;
+    const glide = 0.07 + 0.05 * Math.sin(seconds * 0.45 + member) + Math.abs(pose.bank) * 0.12;
+    out.wingLift = glide + burst * (0.08 + 0.5 * Math.sin(memory.flap));
+  } else if (wings.style === 'batido') {
+    // Pájaro posado que vuela: las alas se abren a golpes, rápidos.
+    memory.flap = (memory.flap + TAU * wings.beat * (0.6 + pose.effort) * delta) % TAU;
+    out.wingLift = air * (0.15 + 1.1 * Math.max(0, Math.sin(memory.flap)));
+  } else {
+    // Zumbido: arriba y abajo sin descanso, simétrico, como una libélula
+    // suspendida. Tan rápido que casi se lee como un temblor de las alas.
+    memory.flap = (memory.flap + TAU * wings.beat * delta) % TAU;
+    out.wingLift = 0.06 + Math.sin(memory.flap) * 0.5;
+  }
+
+  // ── Montar el viento ────────────────────────────────────────────────────
+  // La ráfaga lo levanta despacio y lo deja caer despacio: el milano no sube
+  // de golpe, lo lleva el aire. Mientras sube, levanta el pico; y con viento
+  // fuerte se mece un poco de ala a ala, como en el aire revuelto.
+  let windPitch = 0;
+  let windRock = 0;
+  if (spec.ridesWind) {
+    const before = memory.windLift;
+    memory.windLift = damp(memory.windLift, gust * spec.ridesWind, 0.7, delta);
+    const climb = delta > 0 ? (memory.windLift - before) / delta : 0;
+    windPitch = clamp(climb * 0.35, -0.15, 0.2);
+    windRock = gust * 0.12 * Math.sin(seconds * 1.4 + member * 2.3);
   }
 
   return {
-    pitch: clamp(pose.pitch * 0.6, -0.5, 0.5) + air * (spec.flightPitch ?? 0),
-    bank: pose.bank,
+    pitch: clamp(pose.pitch * 0.6, -0.5, 0.5) + air * (spec.flightPitch ?? 0) + rock + windPitch,
+    bank: pose.bank + windRock,
+    lift: lift + memory.windLift,
   };
 }

@@ -39,6 +39,11 @@ bun run models       # assets/models/source → public/models (fauna optimizada)
 bun run palette      # muestrea los colores de docs/referencias/*.png
 ```
 
+En desarrollo, **`?fauna=<especie>`** en cualquier página (`/es/ubicacion?fauna=libelula`)
+fuerza a esa especie como único elenco, con huecos de 3–6 s entre actos: sirve
+para revisar un animal sin esperar a que el reparto lo saque. En producción no
+existe.
+
 > **En este equipo no hay Node instalado — el runtime y el gestor de paquetes es
 > `bun`.** No uses `npm`/`npx`: usa `bun` / `bunx`.
 
@@ -237,13 +242,20 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   gorriones. Cada animal con deformación necesita su propio material (lleva su
   propia zancada en uniforms), así que se crea al entrar y **se libera con
   `dispose()` al terminar el acto**; todos comparten el mismo programa de GPU
-  gracias a `customProgramCacheKey`. Los materiales que no cambian por individuo
-  (las alas de la libélula) van en una caché por especie.
+  gracias a `customProgramCacheKey`.
 - **`normals()` de gltf-transform genera normales planas y desuelda la malla.**
   El resultado es justo lo que la revisión rechazó: un animal facetado, y
   archivos con el triple de vértices. El pipeline calcula normales suaves,
   promediadas por área, sobre la malla soldada (`smoothNormals` en
   `scripts/optimize-models.ts`).
+- **Un punto negro que la profundidad de campo vuelve cuadrado es un NaN.** El
+  simplificador deja «aletas»: pares de triángulos con los mismos tres vértices
+  y caras opuestas, láminas de grosor cero que sobresalen del cuerpo. En el
+  vértice de la punta las dos normales se anulan al promediarse; una normal de
+  longitud cero da NaN en el shader, el píxel sale negro y el desenfoque lo
+  esparce en un cuadrado. Eran los «puntos negros» del gato (72 aletas; la garza
+  y la ardilla también tenían). El pipeline las quita (`dropFins`) y
+  `smoothNormals` nunca deja una normal a cero.
 - **Las posiciones de un modelo que se deforma en el shader no se cuantizan.**
   Cuantizar las guarda como enteros y mueve la escala al nodo: el shader recibe
   otras coordenadas y las regiones —«la cola empieza en x = −0,14»— caen donde
@@ -252,6 +264,20 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   transformación del nodo de una malla con huesos y la coloca con las
   articulaciones (articulación × matriz de enlace inversa). Medir el nodo dio
   mariposas de un milímetro; `restBounds()` mide la pose de reposo de verdad.
+- **Que un modelo traiga animación no significa que anime lo que parece.** El
+  clip de la libélula sólo desplazaba el esqueleto entero: las alas no batían
+  nunca y el insecto cruzaba la pantalla «como una foto». Antes de apoyarse en
+  un clip, listar sus canales y comprobar que mueven los huesos que importan (la
+  mariposa sí: 51 canales de rotación en las alas). La libélula pasó a modelo
+  estático con las alas batiendo en el shader.
+- **Un vaivén que depende del reloj hace girar al animal parado.** La garza y
+  el tanuki serpenteaban con `sin(tiempo)`: al pararse, seguían deslizándose de
+  lado, el rumbo —que sale del movimiento— apuntaba a la cámara y el animal
+  «intentaba girarse» a media parada. El vaivén lateral de quien camina y se
+  para depende de **lo recorrido**, no del tiempo; y el rumbo y el alabeo sólo
+  siguen al movimiento cuando hay movimiento de verdad. El rumbo inicial sale
+  del primer paso (`aheadHeading`): un pose recién creado miraba a +X y quien
+  entraba por la derecha empezaba girando 180°.
 - **Lo que un animal hace se deduce de su trayectoria, no se declara aparte.**
   Rumbo, cabeceo, alabeo, velocidad y hasta si está en el aire salen de muestrear
   la propia curva (`poseFor`). En cuanto una bandera como "va volando" se lleva

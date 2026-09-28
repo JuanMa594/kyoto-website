@@ -96,6 +96,18 @@ export interface SpeciesSpec {
    * pájaro posado tiene el cuerpo en diagonal; en vuelo va en horizontal.
    */
   readonly flightPitch?: number;
+  /**
+   * El modelo llega en blanco con las alas marcadas como translúcidas (alfa en
+   * el color de vértice); la escena pinta el cuerpo con `body` y las alas con
+   * `accent`.
+   */
+  readonly translucentWings?: boolean;
+  /**
+   * Cuánto lo sube una ráfaga de viento, en largos de cuerpo. El planeador no
+   * vuela contra el viento: lo monta. Cuando sopla la ráfaga que arrastra los
+   * pétalos, el milano gana altura sin batir, y al amainar la pierde.
+   */
+  readonly ridesWind?: number;
   /** Peso relativo al sortear: los bichos raros son raros. */
   readonly weight: number;
 }
@@ -122,9 +134,10 @@ export const BESTIARY: Record<FaunaKind, SpeciesSpec | null> = {
       hipY: 0.46,
       splitX: 0,
       legMinX: -0.32,
-      pairs: 1,
-      legSwing: 0.42,
+      gait: 'paso',
+      legSwing: 0.45,
       stride: 0.42,
+      hop: 0,
       neck: { baseX: 0.06, baseY: 0.62, dirX: 0.15, dirY: 0.99, reach: 0.36 },
       pivotY: 0.5,
     },
@@ -147,11 +160,13 @@ export const BESTIARY: Record<FaunaKind, SpeciesSpec | null> = {
       hipY: -1,
       splitX: 0,
       legMinX: 1,
-      pairs: 1,
+      gait: 'paso',
       legSwing: 0,
       stride: 1,
+      hop: 0,
       tail: { baseX: -0.18, tipX: -0.5, minY: -1, pivotY: 0.28 },
-      wings: { rootZ: 0.12, tipZ: 0.72, shoulderY: 0.45, minX: -1, maxX: 1, minY: -1, maxY: 2 },
+      // Planea casi siempre; cada tanto, tres o cuatro aletazos lentos y hondos.
+      wings: { style: 'planeo', beat: 2.2, rootZ: 0.12, tipZ: 0.72, shoulderY: 0.45, minX: -1, maxX: 1, minY: -1, maxY: 2 },
       pivotY: 0.35,
     },
     size: 1,
@@ -160,6 +175,7 @@ export const BESTIARY: Record<FaunaKind, SpeciesSpec | null> = {
     ride: 0,
     behaviors: ['planearEnCirculos'],
     depth: [-42, -26],
+    ridesWind: 1.6,
     sound: 'silbido',
     weight: 0.8,
   },
@@ -173,12 +189,14 @@ export const BESTIARY: Record<FaunaKind, SpeciesSpec | null> = {
       hipY: 0.12,
       splitX: 0,
       legMinX: 0,
-      pairs: 1,
+      // En el suelo no camina: va a saltitos, con las dos patas a la vez.
+      gait: 'brinco',
       legSwing: 0.5,
-      stride: 0.2,
+      stride: 0.5,
+      hop: 0.3,
       tail: { baseX: -0.14, tipX: -0.5, minY: 0.05, pivotY: 0.25 },
       neck: { baseX: 0.13, baseY: 0.4, dirX: 0.71, dirY: 0.71, reach: 0.22 },
-      wings: { rootZ: 0.035, tipZ: 0.13, shoulderY: 0.42, minX: -0.22, maxX: 0.26, minY: 0.24, maxY: 0.5 },
+      wings: { style: 'batido', beat: 8, rootZ: 0.035, tipZ: 0.13, shoulderY: 0.42, minX: -0.22, maxX: 0.26, minY: 0.24, maxY: 0.5 },
       pivotY: 0.3,
     },
     size: 0.3,
@@ -202,10 +220,22 @@ export const BESTIARY: Record<FaunaKind, SpeciesSpec | null> = {
       hipY: 0.1,
       splitX: 0.15,
       legMinX: -0.16,
-      pairs: 2,
-      legSwing: 0.7,
-      stride: 0.35,
-      tail: { baseX: -0.14, tipX: -0.5, minY: 0.18, pivotY: 0.3 },
+      // No trota: galopa a saltos, estirándose en el aire y recogiéndose al
+      // caer. Un salto cubre algo más de un largo de cuerpo.
+      gait: 'galope',
+      legSwing: 0.9,
+      stride: 1.2,
+      hop: 0.25,
+      // La cola nace en x ≈ −0,1 y sube vertical hasta el codo, a media altura
+      // del arco; desde ahí cae hasta la punta. La base gira casi rígida y el
+      // codo desenrosca el resto al correr.
+      tail: {
+        baseX: -0.07,
+        tipX: -0.12,
+        minY: 0.31,
+        pivotY: 0.3,
+        curl: { x: -0.16, y: 0.47, from: 0.16, to: 0.4 },
+      },
       neck: { baseX: 0.26, baseY: 0.27, dirX: 0.98, dirY: 0.2, reach: 0.2 },
       sit: { hipX: -0.04, hipY: 0.14 },
       pivotY: 0.15,
@@ -229,9 +259,10 @@ export const BESTIARY: Record<FaunaKind, SpeciesSpec | null> = {
       hipY: 0.26,
       splitX: -0.1,
       legMinX: -0.6,
-      pairs: 2,
-      legSwing: 0.4,
-      stride: 0.45,
+      gait: 'trote',
+      legSwing: 0.65,
+      stride: 0.55,
+      hop: 0,
       tail: { baseX: -0.38, tipX: -0.5, minY: 0.35, pivotY: 0.48 },
       neck: { baseX: 0.18, baseY: 0.52, dirX: 0.8, dirY: 0.6, reach: 0.25 },
       pivotY: 0.3,
@@ -253,9 +284,10 @@ export const BESTIARY: Record<FaunaKind, SpeciesSpec | null> = {
       hipY: 0.17,
       splitX: -0.12,
       legMinX: -0.6,
-      pairs: 2,
-      legSwing: 0.45,
-      stride: 0.4,
+      gait: 'trote',
+      legSwing: 0.6,
+      stride: 0.5,
+      hop: 0,
       tail: { baseX: -0.4, tipX: -0.5, minY: 0.14, pivotY: 0.25 },
       neck: { baseX: 0.2, baseY: 0.34, dirX: 0.99, dirY: 0.1, reach: 0.25 },
       pivotY: 0.25,
@@ -284,10 +316,25 @@ export const BESTIARY: Record<FaunaKind, SpeciesSpec | null> = {
   },
 
   // Akatombo, la libélula roja del final del verano. El modelo llega en blanco
-  // y la escena la pinta: cuerpo rojo y alas de papel.
+  // y sin aleteo propio —su único clip movía la armadura entera—, así que la
+  // escena la pinta (cuerpo rojo, alas translúcidas) y el shader le bate las
+  // cuatro alas en horizontal, que es como vuela.
   libelula: {
-    rig: 'animado',
+    rig: 'modelo',
     model: 'libelula',
+    deform: {
+      hipY: -1,
+      splitX: 0,
+      legMinX: 1,
+      gait: 'paso',
+      legSwing: 0,
+      stride: 1,
+      hop: 0,
+      tail: { baseX: 0.12, tipX: -0.5, minY: -1, pivotY: 0.06 },
+      wings: { style: 'zumbido', beat: 14, rootZ: 0.04, tipZ: 0.12, shoulderY: 0.12, minX: 0.02, maxX: 0.5, minY: 0.08, maxY: 1 },
+      pivotY: 0.06,
+    },
+    translucentWings: true,
     size: 0.3,
     body: 'shu',
     accent: 'washi',
@@ -361,7 +408,8 @@ export function durationFor(behavior: BehaviorName, random: () => number): numbe
     bandada: [8, 14],
     correrYParar: [9, 15],
     perseguir: [11, 17],
-    deambular: [15, 23],
+    // Un paseo: sin prisa, para que las patas se vean dar pasos y no temblar.
+    deambular: [32, 42],
     revolotear: [11, 18],
     titilar: [22, 34],
   };

@@ -6,8 +6,10 @@ versiona es lo que produce `bun run models` en `public/models/`.
 
 Todos los modelos de la fauna se publican **modificados**: simplificados (la
 garza pasa de 1,9 millones a 6.000 triángulos), sin texturas —su color va
-horneado en los vértices—, reorientados y escalados. Los insectos conservan su
-esqueleto y su animación, con las texturas reducidas a 256 px en WebP.
+horneado en los vértices—, reorientados y escalados. La mariposa conserva su
+esqueleto y su animación, con las texturas reducidas a 256 px en WebP; la
+libélula se publica sin esqueleto (su animación no movía las alas) y con las
+alas marcadas como translúcidas para que el sitio las pinte.
 
 ## Atribución obligatoria (CC BY)
 

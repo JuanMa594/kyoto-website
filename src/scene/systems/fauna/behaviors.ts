@@ -70,7 +70,9 @@ export function createPose(): FaunaPose {
     x: 0,
     y: 0,
     z: 0,
-    heading: 0,
+    // Sin rumbo todavía: el primer poseFor lo calcula aunque el animal no se
+    // mueva (ver `aheadHeading`).
+    heading: Number.NaN,
     pitch: 0,
     bank: 0,
     speed: 0,
@@ -174,10 +176,22 @@ const planearEnCirculos: Behavior = {
 
     out.x = Math.cos(angle) * radius;
     out.z = act.depth + Math.sin(angle) * radius * 0.55;
-    out.y = bandCenterY(out.z, 'alto') + Math.sin(s * 0.09 + member) * 1.6;
+    // El aire no es parejo: sube en una térmica, cae en un bajón. Dos oleajes
+    // de 7 y 15 s sobre la deriva lenta, para que en un solo acto se le vea
+    // ganar y perder altura. El cabeceo sale solo de la trayectoria: sube con
+    // el pico arriba y baja con el pico abajo. Las ráfagas del viento se suman
+    // aparte, en el cuerpo (`ridesWind`), porque no son función del reloj.
+    // Vuela algo por debajo del centro de la franja: es el hueco que necesita
+    // la ráfaga para subirlo sin sacarlo del cuadro por arriba.
+    out.y =
+      bandCenterY(out.z, 'alto') -
+      1 +
+      Math.sin(s * 0.09 + member) * 1.2 +
+      Math.sin(s * 0.42 + act.seed) * 0.8 +
+      Math.sin(s * 0.87 + member * 2.1 + act.seed) * 0.25;
   },
   decorate: (_act, _member, _s, pose) => {
-    // Alas fijas: el tobi planea, no bate.
+    // Casi sin esfuerzo: el tobi planea; los aletazos los pone el cuerpo.
     pose.effort = 0.05;
     pose.airborne = 1;
   },
@@ -268,7 +282,6 @@ const vadear: Behavior = {
     const stop1 = -dir * (1.2 + jitter(act.seed, member, 21) * 2.2);
     const stop2 = stop1 + dir * (1.2 + jitter(act.seed, member, 22) * 1.1);
 
-    out.z = z + Math.sin(s * 0.13 + act.seed) * 0.35;
     // Tramos cortos: cada fotograma clave es una vacilación, y cuantos más
     // hay, más pareja es la marcha y más baja la punta de velocidad de cada
     // tramo. Con dos paradas largas en medio para pescar.
@@ -284,6 +297,11 @@ const vadear: Behavior = {
       [0.84, lerp(stop2, dir * w, 0.62)],
       [1, dir * w],
     ]);
+    // La orilla serpentea **en función de por dónde va**, no del reloj. Si el
+    // vaivén dependiera del tiempo, al pararse a pescar seguiría deslizándose
+    // de lado, el rumbo —que sale del movimiento— apuntaría a la cámara y la
+    // garza "intentaría girarse" en cada parada.
+    out.z = z + Math.sin(out.x * 0.28 + act.seed) * 0.35;
     out.y = standingY(act, out.x, out.z);
   },
   decorate: (_act, _member, _s, pose) => {
@@ -329,20 +347,19 @@ const bandada: Behavior = {
  */
 const correrYParar: Behavior = {
   place: (act, member, s, out) => {
-    const z = act.depth + Math.sin(s * 0.5 + act.seed) * 0.55;
-    const w = offscreenX(z, act.spec.size);
+    // El margen de salida cubre también el vaivén lateral de abajo.
+    const w = offscreenX(act.depth, act.spec.size) + 0.6;
     const omega = 2 * Math.PI * 0.5;
     const pace = (2 * w) / act.duration;
 
     const distance = pace * (s - (0.93 / omega) * Math.sin(omega * s));
-    const speed = pace * (1 - 0.93 * Math.cos(omega * s));
 
-    out.z = z;
     out.x = act.direction * (-w + distance);
-    // Brinca sólo cuando corre de verdad.
-    out.y =
-      standingY(act, out.x, z) +
-      Math.abs(Math.sin(omega * s)) * 0.07 * clamp(speed / pace, 0, 1.6);
+    // El zigzag depende de lo recorrido: parada, no se desvía.
+    out.z = act.depth + Math.sin(distance * 0.3 + act.seed) * 0.55;
+    // Los brincos no son cosa de la trayectoria sino del cuerpo: los pone el
+    // galope del rig, uno por zancada.
+    out.y = standingY(act, out.x, out.z);
   },
 };
 
@@ -376,7 +393,7 @@ const perseguir: Behavior = {
 
     out.z = depth;
     out.x = enter + play;
-    out.y = standingY(act, out.x, depth) + Math.abs(Math.sin(own * 3.4)) * 0.09;
+    out.y = standingY(act, out.x, depth);
   },
   decorate: (_act, member, _s, pose) => {
     // El que persigue va siempre un poco más lanzado.
@@ -388,8 +405,7 @@ const perseguir: Behavior = {
 const deambular: Behavior = {
   place: (act, member, s, out) => {
     const t = s / act.duration;
-    const z = act.depth + Math.sin(s * 0.22 + act.seed) * 0.7;
-    const w = offscreenX(z, act.spec.size);
+    const w = offscreenX(act.depth, act.spec.size) + 0.7;
 
     const progress = track(t, [
       [0, 0],
@@ -399,9 +415,10 @@ const deambular: Behavior = {
       [1, 1],
     ]);
 
-    out.z = z;
     out.x = act.direction * lerp(-w, w, progress);
-    out.y = standingY(act, out.x, z) + jitter(act.seed, member, 9) * 0.01;
+    // Serpentea con el avance: en la pausa se queda quieto de verdad.
+    out.z = act.depth + Math.sin(progress * 5 + act.seed) * 0.7;
+    out.y = standingY(act, out.x, out.z) + jitter(act.seed, member, 9) * 0.01;
   },
 };
 
@@ -476,6 +493,29 @@ const DT = 0.05;
 const before: Point = { x: 0, y: 0, z: 0 };
 const here: Point = { x: 0, y: 0, z: 0 };
 const after: Point = { x: 0, y: 0, z: 0 };
+const ahead: Point = { x: 0, y: 0, z: 0 };
+
+/**
+ * El rumbo de quien todavía no se ha movido: hacia su **primer paso**, buscado
+ * a saltos de una décima durante un segundo y medio; si ni así se mueve, hacia
+ * donde avanza el acto.
+ *
+ * Sin esto un pose recién creado mira a +X por defecto, y el animal que entra
+ * por la derecha empieza el acto girando 180° sobre sí mismo. Y tiene que ser
+ * el primer paso, no un punto lejano: quien arranca en curva —las ardillas que
+ * se persiguen— apuntaría a otro sitio y giraría igual.
+ */
+function aheadHeading(act: FaunaAct, member: number, s: number): number {
+  const place = BEHAVIORS[act.behavior].place;
+  const step = act.spec.size * 0.05;
+  for (let lookAhead = 0.1; lookAhead <= 1.5; lookAhead += 0.1) {
+    place(act, member, Math.min(act.duration, s + lookAhead), ahead);
+    const dx = ahead.x - here.x;
+    const dz = ahead.z - here.z;
+    if (Math.hypot(dx, dz) > step) return Math.atan2(-dz, dx);
+  }
+  return act.direction >= 0 ? 0 : Math.PI;
+}
 
 /** Diferencia de ángulos, llevada a −π…π. */
 function angleDelta(a: number, b: number): number {
@@ -514,12 +554,20 @@ export function poseFor(act: FaunaAct, member: number, seconds: number, out: Fau
   out.speed = Math.hypot(dx, dy, dz) / span;
 
   // Una rotación en Y lleva el +X local hacia (cos, 0, −sen): de ahí el signo.
-  if (flat > 1e-4) out.heading = Math.atan2(-dz, dx);
+  // El rumbo sólo sigue al movimiento cuando hay movimiento de verdad. Parado,
+  // la dirección de un desplazamiento minúsculo es ruido, y seguirla hace girar
+  // al animal sobre sí mismo sin motivo.
+  const moving = flat / span > 0.03;
+  if (moving) out.heading = Math.atan2(-dz, dx);
+  else if (Number.isNaN(out.heading)) out.heading = aheadHeading(act, member, s);
   out.pitch = clamp(Math.atan2(dy, Math.max(flat, 1e-3)), -0.9, 0.9);
 
+  // El alabeo sale de cuánto tuerce la trayectoria. Con el animal parado, esa
+  // torsión es la de dos desplazamientos casi nulos — puro ruido — y ladearlo
+  // según ella lo haría bambolearse sin moverse.
   const headingIn = Math.atan2(-(here.z - before.z), here.x - before.x);
   const headingOut = Math.atan2(-(after.z - here.z), after.x - here.x);
-  out.bank = clamp(angleDelta(headingOut, headingIn) * 1.6, -0.55, 0.55);
+  out.bank = moving ? clamp(angleDelta(headingOut, headingIn) * 1.6, -0.55, 0.55) : 0;
 
   // Por defecto el esfuerzo es la velocidad: quien va rápido, mueve más.
   out.effort = clamp(out.speed / 1.4, 0, 1);

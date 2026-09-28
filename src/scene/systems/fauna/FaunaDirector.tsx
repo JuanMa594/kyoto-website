@@ -5,7 +5,7 @@ import { useFrame } from '@react-three/fiber';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 
 import { playFauna } from '@/audio/engine';
-import type { Station } from '@/config/journey';
+import type { FaunaKind, Station } from '@/config/journey';
 import { readCssSeconds, type ScenePalette } from '@/lib/css-vars';
 import { mulberry32 } from '@/lib/procedural';
 import { FireflyRig } from '@/scene/objects/fauna/FireflyRig';
@@ -39,21 +39,37 @@ interface FaunaDirectorProps {
   profile: QualityProfile;
 }
 
+/**
+ * Sólo en desarrollo: `?fauna=garza` deja en escena una única especie, sea cual
+ * sea la estación, y acorta las esperas a unos segundos. Sirve para revisar un
+ * animal sin esperar a que el sorteo lo saque. En el build de producción
+ * `process.env.NODE_ENV` vale 'production' y esto no existe.
+ */
+function devFocus(): FaunaKind | null {
+  if (process.env.NODE_ENV === 'production' || typeof window === 'undefined') return null;
+  const wanted = new URLSearchParams(window.location.search).get('fauna');
+  return wanted && speciesSpec(wanted as FaunaKind) ? (wanted as FaunaKind) : null;
+}
+
 export function FaunaDirector({ station, palette, profile }: FaunaDirectorProps) {
   const motionAllowed = useKyotoStore(selectMotionAllowed);
   const [acts, setActs] = useState<readonly FaunaAct[]>([]);
 
-  const cast = useMemo(() => availableSpecies(station.ambient.fauna), [station]);
+  const focus = useMemo(devFocus, []);
+  const cast = useMemo(
+    () => (focus ? [focus] : availableSpecies(station.ambient.fauna)),
+    [station, focus],
+  );
 
   const config = useMemo<CastingConfig>(
     () => ({
-      minGap: readCssSeconds('--fauna-min-gap', 20),
-      maxGap: readCssSeconds('--fauna-max-gap', 40),
+      minGap: focus ? 3 : readCssSeconds('--fauna-min-gap', 20),
+      maxGap: focus ? 6 : readCssSeconds('--fauna-max-gap', 40),
       idleGap: readCssSeconds('--idle-before-fauna', 20),
       // Dos actos a la vez sólo donde hay presupuesto para ellos.
       maxActs: profile.tier === 'high' ? 2 : 1,
     }),
-    [profile.tier],
+    [profile.tier, focus],
   );
 
   const random = useRef(mulberry32(20260915));

@@ -35,15 +35,45 @@ export interface DeformProfile {
   readonly splitX: number;
   /** x por detrás de la cual ya no hay patas (plumas o cola que cuelgan bajo). */
   readonly legMinX: number;
-  /** 1 = ave (dos patas), 2 = cuadrúpedo. */
-  readonly pairs: 1 | 2;
+  /**
+   * Cómo se coordinan las patas:
+   *   · `paso`   — ave caminando: izquierda contra derecha (garza).
+   *   · `brinco` — ave pequeña: las dos a la vez, a saltitos (gorrión).
+   *   · `trote`  — cuadrúpedo al paso: diagonales en fase (gato, tanuki).
+   *   · `galope` — cuadrúpedo que salta: delanteras contra traseras, con el
+   *     cuerpo en arco (ardilla).
+   */
+  readonly gait: 'paso' | 'brinco' | 'trote' | 'galope';
   /** Amplitud máxima de la zancada, en radianes. */
   readonly legSwing: number;
-  /** Largo de un paso, en largos de cuerpo. */
+  /** Largo de un paso o de un salto, en largos de cuerpo. */
   readonly stride: number;
+  /**
+   * Altura de cada brinco, en largos de cuerpo. En `galope` y `brinco` es lo que
+   * de verdad se ve: a su tamaño en pantalla, las patas de una ardilla o de un
+   * gorrión son dos píxeles, pero el cuerpo saltando se lee desde lejos.
+   */
+  readonly hop: number;
 
   /** Cola: de dónde a dónde, y por encima de qué altura (para no llevarse las patas). */
-  readonly tail?: { readonly baseX: number; readonly tipX: number; readonly minY: number; readonly pivotY: number };
+  readonly tail?: {
+    readonly baseX: number;
+    readonly tipX: number;
+    readonly minY: number;
+    readonly pivotY: number;
+    /**
+     * Segunda articulación, a media cola, para colas que **cambian de forma** y
+     * no sólo de ángulo: la de la ardilla va enroscada en «?» cuando se para y
+     * estirada detrás cuando corre. Girar la cola entera desde la base no la
+     * estira nunca —sólo la sube o la baja—; para desenroscarla, la base tiene
+     * que ir hacia atrás y la mitad final doblarse al revés.
+     *
+     * `x, y` es el codo; el peso crece con la **distancia a la base** entre
+     * `from` y `to`, porque la cola sube vertical desde la grupa y la x no
+     * recorre su largo.
+     */
+    readonly curl?: { readonly x: number; readonly y: number; readonly from: number; readonly to: number };
+  };
 
   /** Cuello: base, dirección en la que crece el peso y alcance. */
   readonly neck?: { readonly baseX: number; readonly baseY: number; readonly dirX: number; readonly dirY: number; readonly reach: number };
@@ -53,6 +83,15 @@ export interface DeformProfile {
 
   /** Alas: desde qué |z| hasta cuál, a qué altura del hombro y en qué caja. */
   readonly wings?: {
+    /**
+     * `planeo`: alas extendidas que respiran, con una tanda de aletazos lentos
+     * cada tanto (milano). `batido`: aletazos sólo en el aire, a ráfagas
+     * (gorrión). `zumbido`: batido continuo y rápido, siempre en el aire
+     * (libélula).
+     */
+    readonly style: 'planeo' | 'batido' | 'zumbido';
+    /** Batidos por segundo. */
+    readonly beat: number;
     readonly rootZ: number;
     readonly tipZ: number;
     readonly shoulderY: number;
@@ -75,6 +114,8 @@ export interface DeformPose {
   tailSwing: number;
   tailLift: number;
   tailRoll: number;
+  /** Giro de la mitad final de la cola sobre su codo (sólo con `tail.curl`). */
+  tailCurl: number;
   neckPitch: number;
   neckYaw: number;
   sit: number;
@@ -89,6 +130,7 @@ export function createDeformPose(): DeformPose {
     tailSwing: 0,
     tailLift: 0,
     tailRoll: 0,
+    tailCurl: 0,
     neckPitch: 0,
     neckYaw: 0,
     sit: 0,
@@ -99,11 +141,19 @@ export function createDeformPose(): DeformPose {
 /** Una región que no existe en la especie se "apaga" poniéndola fuera del modelo. */
 const NOWHERE = -10;
 
+const GAIT_CODE: Record<DeformProfile['gait'], number> = {
+  paso: 1,
+  trote: 2,
+  galope: 3,
+  brinco: 4,
+};
+
 const VERTEX_HEADER = /* glsl */ `
   uniform vec4 uLegs;      // cadera y, x que separa, amplitud, x mínima
-  uniform vec4 uGait;      // fase, recogida, pares, -
+  uniform vec4 uGait;      // fase, recogida, marcha (1 paso, 2 trote, 3 galope, 4 brinco), -
   uniform vec4 uTail;      // x base, x punta, y mínima, y del pivote
-  uniform vec4 uTailPose;  // vaivén, elevación, giro, -
+  uniform vec4 uTailPose;  // vaivén, elevación, giro, doblez de la punta
+  uniform vec4 uTailCurl;  // codo x, codo y, distancia a la base donde empieza y acaba el doblez
   uniform vec4 uNeck;      // base x, base y, dirección x, dirección y
   uniform vec4 uNeckPose;  // alcance, cabeceo, giro, -
   uniform vec4 uSit;       // cadera x, cadera y, ángulo, -
@@ -133,13 +183,17 @@ const VERTEX_HEADER = /* glsl */ `
   void faunaDeform(inout vec3 p, inout vec3 n) {
     vec3 rest = p;
 
-    // Patas: cada una gira desde su cadera. Cuadrúpedos al trote (diagonales en
-    // fase); aves, izquierda contra derecha. En vuelo se recogen hacia atrás.
+    // Patas: cada una gira desde su cadera, con el desfase que pide su marcha.
+    // En vuelo se recogen hacia atrás.
     float legW = (1.0 - smoothstep(uLegs.x - 0.05, uLegs.x, rest.y)) * step(uLegs.w, rest.x);
     if (legW > 0.0) {
       float front = step(uLegs.y, rest.x);
       float left = step(0.0, rest.z);
-      float offset = uGait.z > 1.5 ? mod(front + left, 2.0) * 3.14159265 : left * 3.14159265;
+      float offset = 0.0;
+      if (uGait.z < 1.5) offset = left * 3.14159265;                         // paso
+      else if (uGait.z < 2.5) offset = mod(front + left, 2.0) * 3.14159265;  // trote
+      else if (uGait.z < 3.5) offset = (1.0 - front) * 3.14159265;           // galope
+      // brinco: todas a la vez, desfase cero
       float swing = sin(uGait.x + offset) * uLegs.z;
       float a = mix(swing, -1.25, uGait.y) * legW;
       vec3 pivot = vec3(rest.x, uLegs.x, rest.z);
@@ -159,6 +213,14 @@ const VERTEX_HEADER = /* glsl */ `
     // tabla sino que se curva.
     float tailW = faunaRamp(uTail.x, uTail.y, rest.x) * step(uTail.z, rest.y);
     if (tailW > 0.0) {
+      // Primero la punta sobre su codo, luego la cola entera desde la base: el
+      // orden de una cadena de huesos. Así la base se lleva el codo consigo.
+      float curlW = faunaRamp(uTailCurl.z, uTailCurl.w, distance(rest.xy, uTail.xw));
+      if (curlW > 0.0 && uTailPose.w != 0.0) {
+        vec3 knee = vec3(uTailCurl.xy, 0.0);
+        p = knee + faunaRotZ(p - knee, uTailPose.w * curlW);
+        n = faunaRotZ(n, uTailPose.w * curlW);
+      }
       vec3 pivot = vec3(uTail.x, uTail.w, 0.0);
       vec3 q = p - pivot;
       q = faunaRotY(q, uTailPose.x * tailW);
@@ -208,6 +270,12 @@ export interface DeformLook {
   washi: string;
   /** Tinta: el contorno de la silueta, como una pincelada. */
   ink: string;
+  /**
+   * Para modelos que llegan sin color (la libélula): la escena los pinta desde
+   * la paleta. El pipeline marca las alas con alfa < 1 en el color de vértice;
+   * lo opaco toma `body` y lo translúcido `wing`.
+   */
+  paint?: { body: string; wing: string };
 }
 
 /**
@@ -219,13 +287,18 @@ export interface DeformLook {
 export function createDeformMaterial(profile: DeformProfile, look: DeformLook): DeformMaterial {
   const uniforms: Uniforms = {
     uLegs: { value: [profile.hipY, profile.splitX, 0, profile.legMinX] },
-    uGait: { value: [0, 0, profile.pairs, 0] },
+    uGait: { value: [0, 0, GAIT_CODE[profile.gait], 0] },
     uTail: {
       value: profile.tail
         ? [profile.tail.baseX, profile.tail.tipX, profile.tail.minY, profile.tail.pivotY]
         : [NOWHERE, NOWHERE - 1, NOWHERE, 0],
     },
     uTailPose: { value: [0, 0, 0, 0] },
+    uTailCurl: {
+      value: profile.tail?.curl
+        ? [profile.tail.curl.x, profile.tail.curl.y, profile.tail.curl.from, profile.tail.curl.to]
+        : [0, 0, -NOWHERE, -NOWHERE + 1],
+    },
     uNeck: {
       value: profile.neck
         ? [profile.neck.baseX, profile.neck.baseY, profile.neck.dirX, profile.neck.dirY]
@@ -245,12 +318,18 @@ export function createDeformMaterial(profile: DeformProfile, look: DeformLook): 
     },
     uWashi: { value: new Color(look.washi) },
     uInk: { value: new Color(look.ink) },
+    uPaint: { value: look.paint ? 1 : 0 },
+    uPaintBody: { value: new Color(look.paint?.body ?? '#ffffff') },
+    uPaintWing: { value: new Color(look.paint?.wing ?? '#ffffff') },
   };
 
   const material = new MeshStandardMaterial({
     vertexColors: true,
     roughness: 0.88,
     metalness: 0,
+    // Con alas translúcidas, el material tiene que mezclar. El alfa lo trae el
+    // propio color de vértice: el cuerpo sigue opaco.
+    transparent: Boolean(look.paint),
   });
 
   material.onBeforeCompile = (shader) => {
@@ -271,11 +350,18 @@ export function createDeformMaterial(profile: DeformProfile, look: DeformLook): 
         '#include <common>',
         `#include <common>
         uniform vec3 uWashi;
-        uniform vec3 uInk;`,
+        uniform vec3 uInk;
+        uniform float uPaint;
+        uniform vec3 uPaintBody;
+        uniform vec3 uPaintWing;`,
       )
       .replace(
         '#include <color_fragment>',
         `#include <color_fragment>
+        // Modelo sin color propio: lo opaco es cuerpo, lo translúcido es ala.
+        if (uPaint > 0.5) {
+          diffuseColor.rgb = diffuseColor.a > 0.99 ? uPaintBody : uPaintWing;
+        }
         // Un 10 % de washi en la piel: el animal toma la luz del papel.
         diffuseColor.rgb = mix(diffuseColor.rgb, uWashi, 0.1);`,
       )
@@ -291,7 +377,7 @@ export function createDeformMaterial(profile: DeformProfile, look: DeformLook): 
   };
 
   // Todos los individuos comparten programa: lo que los distingue son uniforms.
-  material.customProgramCacheKey = () => 'fauna-deform-v1';
+  material.customProgramCacheKey = () => 'fauna-deform-v2';
 
   return { material, uniforms };
 }
@@ -309,6 +395,7 @@ export function applyDeformPose(uniforms: Uniforms, pose: DeformPose, profile: D
   tail[0] = pose.tailSwing;
   tail[1] = pose.tailLift;
   tail[2] = pose.tailRoll;
+  tail[3] = pose.tailCurl;
 
   const neck = uniforms.uNeckPose!.value as number[];
   neck[0] = profile.neck?.reach ?? 0;

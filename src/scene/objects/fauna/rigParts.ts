@@ -1,9 +1,10 @@
 'use client';
 
 import { useFrame } from '@react-three/fiber';
-import { useMemo, type RefObject } from 'react';
+import { useMemo, useRef, type RefObject } from 'react';
 import { SphereGeometry, type Group } from 'three';
 
+import { damp } from '@/lib/procedural';
 import { WIND } from '@/scene/systems/WindField';
 import { createPose, poseFor, type FaunaAct, type FaunaPose } from '@/scene/systems/fauna/behaviors';
 
@@ -37,19 +38,30 @@ export function useFaunaFrame(
   apply: (pose: FaunaPose, delta: number, seconds: number) => void,
 ): FaunaPose {
   const pose = useMemo(createPose, []);
+  const heading = useRef<number | null>(null);
 
   useFrame((_, delta) => {
     const node = group.current;
     if (!node) return;
 
+    const dt = Math.min(delta, 0.1);
     const seconds = WIND.time - act.startedAt;
     poseFor(act, member, seconds, pose);
 
+    // Ningún animal gira en un frame. El rumbo de la conducta es el objetivo;
+    // el cuerpo lo alcanza con inercia y siempre por el lado corto. Un giro de
+    // media vuelta tarda así unas décimas, como el de un animal de verdad, en
+    // vez de dar un salto que se lee como un error.
+    if (heading.current === null) heading.current = pose.heading;
+    let turn = pose.heading - heading.current;
+    turn = Math.atan2(Math.sin(turn), Math.cos(turn));
+    heading.current = damp(heading.current, heading.current + turn, 7, dt);
+
     node.position.set(pose.x, pose.y, pose.z);
-    node.rotation.set(0, pose.heading, 0);
+    node.rotation.set(0, heading.current, 0);
     node.scale.setScalar(act.spec.size * pose.scale);
 
-    apply(pose, Math.min(delta, 0.1), seconds);
+    apply(pose, dt, seconds);
   });
 
   return pose;
