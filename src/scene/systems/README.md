@@ -20,12 +20,15 @@
   cuenta acabarían diciendo cosas distintas.
 - `fauna/` — **Fase 2C**. Cuatro piezas, tres de ellas puras y comprobables sin
   navegador:
-  - `bestiary.ts` — qué es cada especie: rig, proporciones, colores, repertorio.
+  - `bestiary.ts` — qué es cada especie: modelo, tamaño, **regiones que se
+    doblan** (cola, patas, cuello, alas), repertorio.
   - `behaviors.ts` — el repertorio, como funciones puras del tiempo a una
     posición. Rumbo, alabeo, esfuerzo y si está en el aire **se deducen** de la
     propia trayectoria.
   - `casting.ts` — las reglas del director: cadencia, aforo, variedad.
-  - `FaunaDirector.tsx` — la parte que React necesita: reloj, estado y mallas.
+  - `FaunaDirector.tsx` — la parte que React necesita: reloj, estado, precarga
+    de modelos y el reparto a los cuerpos de `objects/fauna/` (modelo con
+    deformación, modelo animado o punto de luz).
 
   Ver §5.6 del PLAN.
 

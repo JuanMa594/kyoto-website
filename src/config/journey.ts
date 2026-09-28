@@ -191,7 +191,8 @@ export const JOURNEY: readonly Station[] = [
       petals: 'baja',
       petalKind: 'ninguna',
       wind: 0.2,
-      fauna: ['libelula'],
+      // Valle abierto: libélulas sobre la hierba y alguna garza de paso.
+      fauna: ['libelula', 'garza'],
       sounds: ['viento'],
       fog: { near: 30, far: 140 },
     },
@@ -322,7 +323,9 @@ export const JOURNEY: readonly Station[] = [
       petals: 'ninguna',
       petalKind: 'ninguna',
       wind: 0.1,
-      fauna: ['carpa'],
+      // Gorriones picoteando en el patio de la machiya. La carpa queda
+      // declarada para cuando haya agua en escena (ver bestiary.ts).
+      fauna: ['gorrion', 'carpa'],
       sounds: ['arroyo', 'furin'],
       fog: { near: 30, far: 120 },
     },

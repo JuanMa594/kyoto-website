@@ -18,3 +18,8 @@ next-env.d.ts
 .DS_Store
 Thumbs.db
 *.log
+
+# modelos originales: la garza sola pesa 127 MB y GitHub no acepta archivos de
+# más de 100. Se versionan las versiones optimizadas de public/models/, que es
+# lo que produce `bun run models`.
+/assets/models/source/

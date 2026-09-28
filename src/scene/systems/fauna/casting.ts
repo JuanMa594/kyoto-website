@@ -174,7 +174,7 @@ function castAct(
     species: chosen.kind,
     spec,
     behavior: chosen.behavior,
-    members: membersFor(chosen.behavior, random),
+    members: membersFor(chosen.behavior, random, spec),
     duration: durationFor(chosen.behavior, random),
     startedAt: now,
     direction: random() < 0.5 ? -1 : 1,

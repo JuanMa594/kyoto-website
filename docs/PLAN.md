@@ -3,7 +3,7 @@
 > Documento de referencia del proyecto. Consolida las decisiones tomadas en la fase de
 > definición. Si algo cambia, se actualiza aquí y no en la memoria de nadie.
 >
-> Estado: **Fase 2 completa** — 2A motor, 2B ambiente y 2C vida implementados.
+> Estado: **Fase 2 completa** — 2A motor, 2B ambiente y 2C vida. La fauna pasó de primitivas a modelos reales.
 > El estado vivo de las fases y las convenciones del repo están en `CLAUDE.md`.
 
 ---
@@ -197,27 +197,42 @@ quince segundos, y por eso dos ardillas pueden **perseguirse jugando** — la
 persecución no es una animación, es una ardilla siguiendo a otra con retardo y
 error.
 
-**Tres rigs procedurales cubren todo el bestiario.** Es lo que hace barata la
-variedad: añadir una especie es declarar proporciones, no dibujar nada.
+**Los cuerpos son modelos reales; el movimiento, código.** La primera versión
+ensamblaba cada animal con primitivas de three.js (esferas, conos, cilindros) y
+se descartó en la revisión: se veía «rústico, poligonal y abstracto». Ahora cada
+especie es un `.glb` de verdad, preparado por `bun run models` (ver §7), y hay
+tres maneras de darle vida:
 
-| Rig | Piezas | Especies |
+| Cuerpo | Cómo se mueve | Especies |
 |---|---|---|
-| `BirdRig` | cuerpo, cuello articulado, dos alas ahusadas plegables, patas, cola | garza, milano, gorrión |
-| `QuadrupedRig` | cuerpo, cabeza, cuatro patas de dos segmentos, **cola de tubo sobre curva, con retardo respecto al cuerpo** | ardilla, gato, tanuki, kitsune |
-| `InsectRig` | dos o cuatro alas + cuerpo fino | mariposa, libélula, luciérnaga |
+| `modelo` | Malla sin esqueleto. **El shader dobla regiones** —cola desde la grupa, cada pata desde la cadera, cuello desde el pecho, alas desde el hombro— con los ángulos que ya calcula la conducta | garza, milano, gorrión, ardilla, gato, tanuki |
+| `animado` | Esqueleto y vuelo propios del modelo; la conducta marca el ritmo del aleteo | mariposa, libélula |
+| `luz` | Un punto que late con halo: a ocho píxeles, la forma no se ve | luciérnaga |
+
+Casi ningún modelo traía esqueleto, así que la opción de «vincular alas, cola y
+patas a los nodos» no existía: no hay nodos. La deformación por regiones es la
+técnica estándar para animar mallas sin huesos, y las regiones de cada especie se
+calibraron sobre una rejilla del modelo normalizado (`bestiary.ts`).
+
+**La garza no vuela: vadea.** El modelo está de pie y con las alas plegadas. En
+vez de un vuelo que no puede hacer, entra andando por la orilla, se para dos
+veces a pescar —espera con el cuello tenso y golpea— y sigue su camino, que es lo
+que hace una garza casi todo el día. El vuelo se lo queda el milano, cuyo modelo
+viene con las alas abiertas. Queda previsto el hueco para una garza en vuelo
+(`flightModel` en el bestiario).
 
 **Bestiario.** El criterio es geográfico, no «japonés genérico»: el ciervo, por
 ejemplo, queda fuera porque es de Nara.
 
 | Especie | Por qué es de Kyoto | Dónde vive en el cuadro |
 |---|---|---|
-| **Garza** (aosagi / shirasagi) | Las del río Kamo, quietas en la orilla | Vuela por el tercio superior; **camina y picotea en el inferior** |
+| **Garza** (aosagi) | Las del río Kamo, quietas en la orilla | Tercio inferior: **vadea y pesca**. Sin vuelo hasta que haya modelo en vuelo |
 | **Milano** (tobi) | Planean en círculo sobre las colinas del este | Sólo tercio superior, lejos; no aterriza nunca |
-| **Gorrión** (suzume) | En bandadas por los tejados | Bandada de 5–9; se posan en las piedras y despegan a la vez |
+| **Gorrión** (suzume) | En bandadas por los tejados | Bandada de 5–9, o de 3 a 5 bajando juntos a picotear |
 | **Ardilla japonesa** (*Sciurus lis*) | Bosques de Higashiyama y Arashiyama | Suelo del tercio inferior; **es la que persigue a otra** |
-| **Gato** | Callejones de Gion y Pontochō | Suelo, paso lento, se sienta y se estira |
+| **Gato** | Callejones de Gion y Pontochō. Es un bobtail calicó, el del maneki-neko | Suelo, paso lento, se para y sigue |
 | **Luciérnaga** (Genji-botaru) | Junio en el Shirakawa y el Kamo | Sólo en Gion, al anochecer |
-| **Mariposa / libélula** (ageha / akatombo) | Jardines y campo abierto | Capa delantera, cruzan cerca de la cámara |
+| **Mariposa / libélula** (ageha *Papilio xuthus* / akatombo) | Jardines y campo abierto | Capa delantera, cruzan cerca de la cámara |
 | **Tanuki** | Nocturno, en las colinas | Raro, sólo Gion |
 | **Uguisu** (ruiseñor japonés) | *El* sonido de la primavera en Kyoto | **No se ve: sólo existe como capa de audio** |
 | **Kitsune** | Mensajero de Inari | Aplazado a la **Fase 6**, entre los toriis |
@@ -333,8 +348,8 @@ instancia miles de veces y reacciona al input. Un dibujo estático no.
 | **Bambú** | `CylinderGeometry` instanciado + vertex shader de viento (seno + ruido) | R3F `<Instances>` + GLSL |
 | **Pétalos / hojas** | `InstancedMesh` con posición calculada **en el shader** → coste CPU ≈ 0, miles de partículas a 60 fps | R3F + shader |
 | **Faroles** | `LatheGeometry` para la acanaladura + material emisivo + bloom. Se balancean con física | R3F + postprocessing + rapier |
-| **Garzas y demás fauna** | Geometría procedural con tres rigs (§5.6): cuerpos de revolución, alas ahusadas plegables y colas de `TubeGeometry` sobre curva. Silueta de tinta plana, animada por conducta — no por clip | R3F + three |
-| **Luciérnagas** | Puntos con material emisivo y pulso propio + bloom | R3F + postprocessing |
+| **Fauna** | Modelos `.glb` reales pasados por `bun run models`: el color de la textura se **hornea en los vértices** y la textura se tira (el 80 % del peso, y un realismo fotográfico que chocaba con el cartel), la malla se simplifica y se normaliza (morro a +X, pies en y = 0, largo 1). De 177 MB a ~1 MB. Se animan deformando regiones en el vertex shader, con un tinte leve de washi y un filo de tinta en la silueta (§5.6) | gltf-transform + meshoptimizer + sharp; R3F + GLSL |
+| **Luciérnagas** | Puntos con material emisivo y pulso propio | R3F |
 | **Ambiente sonoro** | Sintetizado con la Web Audio API: ruido rosa filtrado para el viento (la frecuencia sigue al `WindField`), parciales con decaimiento para el *fūrin*, ráfagas cortas para los grillos, envolvente sobre oscilador ruidoso para el graznido | Web Audio nativa |
 | **Pétalos y hojas** | Densidad por zona con pico en cada ráfaga. Contorno paramétrico triangulado en abanico (pétalo de cerezo con su muesca, arce de cinco lóbulos por el valor absoluto de cos(2.5θ), hoja lanceolada de bambú) + `InstancedMesh` con la posición calculada **en el vertex shader** | R3F + GLSL |
 | **Estallido de pétalos al click** | `confetti.shapeFromPath()` con la silueta de un pétalo | canvas-confetti |
@@ -483,8 +498,10 @@ buena medida rellenar contenido sobre una plantilla que ya funciona.
 | Fuente de kanji | ⏳ Zen Old Mincho vs Yuji Syuku — comparar en `/es/tipografia/` |
 | Slugs por idioma | ⏳ Hoy `/en/ubicacion` usa el slug español. Si se quieren traducidos, se resuelve en Fase 3 con `pathnames` de next-intl |
 | Pagoda, casas de Gion y platos | ⏳ Se resuelve en sus fases (ver §7) |
-| Gastronomía y ubicación, sin fauna o con una sola | ⏳ Gastronomía declara sólo `carpa`, que está aplazada, así que **no tiene fauna visible**; ubicación declara sólo `libelula` y repite especie siempre. Las dos se resuelven añadiendo una especie a su `ambient.fauna` en `journey.ts` — decisión de contenido, no de código |
-| Kitsune y carpa koi | ⏳ Aplazados: el zorro necesita el túnel de toriis (Fase 6) y la carpa necesita agua en escena. El resto del bestiario de §5.6 entra en la Fase 2C |
+| Kitsune | ⏳ Aplazado a la Fase 6, entre los toriis. El modelo está en `assets/models/source/` |
+| Carpa koi | ⏳ Aplazada hasta que haya agua: un estanque en alguno de los templos o en la home. El koi que había es un asset de Animal Crossing y **no se puede publicar**; se hará uno propio (los peces son el caso de libro de la deformación en el shader) |
+| **Créditos de los modelos** | ⚠️ Garza y gorrión son CC BY: **antes de publicar tiene que existir una sección de créditos visible**. Detalle en `assets/models/LICENSES.md` (Fase 9) |
+| Peso de la fauna | ⏳ ~1,1 MB en total; cada estación sólo carga su elenco. La mariposa se lleva 620 KB (esqueleto de 192 huesos que el simplificador no consigue bajar de 16.000 triángulos), y las posiciones de los modelos estáticos van sin cuantizar para que el shader vea coordenadas reales. Las dos cosas son candidatas a recorte en la Fase 9 |
 | Bloom | ⏳ Aplazado de 2B a **2C**. Sobre un fondo washi (`#FFFACD`, luminancia ~0,97) un bloom por umbral ilumina el fondo entero. Entra con las luciérnagas y los faroles, que son lo que de verdad tiene que brillar |
 | Giroscopio en iOS | ⚠️ `DeviceOrientationEvent.requestPermission()` exige un gesto y abre un diálogo del sistema. No se pide al vuelo: el parallax por giro queda listo pero apagado en iOS hasta que haya un interruptor explícito (Fase 2C / 9) |
 | Profundidad del contenido | ⏳ ¿Tarjetas cortas o artículos largos? Define si se usa MDX o datos en TS |

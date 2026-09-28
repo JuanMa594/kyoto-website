@@ -246,6 +246,52 @@ const visitaAlSuelo: Behavior = {
   },
 };
 
+/**
+ * La garza pescando: entra andando por la orilla, se para, espera, da unos
+ * pasos más, vuelve a pararse y sigue su camino.
+ *
+ * Una garza no camina a velocidad constante: da un paso, se queda quieta, da
+ * otro. Por eso la trayectoria tiene fotogramas clave intermedios aunque no se
+ * pare en ellos — cada uno es una vacilación, y `track` los empalma frenando un
+ * poco en cada uno. Las dos paradas largas son las de pesca: ahí la velocidad
+ * cae a cero y el rig, al verla quieta en el suelo, baja el cuello a picotear.
+ */
+const vadear: Behavior = {
+  place: (act, member, s, out) => {
+    const t = s / act.duration;
+    const z = act.depth + (jitter(act.seed, member, 20) - 0.5) * 1.2;
+    const w = offscreenX(z, act.spec.size);
+    const dir = act.direction;
+
+    // Primera parada, un poco antes del centro; la segunda, un par de pasos
+    // después. Nunca en el mismo sitio dos veces.
+    const stop1 = -dir * (1.2 + jitter(act.seed, member, 21) * 2.2);
+    const stop2 = stop1 + dir * (1.2 + jitter(act.seed, member, 22) * 1.1);
+
+    out.z = z + Math.sin(s * 0.13 + act.seed) * 0.35;
+    // Tramos cortos: cada fotograma clave es una vacilación, y cuantos más
+    // hay, más pareja es la marcha y más baja la punta de velocidad de cada
+    // tramo. Con dos paradas largas en medio para pescar.
+    out.x = track(t, [
+      [0, -dir * w],
+      [0.1, lerp(-dir * w, stop1, 0.35)],
+      [0.2, lerp(-dir * w, stop1, 0.7)],
+      [0.3, stop1],
+      [0.42, stop1],
+      [0.5, stop2],
+      [0.62, stop2],
+      [0.72, lerp(stop2, dir * w, 0.3)],
+      [0.84, lerp(stop2, dir * w, 0.62)],
+      [1, dir * w],
+    ]);
+    out.y = standingY(act, out.x, out.z);
+  },
+  decorate: (_act, _member, _s, pose) => {
+    pose.airborne = 0;
+    pose.effort = clamp(pose.speed / 0.8, 0, 1);
+  },
+};
+
 /** La bandada de gorriones: van juntos, giran juntos y se asustan juntos. */
 const bandada: Behavior = {
   place: (act, member, s, out) => {
@@ -413,6 +459,7 @@ const BEHAVIORS: Record<BehaviorName, Behavior> = {
   cruzarVolando,
   planearEnCirculos,
   visitaAlSuelo,
+  vadear,
   bandada,
   correrYParar,
   perseguir,

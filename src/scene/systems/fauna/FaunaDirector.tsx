@@ -1,20 +1,21 @@
 'use client';
 
+import { useGLTF } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 
 import { playFauna } from '@/audio/engine';
 import type { Station } from '@/config/journey';
 import { readCssSeconds, type ScenePalette } from '@/lib/css-vars';
 import { mulberry32 } from '@/lib/procedural';
-import { BirdRig } from '@/scene/objects/fauna/BirdRig';
-import { InsectRig } from '@/scene/objects/fauna/InsectRig';
-import { QuadrupedRig } from '@/scene/objects/fauna/QuadrupedRig';
+import { FireflyRig } from '@/scene/objects/fauna/FireflyRig';
+import { ModelCreature } from '@/scene/objects/fauna/ModelCreature';
+import { SkinnedCreature } from '@/scene/objects/fauna/SkinnedCreature';
 import type { QualityProfile } from '@/scene/quality/tiers';
 import { WIND } from '@/scene/systems/WindField';
 import { selectMotionAllowed, useKyotoStore } from '@/store/useKyotoStore';
 
-import { availableSpecies } from './bestiary';
+import { availableSpecies, modelUrl, speciesSpec } from './bestiary';
 import type { FaunaAct } from './behaviors';
 import { advanceCasting, newMemory, type CastingConfig } from './casting';
 
@@ -57,6 +58,17 @@ export function FaunaDirector({ station, palette, profile }: FaunaDirectorProps)
 
   const random = useRef(mulberry32(20260915));
   const memory = useRef(newMemory(0, random.current));
+
+  // Los modelos del elenco se piden en cuanto se llega a la estación. Pesan
+  // decenas de KB, pero si se pidieran al empezar el acto la garza aparecería a
+  // mitad de su paseo, cuando ya terminara de descargar.
+  useEffect(() => {
+    for (const kind of cast) {
+      const spec = speciesSpec(kind);
+      if (spec?.model) useGLTF.preload(modelUrl(spec.model), false, true);
+      if (spec?.flightModel) useGLTF.preload(modelUrl(spec.flightModel), false, true);
+    }
+  }, [cast]);
 
   // Al cambiar de estación no se hereda nada: el elenco es otro.
   useEffect(() => {
@@ -101,7 +113,13 @@ export function FaunaDirector({ station, palette, profile }: FaunaDirectorProps)
   );
 }
 
-/** Un acto en escena: tantos individuos como pida su conducta. */
+/**
+ * Un acto en escena: tantos individuos como pida su conducta.
+ *
+ * Va dentro de `Suspense` porque los modelos se cargan de red. Mientras llegan
+ * no se pinta nada — nunca un hueco, nunca un marcador de posición: un animal
+ * que aún no ha llegado simplemente no ha entrado todavía en cuadro.
+ */
 function ActView({ act, palette }: { act: FaunaAct; palette: ScenePalette }) {
   const members = useMemo(
     () => Array.from({ length: act.members }, (_, index) => index),
@@ -109,18 +127,19 @@ function ActView({ act, palette }: { act: FaunaAct; palette: ScenePalette }) {
   );
 
   return (
-    <>
+    <Suspense fallback={null}>
       {members.map((member) => {
         const key = `${act.id}-${member}`;
 
-        if (act.spec.rig === 'ave') {
-          return <BirdRig key={key} act={act} member={member} palette={palette} />;
+        switch (act.spec.rig) {
+          case 'modelo':
+            return <ModelCreature key={key} act={act} member={member} palette={palette} />;
+          case 'animado':
+            return <SkinnedCreature key={key} act={act} member={member} palette={palette} />;
+          case 'luz':
+            return <FireflyRig key={key} act={act} member={member} palette={palette} />;
         }
-        if (act.spec.rig === 'cuadrupedo') {
-          return <QuadrupedRig key={key} act={act} member={member} palette={palette} />;
-        }
-        return <InsectRig key={key} act={act} member={member} palette={palette} />;
       })}
-    </>
+    </Suspense>
   );
 }

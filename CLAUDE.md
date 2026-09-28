@@ -35,6 +35,7 @@ bun run build        # export estático a out/
 bun run preview      # sirve out/ como lo haría el hosting
 bun run typecheck    # tsc --noEmit
 bun run fonts        # regenera los .woff2 subseteados
+bun run models       # assets/models/source → public/models (fauna optimizada)
 bun run palette      # muestrea los colores de docs/referencias/*.png
 ```
 
@@ -96,7 +97,7 @@ src/
 │   ├─ FoundationScene.tsx     ← escena de calibración de la Fase 1
 │   ├─ objects/Stone.tsx       ← piedra procedural
 │   ├─ objects/PetalGeometry.ts← pétalo, arce y hoja de bambú por contorno
-│   ├─ objects/fauna/          ← los tres rigs: ave, cuadrúpedo, insecto
+│   ├─ objects/fauna/          ← cuerpos: modelo + deformación, animado, luz
 │   ├─ PostProcessing.tsx      ← profundidad de campo (sólo tier alto)
 │   ├─ systems/elevation.ts    ← ★ altura del terreno (función pura)
 │   ├─ systems/Terrain.tsx     ← malla del suelo, deformada por estación
@@ -120,6 +121,12 @@ src/
 ├─ lib/css-vars.ts             ← puente tokens CSS → colores de Three
 └─ lib/procedural.ts           ← PRNG, ruido direccional, damping
 ```
+
+Fuera de `src/`: `scripts/` (pipelines de fuentes, paleta y modelos) y
+`assets/` (originales). Los modelos originales de `assets/models/source/` **no
+se versionan** —la garza pesa 127 MB y GitHub no acepta más de 100—; sí se
+versionan los optimizados de `public/models/`. Créditos y licencias en
+`assets/models/LICENSES.md`.
 
 ### Cómo se conectan las piezas
 
@@ -225,13 +232,26 @@ src/
   temblor va ahora envuelto en un `sin(PI · progreso)`, que vale 0 justo en los
   dos empalmes. Al cambiar de tramo, comprobar siempre que el valor de salida de
   uno es el de entrada del siguiente.
-- **Un material creado por individuo es una fuga.** La fauna monta y desmonta
-  actos cada veinte segundos, y una bandada son nueve gorriones: crear los
-  materiales dentro de cada criatura significa abandonar miles de programas de
-  GPU en una sesión larga, porque un material sólo se libera si alguien llama a
-  `dispose()`. Van en una caché por especie (`rigParts.ts`). La excepción es la
-  luciérnaga, que necesita opacidad propia para titilar por su cuenta: ésa sí
-  crea material por individuo, y lo libera al terminar el acto.
+- **Un material creado por individuo es una fuga… salvo que se libere.** La
+  fauna monta y desmonta actos cada veinte segundos, y una bandada son nueve
+  gorriones. Cada animal con deformación necesita su propio material (lleva su
+  propia zancada en uniforms), así que se crea al entrar y **se libera con
+  `dispose()` al terminar el acto**; todos comparten el mismo programa de GPU
+  gracias a `customProgramCacheKey`. Los materiales que no cambian por individuo
+  (las alas de la libélula) van en una caché por especie.
+- **`normals()` de gltf-transform genera normales planas y desuelda la malla.**
+  El resultado es justo lo que la revisión rechazó: un animal facetado, y
+  archivos con el triple de vértices. El pipeline calcula normales suaves,
+  promediadas por área, sobre la malla soldada (`smoothNormals` en
+  `scripts/optimize-models.ts`).
+- **Las posiciones de un modelo que se deforma en el shader no se cuantizan.**
+  Cuantizar las guarda como enteros y mueve la escala al nodo: el shader recibe
+  otras coordenadas y las regiones —«la cola empieza en x = −0,14»— caen donde
+  no toca. Normales y color sí se comprimen.
+- **La caja de una malla con esqueleto no es la de su nodo.** glTF ignora la
+  transformación del nodo de una malla con huesos y la coloca con las
+  articulaciones (articulación × matriz de enlace inversa). Medir el nodo dio
+  mariposas de un milímetro; `restBounds()` mide la pose de reposo de verdad.
 - **Lo que un animal hace se deduce de su trayectoria, no se declara aparte.**
   Rumbo, cabeceo, alabeo, velocidad y hasta si está en el aire salen de muestrear
   la propia curva (`poseFor`). En cuanto una bandera como "va volando" se lleva
