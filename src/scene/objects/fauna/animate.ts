@@ -11,7 +11,7 @@
  * del navegador al calibrar las regiones de cada especie.
  */
 
-import { clamp, damp, smoothstep } from '@/lib/procedural';
+import { clamp, damp, lerp, smoothstep } from '@/lib/procedural';
 import type { FaunaPose } from '@/scene/systems/fauna/behaviors';
 import type { SpeciesSpec } from '@/scene/systems/fauna/bestiary';
 
@@ -53,6 +53,12 @@ export interface BodyPose {
   bank: number;
   /** Cuánto se levanta el cuerpo del suelo en este instante, en largos de cuerpo. */
   lift: number;
+  /**
+   * Aplastamiento sobre los pies: 0 nada, 0,1 un 10 % más bajo (y algo más
+   * ancho, para que el volumen no cambie). La recepción del galope y el
+   * respirar del gato dormido.
+   */
+  squash: number;
 }
 
 const TAU = Math.PI * 2;
@@ -92,24 +98,87 @@ export function animate(
   // ── Patas y cuerpo ──────────────────────────────────────────────────────
   // Un ciclo completo por cada paso o salto recorrido: las patas van al ritmo
   // al que el animal avanza de verdad, así que nunca patinan.
-  memory.stride = (memory.stride + (TAU * pose.speed * delta) / (profile.stride * spec.size)) % TAU;
+  //
+  // El galope acorta la zancada a velocidad de persecución —un 15 % desde los
+  // ~3 cuerpos por segundo a los que se persiguen—: más saltos por segundo y
+  // más bajos, un ciclo continuo y pegado al suelo en vez de botes sueltos. Se
+  // integra igual que siempre, así que cambiar el largo no hace saltar la fase.
+  const galope = profile.gait === 'galope';
+  // Quien trota al paso y galopa al correr (el gato): cuánto galopa ya. La
+  // zancada se alarga con él, y como la fase se integra, sin saltos.
+  const run = profile.run ? smoothstep(profile.run.from, profile.run.to, pace) * moving : 0;
+  const bound = galope ? 1 : run;
+  const strideLength = galope
+    ? profile.stride * (1 - 0.15 * smoothstep(1.5, 3.5, pace))
+    : profile.run
+      ? lerp(profile.stride, profile.run.stride, run)
+      : profile.stride;
+  memory.stride = (memory.stride + (TAU * pose.speed * delta) / (strideLength * spec.size)) % TAU;
   out.stridePhase = memory.stride;
   out.legAmplitude = profile.legSwing * moving;
   out.tuck = air;
+  out.gallop = run;
 
   // En galope y a saltitos el cuerpo **despega** media zancada y cae la otra
   // media: es lo que se ve de una ardilla o de un gorrión a veinte píxeles.
   // Al paso, sólo el leve sube y baja de cada apoyo.
-  // El galope cabecea: morro arriba al despegar, abajo al caer.
-  const rock = profile.gait === 'galope' ? Math.cos(memory.stride) * 0.16 * moving : 0;
+  //
+  // El vuelo es medio seno: sube frenando, se detiene sin pico en la cúspide y
+  // cae acelerando. El galope cabecea poco —morro arriba al despegar, abajo al
+  // caer—: un balanceo de peso, no un vaivén.
+  const rock = Math.cos(memory.stride) * 0.07 * moving * bound;
   // Cabecear alrededor del pecho baja el extremo que cae: sin compensarlo, las
   // manos se hunden en el suelo al aterrizar. El pie más alejado del pivote
   // anda a unos 0,3 largos, así que se sube el cuerpo lo que ese pie baja.
   const lift =
     (bounding
       ? profile.hop * Math.max(0, Math.sin(memory.stride)) * moving
-      : 0.012 * Math.abs(Math.sin(memory.stride)) * moving) +
+      : lerp(
+          0.012 * Math.abs(Math.sin(memory.stride)),
+          (profile.run?.hop ?? 0) * Math.max(0, Math.sin(memory.stride)),
+          run,
+        ) * moving) +
     0.3 * Math.abs(Math.sin(rock));
+  // Al tocar suelo, el cuerpo **se comprime** antes de volver a impulsarse. La
+  // media zancada de apoyo es de π a 2π; el aplastamiento empieza y acaba en
+  // cero —empalma con el vuelo por los dos lados— y llega a su máximo al 40 %
+  // del apoyo, poco después del contacto. El sesgo es un polinomio y no una
+  // potencia: con v^0,7 la pendiente en el contacto era infinita y el cuerpo se
+  // aplastaba de golpe en un frame.
+  const stance = memory.stride > Math.PI ? (memory.stride - Math.PI) / Math.PI : 0;
+  const landing = 0.09 * Math.sin(Math.PI * stance * (1.4 - 0.4 * stance)) * moving * bound;
+
+  // ── Posturas del cuadrúpedo parado (el gato) ────────────────────────────
+  // Sentarse, echarse y desperezarse no se deducen del movimiento: la
+  // conducta las marca con el mismo reloj con el que lo para. El desperezo
+  // tiene dos tiempos: manos al frente con el pecho al suelo, y luego las
+  // patas traseras estiradas hacia atrás; cada uno empieza y acaba en cero.
+  const postures = profile.postures;
+  const sitting = postures ? pose.sitting : 0;
+  const lying = postures ? pose.lying : 0;
+  const sleeping = postures ? pose.sleeping : 0;
+  const stretch = postures ? pose.stretching : 0;
+  const reach = stretch > 0 && stretch < 0.55 ? Math.sin((Math.PI * stretch) / 0.55) : 0;
+  const kick = stretch >= 0.55 ? Math.sin((Math.PI * (stretch - 0.55)) / 0.45) : 0;
+  let posturePitch = 0;
+  let postureLift = 0;
+  if (postures) {
+    out.legFront =
+      -postures.sitTilt * sitting + postures.lieFront * lying + postures.reachFront * reach;
+    out.legHind = postures.sitFold * sitting + postures.lieHind * lying - postures.kickHind * kick;
+    posturePitch = postures.sitTilt * sitting - postures.reachTilt * reach + postures.kickTilt * kick;
+    postureLift =
+      -postures.sitDrop * sitting -
+      postures.lieDrop * lying -
+      postures.reachDrop * reach -
+      postures.kickDrop * kick;
+  } else {
+    out.legFront = 0;
+    out.legHind = 0;
+  }
+  // Echado, respira: el lomo sube y baja despacio, más despacio si duerme.
+  const resting = Math.max(lying, sitting * 0.5);
+  const breath = resting * 0.02 * Math.sin(seconds * (2.2 - 0.8 * sleeping));
 
   // ── Cola: persigue al cuerpo con retardo ────────────────────────────────
   const tailTarget =
@@ -152,9 +221,15 @@ export function animate(
   // ── Cuello y cabeza ─────────────────────────────────────────────────────
   if (quadruped) {
     // Olfatea parado —golpes cortos de hocico— y cabecea con cada zancada.
+    // Sentado o echado no olfatea: levanta la cabeza a mirar; y dormido la
+    // apoya sobre las manos.
+    const upright = Math.max(sitting, lying) * (1 - sleeping);
     out.neckPitch =
-      -still * (0.12 + 0.08 * Math.sin(seconds * 9 + member)) +
-      Math.sin(memory.stride * 2) * 0.06 * moving;
+      (-still * (0.12 + 0.08 * Math.sin(seconds * 9 + member)) +
+        Math.sin(memory.stride * 2) * 0.06 * moving) *
+        (1 - Math.max(sitting, lying)) +
+      upright * 0.08 -
+      sleeping * 0.55;
   } else if (profile.gait === 'paso') {
     // La garza: cabeceo adelante-atrás con cada paso, y quieta, espera con el
     // cuello tenso hasta que golpea. Esperas largas, golpes secos.
@@ -172,7 +247,9 @@ export function animate(
   } else {
     out.neckPitch = 0;
   }
-  const lookTarget = still * Math.sin(seconds * 0.7 + member * 2) * 0.45;
+  // Parado mira alrededor; dormido deja la cabeza ladeada, quieta.
+  const lookTarget =
+    still * Math.sin(seconds * 0.7 + member * 2) * 0.45 * (1 - sleeping) + sleeping * 0.3;
   memory.neckYaw = damp(memory.neckYaw, lookTarget, 3, delta);
   out.neckYaw = memory.neckYaw;
 
@@ -221,8 +298,14 @@ export function animate(
   }
 
   return {
-    pitch: clamp(pose.pitch * 0.6, -0.5, 0.5) + air * (spec.flightPitch ?? 0) + rock + windPitch,
+    pitch:
+      clamp(pose.pitch * 0.6, -0.5, 0.5) +
+      air * (spec.flightPitch ?? 0) +
+      rock +
+      windPitch +
+      posturePitch,
     bank: pose.bank + windRock,
-    lift: lift + memory.windLift,
+    lift: lift + memory.windLift + postureLift,
+    squash: landing + breath,
   };
 }

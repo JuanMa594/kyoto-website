@@ -236,6 +236,30 @@ baja—, así que tiene una segunda articulación a media cola (`tail.curl`): la
 base va hacia atrás y la mitad final se dobla al revés. Se estira al arrancar y
 se enrosca en cada frenazo.
 
+**El galope de la ardilla es bajo y continuo.** El salto se quedó en un 62 %
+de su altura inicial —la parábola era alta para lo que avanzaba y se leía como
+rebote—, la zancada se acorta un 15 % a velocidad de persecución (más saltos
+por segundo, más pegados al suelo), el vuelo es medio seno con la cúspide suave,
+el cabeceo es un balanceo de peso de 0,07 rad y, al aterrizar, el cuerpo se
+aplasta un 9 % sobre los pies antes de volver a impulsarse.
+
+**El gato tiene cuatro planes**, que salen de la duración del acto
+(`callejear`): dos gatos jugando a perseguirse (19–25 s), el paseo de siempre
+(32–42 s), sentarse a mirar y desperezarse (44–52 s) o echarse la siesta
+(54–62 s). En la siesta se echa, duerme con la cabeza sobre las manos y
+respirando, despierta, se levanta, se despereza en dos tiempos —manos al frente
+con el pecho al suelo, luego las patas atrás— y se va. Es una sola conducta a
+propósito: el reparto pesa cada conducta por separado, y cuatro le habrían
+dado al gato el cuádruple de apariciones.
+
+Jugando, los gatos **dan vueltas de verdad**: el recorrido se define por su
+curvatura —dos bucles completos, uno que se aleja de la cámara y otro que se le
+acerca, con radio mínimo de un gato y medio— y nunca se paran, así que cada
+giro se ve entero: de costado, de espaldas, del otro costado, de frente. El
+perseguidor es el mismo recorrido 0,75 s antes. Al paso trotan; corriendo
+galopan, y el cambio desliza el desfase de las patas en unos pasos, sin salto. Las posturas viven en el perfil
+(`deform.postures`) y se calibraron con pies y grupa a ras de suelo.
+
 **El milano monta el viento.** Planea casi siempre, pero el aire no es parejo:
 gana y pierde altura en oleajes de 7 y 15 s —con el pico arriba al subir y
 abajo al bajar, que sale solo de la trayectoria—, y **la misma ráfaga que
@@ -267,7 +291,7 @@ ejemplo, queda fuera porque es de Nara.
 | **Milano** (tobi) | Planean en círculo sobre las colinas del este | Sólo tercio superior, lejos; no aterriza nunca |
 | **Gorrión** (suzume) | En bandadas por los tejados | Bandada de 5–9, o de 3 a 5 bajando juntos a picotear |
 | **Ardilla japonesa** (*Sciurus lis*) | Bosques de Higashiyama y Arashiyama | Suelo del tercio inferior; **es la que persigue a otra** |
-| **Gato** | Callejones de Gion y Pontochō. Es un bobtail calicó, el del maneki-neko | Suelo, paso lento, se para y sigue |
+| **Gato** | Callejones de Gion y Pontochō. Es un bobtail calicó, el del maneki-neko | Suelo. Pasea con pausas; o se sienta a mirar la calle y se despereza; o se echa la siesta, despierta, se despereza y se va; o **son dos, persiguiéndose en círculos** |
 | **Luciérnaga** (Genji-botaru) | Junio en el Shirakawa y el Kamo | Sólo en Gion, al anochecer |
 | **Mariposa / libélula** (ageha *Papilio xuthus* / akatombo) | Jardines y campo abierto | Capa delantera, cruzan cerca de la cámara |
 | **Tanuki** | Nocturno, en las colinas | Raro, sólo Gion |

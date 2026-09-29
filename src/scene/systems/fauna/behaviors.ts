@@ -23,7 +23,7 @@ import { clamp, lerp, mulberry32, smoothstep } from '@/lib/procedural';
 import { bandCenterY, halfWidthAt, screenBandY } from '@/scene/camera/framing';
 import { GROUND_Y, terrainHeight } from '@/scene/systems/elevation';
 
-import type { BehaviorName, SpeciesSpec } from './bestiary';
+import { catPlan, type BehaviorName, type SpeciesSpec } from './bestiary';
 
 export interface FaunaAct {
   readonly id: number;
@@ -63,6 +63,16 @@ export interface FaunaPose {
   glow: number;
   /** Entradas y salidas, por si el acto empieza dentro de cuadro. */
   scale: number;
+  /**
+   * Posturas que no se deducen de la trayectoria —parado, un gato puede estar
+   * de pie, sentado o dormido— y que la conducta marca con el mismo reloj con
+   * el que lo para: 0–1 cada una, con entradas y salidas suaves.
+   */
+  sitting: number;
+  lying: number;
+  sleeping: number;
+  /** Progreso del desperezo, 0–1 (0 fuera de él): primero las manos, luego las patas. */
+  stretching: number;
 }
 
 export function createPose(): FaunaPose {
@@ -80,6 +90,10 @@ export function createPose(): FaunaPose {
     airborne: 1,
     glow: 1,
     scale: 1,
+    sitting: 0,
+    lying: 0,
+    sleeping: 0,
+    stretching: 0,
   };
 }
 
@@ -422,6 +436,210 @@ const deambular: Behavior = {
   },
 };
 
+/**
+ * Llegar a paso de crucero y frenar al final (u de 0 a 1). `track` frena en
+ * cada fotograma clave; aquí la velocidad es pareja el 70 % del camino y sólo
+ * se va a cero al llegar, como quien anda hasta un sitio y se para en él.
+ */
+function arrive(u: number): number {
+  const cruise = 0.7;
+  const k = 2 / (1 + cruise);
+  const v = clamp(u, 0, 1);
+  return v <= cruise ? k * v : 1 - (k / (2 * (1 - cruise))) * (1 - v) ** 2;
+}
+
+/** Lo mismo al revés: arrancar suave y seguir a paso de crucero. */
+function depart(u: number): number {
+  return 1 - arrive(1 - u);
+}
+
+/** Una postura que entra entre `a0` y `a1` y sale entre `b0` y `b1`. */
+function spell(t: number, a0: number, a1: number, b0: number, b1: number): number {
+  return smoothstep(a0, a1, t) * (1 - smoothstep(b0, b1, t));
+}
+
+/**
+ * Los dos planes del gato que se paran de verdad: sentarse a mirar y
+ * desperezarse, o echarse la siesta. Tiempos en fracción del acto; a la
+ * salida le toca más que a la entrada porque cruza el cuadro entero. Todo el
+ * gato de un acto sale del mismo reloj: la postura y la posición no pueden
+ * contradecirse, porque las dos se leen aquí.
+ */
+const CAT_PLANS = {
+  sentarse: {
+    arrive: 0.27,
+    leave: 0.69,
+    sit: [0.29, 0.33, 0.52, 0.56],
+    lie: null,
+    sleep: null,
+    stretch: [0.58, 0.68],
+  },
+  siesta: {
+    arrive: 0.23,
+    leave: 0.73,
+    sit: null,
+    lie: [0.24, 0.27, 0.6, 0.63],
+    sleep: [0.29, 0.32, 0.54, 0.57],
+    stretch: [0.64, 0.72],
+  },
+} as const;
+
+/**
+ * El juego de dos gatos: uno corre y el otro lo persigue, **dando vueltas**.
+ *
+ * Un giro se ve en tres dimensiones cuando el animal describe la curva —de
+ * costado, de espaldas, del otro costado, de frente—, y se ve plano, como un
+ * recorte que se voltea, cuando se da la vuelta en el sitio. Por eso este
+ * recorrido no se escribe con posiciones sino con su **curvatura**, y la
+ * posición sale de integrarla: una recta de entrada, un bucle completo que se
+ * aleja de la cámara, un tramo recto, otro que se le acerca, y la salida. En
+ * cada bucle la curvatura crece y mengua como 2·sen² —nula en los empalmes—,
+ * así que el cuerpo se inclina hacia dentro de la curva sin tirones. El radio
+ * más cerrado es ℓ/4π ≈ 1 unidad: un gato y medio.
+ *
+ * Se integra una vez por acto y se guarda; la conducta sigue siendo una
+ * función del tiempo.
+ */
+interface PlayPath {
+  readonly x: Float32Array;
+  readonly z: Float32Array;
+  readonly length: number;
+}
+
+const PLAY_PATHS = new WeakMap<FaunaAct, PlayPath>();
+/** Largo de cada bucle, en unidades de mundo. */
+const PLAY_LOOP = 12;
+const PLAY_STEP = 0.02;
+/** Lo que el perseguidor va por detrás, en segundos: pisa por donde ya pasó el otro. */
+const PLAY_LAG = 0.75;
+
+function playPath(act: FaunaAct): PlayPath {
+  const cached = PLAY_PATHS.get(act);
+  if (cached) return cached;
+
+  // Se integra de izquierda a derecha; la dirección del acto lo refleja luego.
+  const w = offscreenX(act.depth, act.spec.size) + 1;
+  const firstLoopAt = -3.2 + jitter(act.seed, 0, 42) * 1.4;
+  const between = 1.2 + jitter(act.seed, 0, 43) * 1.6;
+
+  const xs: number[] = [];
+  const zs: number[] = [];
+  let x = -w;
+  let z = 0;
+  let heading = 0;
+  // 0 entra · 1 bucle que se aleja · 2 recta · 3 bucle que se acerca · 4 sale
+  let stage = 0;
+  let into = 0;
+
+  for (let guard = 0; guard < 20000; guard += 1) {
+    xs.push(x);
+    zs.push(z);
+    if (stage === 4 && x >= w) break;
+
+    let curvature = 0;
+    if (stage === 1 || stage === 3) {
+      const u = into / PLAY_LOOP;
+      // z crece hacia la cámara: girar a menor rumbo es alejarse de ella.
+      const turn = stage === 1 ? -1 : 1;
+      curvature = turn * ((2 * Math.PI) / PLAY_LOOP) * 2 * Math.sin(Math.PI * u) ** 2;
+    }
+    const mid = heading + (curvature * PLAY_STEP) / 2;
+    x += Math.cos(mid) * PLAY_STEP;
+    z += Math.sin(mid) * PLAY_STEP;
+    heading += curvature * PLAY_STEP;
+    into += PLAY_STEP;
+
+    if (stage === 0 && x >= firstLoopAt) {
+      stage = 1;
+      into = 0;
+    } else if ((stage === 1 || stage === 3) && into >= PLAY_LOOP) {
+      // Una vuelta entera exacta: sin arrastrar el error de la integración.
+      stage += 1;
+      into = 0;
+      heading = 0;
+    } else if (stage === 2 && into >= between) {
+      stage = 3;
+      into = 0;
+    }
+  }
+
+  const path: PlayPath = {
+    x: Float32Array.from(xs),
+    z: Float32Array.from(zs),
+    length: (xs.length - 1) * PLAY_STEP,
+  };
+  PLAY_PATHS.set(act, path);
+  return path;
+}
+
+/**
+ * El gato de Gion. Casi siempre anda, se para y sigue; pero unas veces se
+ * sienta a mirar la calle y se despereza antes de irse, otras se echa a
+ * dormir la siesta en mitad del callejón, y otras son dos, jugando a
+ * perseguirse en círculos.
+ *
+ * Es una sola conducta con cuatro planes, y no cuatro conductas, a propósito:
+ * el director reparte el peso por conducta, y cuatro le darían al gato el
+ * cuádruple de apariciones que al tanuki y a las luciérnagas.
+ */
+const callejear: Behavior = {
+  place: (act, member, s, out) => {
+    const plan = catPlan(act.duration);
+    if (plan === 'pasear') {
+      // El paseo de siempre, con su duración de siempre.
+      deambular.place(act, member, s, out);
+      return;
+    }
+
+    if (plan === 'jugar') {
+      const path = playPath(act);
+      const own = Math.max(0, s - member * PLAY_LAG);
+      // Recorre el camino entero en lo que dura el acto, a arrancones: la
+      // velocidad ondea un 18 % sin llegar nunca a pararse.
+      const pace = path.length / (act.duration - PLAY_LAG - 0.6);
+      const arc =
+        pace * (own - (0.18 / 1.1) * (Math.cos(1.1 * own + act.seed) - Math.cos(act.seed)));
+      const at = clamp(arc, 0, path.length) / PLAY_STEP;
+      const i = Math.min(path.x.length - 2, Math.floor(at));
+      const f = at - i;
+      out.x = act.direction * lerp(path.x[i]!, path.x[i + 1]!, f);
+      out.z = act.depth + lerp(path.z[i]!, path.z[i + 1]!, f);
+      out.y = standingY(act, out.x, out.z);
+      return;
+    }
+
+    const timeline = CAT_PLANS[plan];
+    const t = s / act.duration;
+    const dir = act.direction;
+    const w = offscreenX(act.depth, act.spec.size) + 0.7;
+    // Se para antes del centro, del lado por el que entra: en un tercio, no en
+    // mitad del cuadro.
+    const stop = -dir * (1 + jitter(act.seed, member, 41) * 2.5);
+
+    if (t <= timeline.arrive) {
+      out.x = lerp(-dir * w, stop, arrive(t / timeline.arrive));
+    } else if (t < timeline.leave) {
+      out.x = stop;
+    } else {
+      out.x = lerp(stop, dir * w, depart((t - timeline.leave) / (1 - timeline.leave)));
+    }
+    // Serpentea con lo recorrido, no con el reloj: sentado, no se desliza.
+    out.z = act.depth + Math.sin(out.x * 0.3 + act.seed) * 0.5;
+    out.y = standingY(act, out.x, out.z);
+  },
+  decorate: (act, _member, s, pose) => {
+    const plan = catPlan(act.duration);
+    if (plan === 'pasear' || plan === 'jugar') return;
+    const timeline = CAT_PLANS[plan];
+    const t = s / act.duration;
+    if (timeline.sit) pose.sitting = spell(t, ...timeline.sit);
+    if (timeline.lie) pose.lying = spell(t, ...timeline.lie);
+    if (timeline.sleep) pose.sleeping = spell(t, ...timeline.sleep);
+    const [from, to] = timeline.stretch;
+    pose.stretching = t > from && t < to ? (t - from) / (to - from) : 0;
+  },
+};
+
 /** Mariposas y libélulas: cerca de la cámara y sin línea recta que valga. */
 const revolotear: Behavior = {
   place: (act, member, s, out) => {
@@ -481,6 +699,7 @@ const BEHAVIORS: Record<BehaviorName, Behavior> = {
   correrYParar,
   perseguir,
   deambular,
+  callejear,
   revolotear,
   titilar,
 };
@@ -573,6 +792,10 @@ export function poseFor(act: FaunaAct, member: number, seconds: number, out: Fau
   out.effort = clamp(out.speed / 1.4, 0, 1);
   out.airborne = 0;
   out.glow = 1;
+  out.sitting = 0;
+  out.lying = 0;
+  out.sleeping = 0;
+  out.stretching = 0;
 
   const t = s / act.duration;
   out.scale = smoothstep(0, 0.03, t) * (1 - smoothstep(0.97, 1, t));

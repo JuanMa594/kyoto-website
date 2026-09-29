@@ -54,6 +54,13 @@ export interface DeformProfile {
    * gorrión son dos píxeles, pero el cuerpo saltando se lee desde lejos.
    */
   readonly hop: number;
+  /**
+   * Para quien trota al paso y galopa al correr (el gato): entre `from` y `to`
+   * cuerpos por segundo pasa del trote al galope deslizando el desfase de las
+   * patas —sin saltos— y alargando la zancada hasta `stride`; `hop` es su
+   * brinco al galope.
+   */
+  readonly run?: { readonly from: number; readonly to: number; readonly stride: number; readonly hop: number };
 
   /** Cola: de dónde a dónde, y por encima de qué altura (para no llevarse las patas). */
   readonly tail?: {
@@ -101,6 +108,30 @@ export interface DeformProfile {
     readonly maxY: number;
   };
 
+  /**
+   * Posturas de un cuadrúpedo parado (el gato): cuánto se inclina el cuerpo,
+   * cuánto baja y cuánto giran delanteras y traseras en cada una. Radianes y
+   * largos de cuerpo. Se calibran como las regiones: con los pies en el suelo.
+   */
+  readonly postures?: {
+    /** Sentado: el lomo se levanta, las manos quedan verticales, las patas se pliegan. */
+    readonly sitTilt: number;
+    readonly sitDrop: number;
+    readonly sitFold: number;
+    /** Echado: manos al frente, patas recogidas bajo el vientre. */
+    readonly lieFront: number;
+    readonly lieHind: number;
+    readonly lieDrop: number;
+    /** Desperezo, primer tiempo: manos estiradas al frente y el pecho al suelo. */
+    readonly reachFront: number;
+    readonly reachTilt: number;
+    readonly reachDrop: number;
+    /** Segundo tiempo: las patas traseras estiradas hacia atrás. */
+    readonly kickHind: number;
+    readonly kickTilt: number;
+    readonly kickDrop: number;
+  };
+
   /** Altura del centro de giro del cuerpo entero (alabeo y cabeceo). */
   readonly pivotY: number;
 }
@@ -111,6 +142,14 @@ export interface DeformPose {
   legAmplitude: number;
   /** 0 de pie, 1 patas recogidas (vuelo). */
   tuck: number;
+  /**
+   * Ángulo fijo que se suma a las delanteras y a las traseras, por encima de la
+   * zancada: sentarse, echarse o desperezarse. Positivo, hacia delante.
+   */
+  legFront: number;
+  legHind: number;
+  /** 0 su marcha propia, 1 galope (ver `DeformProfile.run`). */
+  gallop: number;
   tailSwing: number;
   tailLift: number;
   tailRoll: number;
@@ -127,6 +166,9 @@ export function createDeformPose(): DeformPose {
     stridePhase: 0,
     legAmplitude: 0,
     tuck: 0,
+    legFront: 0,
+    legHind: 0,
+    gallop: 0,
     tailSwing: 0,
     tailLift: 0,
     tailRoll: 0,
@@ -150,7 +192,8 @@ const GAIT_CODE: Record<DeformProfile['gait'], number> = {
 
 const VERTEX_HEADER = /* glsl */ `
   uniform vec4 uLegs;      // cadera y, x que separa, amplitud, x mínima
-  uniform vec4 uGait;      // fase, recogida, marcha (1 paso, 2 trote, 3 galope, 4 brinco), -
+  uniform vec4 uGait;      // fase, recogida, marcha (1 paso, 2 trote, 3 galope, 4 brinco), cuánto galopa
+  uniform vec4 uLegRest;   // ángulo fijo de las delanteras, de las traseras, -, -
   uniform vec4 uTail;      // x base, x punta, y mínima, y del pivote
   uniform vec4 uTailPose;  // vaivén, elevación, giro, doblez de la punta
   uniform vec4 uTailCurl;  // codo x, codo y, distancia a la base donde empieza y acaba el doblez
@@ -194,8 +237,14 @@ const VERTEX_HEADER = /* glsl */ `
       else if (uGait.z < 2.5) offset = mod(front + left, 2.0) * 3.14159265;  // trote
       else if (uGait.z < 3.5) offset = (1.0 - front) * 3.14159265;           // galope
       // brinco: todas a la vez, desfase cero
+      // Quien trota y se lanza a correr desliza el desfase hacia el del galope
+      // poco a poco: las patas se reacomodan en unos pasos, sin saltar.
+      offset = mix(offset, (1.0 - front) * 3.14159265, uGait.w);
       float swing = sin(uGait.x + offset) * uLegs.z;
-      float a = mix(swing, -1.25, uGait.y) * legW;
+      // Ojo con el nombre: rest es la pose de reposo del vértice, y taparla
+      // aquí deja el shader sin compilar (y sin fauna).
+      float restAngle = front > 0.5 ? uLegRest.x : uLegRest.y;
+      float a = (mix(swing, -1.25, uGait.y) + restAngle) * legW;
       vec3 pivot = vec3(rest.x, uLegs.x, rest.z);
       p = pivot + faunaRotZ(p - pivot, a);
       n = faunaRotZ(n, a);
@@ -288,6 +337,7 @@ export function createDeformMaterial(profile: DeformProfile, look: DeformLook): 
   const uniforms: Uniforms = {
     uLegs: { value: [profile.hipY, profile.splitX, 0, profile.legMinX] },
     uGait: { value: [0, 0, GAIT_CODE[profile.gait], 0] },
+    uLegRest: { value: [0, 0, 0, 0] },
     uTail: {
       value: profile.tail
         ? [profile.tail.baseX, profile.tail.tipX, profile.tail.minY, profile.tail.pivotY]
@@ -377,7 +427,7 @@ export function createDeformMaterial(profile: DeformProfile, look: DeformLook): 
   };
 
   // Todos los individuos comparten programa: lo que los distingue son uniforms.
-  material.customProgramCacheKey = () => 'fauna-deform-v2';
+  material.customProgramCacheKey = () => 'fauna-deform-v4';
 
   return { material, uniforms };
 }
@@ -390,6 +440,11 @@ export function applyDeformPose(uniforms: Uniforms, pose: DeformPose, profile: D
   const gait = uniforms.uGait!.value as number[];
   gait[0] = pose.stridePhase;
   gait[1] = pose.tuck;
+  gait[3] = pose.gallop;
+
+  const legRest = uniforms.uLegRest!.value as number[];
+  legRest[0] = pose.legFront;
+  legRest[1] = pose.legHind;
 
   const tail = uniforms.uTailPose!.value as number[];
   tail[0] = pose.tailSwing;

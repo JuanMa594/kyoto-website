@@ -204,6 +204,15 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   —la costumbre del resto del proyecto— termina la cadena en mitad del shader
   y TypeScript se queja de una coma que falta veinte líneas más abajo. Dentro
   de un shader, los nombres van sin comillas.
+- **Ni `tsc` ni el build compilan el GLSL.** Los shaders son template strings:
+  para TypeScript son texto. Un `float rest` que tapaba al `vec3 rest` del
+  shader de la fauna pasó el typecheck y el build, y en el navegador el
+  programa no compiló — y como todos los animales con modelo comparten
+  programa, desapareció la fauna entera. Todo cambio en GLSL se compila en un
+  contexto WebGL2 real antes de darlo por bueno (`gl.compileShader` y
+  `getShaderInfoLog`; funciona aunque la pestaña esté oculta) y se mira la
+  consola en busca de «Shader Error». En GLSL no hay que reutilizar nombres de
+  variables de un ámbito exterior.
 - **Un `ShaderMaterial` propio no hereda la niebla.** Hay que mezclarle
   `UniformsLib.fog` con `UniformsUtils.merge`, ponerle `fog: true` e incluir
   los chunks `fog_pars_vertex` / `fog_vertex` / `fog_pars_fragment` /
@@ -270,6 +279,25 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   un clip, listar sus canales y comprobar que mueven los huesos que importan (la
   mariposa sí: 51 canales de rotación en las alas). La libélula pasó a modelo
   estático con las alas batiendo en el shader.
+- **Un modelo puede venir esculpido mirando de lado.** El bobtail tenía la
+  cabeza girada 105° hacia el espectador: andando, miraba siempre de costado,
+  y ninguna deformación en tiempo real lo arregla sin torcer el cuello en cada
+  frame. Se endereza al preparar el modelo (`headTurn` en el manifiesto de
+  `scripts/optimize-models.ts`): giro sobre el **centro de la cabeza** —sobre
+  el cuello la desplazaba y estiraba— y selección por **cilindro vertical**
+  —en una esfera las orejas caían en la franja de transición y giraban a
+  medias—.
+- **En el reparto, cada conducta suma el peso de su especie.** Dar tres
+  conductas a una especie triplica sus apariciones. Por eso el gato tiene una
+  sola, `callejear`, con cuatro planes que salen de la duración del acto (y
+  por eso el reparto sortea la duración antes que el número de individuos:
+  jugar es de dos).
+- **Un giro se ve plano cuando el animal se da la vuelta en el sitio.** Si la
+  trayectoria invierte la marcha con la velocidad a cero, el rumbo salta media
+  vuelta y el cuerpo gira sobre sí mismo como un recorte. Para que un giro se
+  lea en 3D el animal tiene que **describir la curva** sin pararse, pasando
+  por el tres cuartos, la espalda y el frente. Los bucles del juego de los
+  gatos se escriben por curvatura y se integran (`playPath`).
 - **Un vaivén que depende del reloj hace girar al animal parado.** La garza y
   el tanuki serpenteaban con `sin(tiempo)`: al pararse, seguían deslizándose de
   lado, el rumbo —que sale del movimiento— apuntaba a la cámara y el animal

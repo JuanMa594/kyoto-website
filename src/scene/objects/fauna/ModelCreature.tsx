@@ -74,6 +74,7 @@ export function ModelCreature({ act, member, palette }: ModelCreatureProps) {
 
   const group = useRef<Group>(null);
   const tilt = useRef<Group>(null);
+  const feet = useRef<Group>(null);
   const groundMesh = useRef<Mesh>(null);
   const flightMesh = useRef<Mesh>(null);
   const memory = useMemo(createAnimMemory, []);
@@ -90,6 +91,11 @@ export function ModelCreature({ act, member, palette }: ModelCreatureProps) {
       // largos de cuerpo.
       tilt.current.position.y = body.lift;
     }
+    if (feet.current) {
+      // Este grupo tiene su origen en los pies: escalarlo aplasta el cuerpo
+      // hacia el suelo sin despegarlo. Lo que pierde de alto lo gana de ancho.
+      feet.current.scale.set(1 + body.squash * 0.5, 1 - body.squash, 1 + body.squash * 0.5);
+    }
 
     if (spec.flightModel && groundMesh.current && flightMesh.current) {
       const flying = pose.airborne > 0.5;
@@ -104,7 +110,7 @@ export function ModelCreature({ act, member, palette }: ModelCreatureProps) {
     <group ref={group}>
       <group position={[0, profile.pivotY, 0]}>
         <group ref={tilt}>
-          <group position={[0, -profile.pivotY, 0]}>
+          <group ref={feet} position={[0, -profile.pivotY, 0]}>
             <mesh ref={groundMesh} geometry={groundGeometry} material={material} castShadow />
             {spec.flightModel && flightGeometry && (
               <mesh

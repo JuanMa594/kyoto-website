@@ -73,6 +73,29 @@ interface StaticJob {
    * sola malla. La escena distingue las dos por ese alfa para pintarlas.
    */
   translucentFlat?: number;
+  /**
+   * Para modelos esculpidos **mirando de lado**: gira la cabeza sobre su propio
+   * eje vertical hasta que mire al frente (+X), y la devuelve al eje del cuerpo.
+   * Todo en unidades ya normalizadas.
+   *
+   * La cabeza se elige con un cilindro vertical alrededor de su centro —así
+   * entran las orejas enteras, que en una esfera caían a medio girar— por
+   * encima de la barbilla, para no arrastrar el pecho. Entre `inner` y `outer`
+   * el giro se funde con el cuello.
+   */
+  headTurn?: {
+    /** Grados; positivo lleva lo que mira a +Z hacia +X. */
+    readonly yaw: number;
+    /** Centro de la cabeza en planta (x, z): el eje del giro. */
+    readonly center: readonly [number, number];
+    readonly inner: number;
+    readonly outer: number;
+    /** Altura de la barbilla: por debajo de `fromY` no gira nada; desde `toY`, todo. */
+    readonly fromY: number;
+    readonly toY: number;
+    /** Desplazamiento en Z que la devuelve al eje del cuerpo. */
+    readonly shiftZ: number;
+  };
 }
 
 interface AnimatedJob {
@@ -96,7 +119,16 @@ const JOBS: Job[] = [
   { kind: 'estatico', source: 'fauna/grey_heron__standing_rigged_bird.glb', output: 'fauna/garza.glb', triangles: 6000, yaw: 180 },
   { kind: 'estatico', source: 'fauna/Squirrel.glb', output: 'fauna/ardilla.glb', triangles: 4500, yaw: 90 },
   { kind: 'estatico', source: 'fauna/Tanuki3d.glb', output: 'fauna/tanuki.glb', triangles: 4500, yaw: 90 },
-  { kind: 'estatico', source: 'fauna/Botail cat 3d model.glb', output: 'fauna/gato.glb', triangles: 4500, yaw: 0 },
+  // El bobtail está esculpido mirando al espectador, con la cabeza girada 105°
+  // hacia un costado: andando, miraba siempre de lado. Se le endereza aquí.
+  {
+    kind: 'estatico',
+    source: 'fauna/Botail cat 3d model.glb',
+    output: 'fauna/gato.glb',
+    triangles: 4500,
+    yaw: 0,
+    headTurn: { yaw: 105, center: [0.37, 0.09], inner: 0.14, outer: 0.2, fromY: 0.43, toY: 0.5, shiftZ: -0.07 },
+  },
   { kind: 'estatico', source: 'fauna/Milano Negro.glb', output: 'fauna/milano.glb', triangles: 3500, yaw: 90 },
   // Un cucarachero de cactus haciendo de gorrión: a 20 px y en bandada no se
   // distinguen, y es el único pájaro pequeño del lote.
@@ -277,6 +309,8 @@ async function processStatic(io: NodeIO, job: StaticJob): Promise<Document> {
     positions[i + 2] = (positions[i + 2]! - cz) / length;
   }
 
+  if (job.headTurn) turnHead(positions, job.headTurn);
+
   // Un mismo punto aparece varias veces —una por cada isla de UV que lo toca—
   // con colores apenas distintos. Se les da el color medio para que se puedan
   // soldar: sin soldar, el simplificador no puede colapsar aristas y la garza
@@ -324,6 +358,35 @@ async function processStatic(io: NodeIO, job: StaticJob): Promise<Document> {
   }
 
   return doc;
+}
+
+function smoothstep(edge0: number, edge1: number, x: number): number {
+  const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
+
+/** Endereza una cabeza esculpida mirando de lado (ver `StaticJob.headTurn`). */
+function turnHead(positions: number[], turn: NonNullable<StaticJob['headTurn']>): void {
+  const [cx, cz] = turn.center;
+  const yaw = (turn.yaw * Math.PI) / 180;
+  for (let i = 0; i < positions.length; i += 3) {
+    const x = positions[i]!;
+    const y = positions[i + 1]!;
+    const z = positions[i + 2]!;
+    const w =
+      (1 - smoothstep(turn.inner, turn.outer, Math.hypot(x - cx, z - cz))) *
+      smoothstep(turn.fromY, turn.toY, y);
+    if (w <= 0) continue;
+    // Giro en Y sobre el centro de la cabeza, en la proporción de su peso: la
+    // cabeza gira entera y el cuello se tuerce lo justo para seguirla.
+    const a = yaw * w;
+    const c = Math.cos(a);
+    const s = Math.sin(a);
+    const dx = x - cx;
+    const dz = z - cz;
+    positions[i] = cx + c * dx + s * dz;
+    positions[i + 2] = cz - s * dx + c * dz + turn.shiftZ * w;
+  }
 }
 
 /**

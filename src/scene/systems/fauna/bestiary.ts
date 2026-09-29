@@ -40,6 +40,7 @@ export type BehaviorName =
   | 'correrYParar'
   | 'perseguir'
   | 'deambular'
+  | 'callejear'
   | 'revolotear'
   | 'titilar';
 
@@ -225,7 +226,9 @@ export const BESTIARY: Record<FaunaKind, SpeciesSpec | null> = {
       gait: 'galope',
       legSwing: 0.9,
       stride: 1.2,
-      hop: 0.25,
+      // Un 38 % más bajo que al principio: con 0,25 la parábola era alta para
+      // lo que avanzaba y se leía como rebote.
+      hop: 0.155,
       // La cola nace en x ≈ −0,1 y sube vertical hasta el codo, a media altura
       // del arco; desde ahí cae hasta la punta. La base gira casi rígida y el
       // codo desenrosca el resto al correr.
@@ -265,13 +268,33 @@ export const BESTIARY: Record<FaunaKind, SpeciesSpec | null> = {
       hop: 0,
       tail: { baseX: -0.38, tipX: -0.5, minY: 0.35, pivotY: 0.48 },
       neck: { baseX: 0.18, baseY: 0.52, dirX: 0.8, dirY: 0.6, reach: 0.25 },
+      // Al paso trota; jugando, galopa. El paseo nunca pasa de 2,5 cuerpos por
+      // segundo, así que sólo galopa cuando corre de verdad.
+      run: { from: 2.6, to: 3.1, stride: 1, hop: 0.09 },
+      // Calibradas con los pies —y la grupa, sentado— a ras de suelo.
+      postures: {
+        sitTilt: 0.45,
+        sitDrop: 0.075,
+        sitFold: 1.5,
+        lieFront: 1.5,
+        lieHind: 1.5,
+        lieDrop: 0.242,
+        reachFront: 1.6,
+        reachTilt: 0.3,
+        reachDrop: 0.117,
+        // Con las patas estiradas atrás la grupa baja: el cuerpo se inclina lo
+        // justo para que manos y patas sigan pisando.
+        kickHind: 0.8,
+        kickTilt: 0.09,
+        kickDrop: 0.02,
+      },
       pivotY: 0.3,
     },
     size: 0.62,
     body: 'sumi',
     accent: 'washi',
     ride: 0,
-    behaviors: ['deambular'],
+    behaviors: ['callejear'],
     depth: [-8, -3.5],
     weight: 1,
   },
@@ -374,13 +397,30 @@ export function modelUrl(name: string): string {
   return `/models/fauna/${name}.glb`;
 }
 
-/** Cuántos individuos salen juntos, según la conducta y la especie. */
+/**
+ * Los planes del gato (`callejear`), por tramos de duración: cada uno necesita
+ * su tiempo —una siesta no cabe en un paseo— y así el acto nunca dura lo que
+ * no le toca. Los huecos entre tramos evitan planes con el tiempo justo.
+ */
+export type CatPlan = 'jugar' | 'pasear' | 'sentarse' | 'siesta';
+
+export function catPlan(duration: number): CatPlan {
+  if (duration < 30) return 'jugar';
+  if (duration < 43) return 'pasear';
+  return duration < 53 ? 'sentarse' : 'siesta';
+}
+
+/** Cuántos individuos salen juntos, según la conducta, la especie y la duración. */
 export function membersFor(
   behavior: BehaviorName,
   random: () => number,
   spec?: SpeciesSpec,
+  duration?: number,
 ): number {
   switch (behavior) {
+    case 'callejear':
+      // Jugar a perseguirse es cosa de dos.
+      return duration !== undefined && catPlan(duration) === 'jugar' ? 2 : 1;
     case 'visitaAlSuelo':
       return spec?.gregarious ? 3 + Math.floor(random() * 3) : 1;
     case 'bandada':
@@ -410,9 +450,22 @@ export function durationFor(behavior: BehaviorName, random: () => number): numbe
     perseguir: [11, 17],
     // Un paseo: sin prisa, para que las patas se vean dar pasos y no temblar.
     deambular: [32, 42],
+    // Sólo el rango total: el reparto real está abajo.
+    callejear: [19, 62],
     revolotear: [11, 18],
     titilar: [22, 34],
   };
+
+  // El gato elige plan por la duración (`catPlan`): dos gatos jugando a
+  // perseguirse (19–25 s), un paseo como el de siempre (32–42 s), un rato
+  // sentado (44–52 s) o una siesta entera (54–62 s).
+  if (behavior === 'callejear') {
+    const roll = random();
+    if (roll < 0.22) return 19 + (roll / 0.22) * 6;
+    if (roll < 0.5) return 32 + ((roll - 0.22) / 0.28) * 10;
+    if (roll < 0.75) return 44 + ((roll - 0.5) / 0.25) * 8;
+    return 54 + ((roll - 0.75) / 0.25) * 8;
+  }
 
   const [min, max] = range[behavior];
   return min + random() * (max - min);

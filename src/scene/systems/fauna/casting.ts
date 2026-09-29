@@ -169,13 +169,16 @@ function castAct(
   memory.counter += 1;
   memory.lastSpecies = chosen.kind;
 
+  // La duración va primero: el gato decide por ella si juega, y jugar es de dos.
+  const duration = durationFor(chosen.behavior, random);
+
   return {
     id: memory.counter,
     species: chosen.kind,
     spec,
     behavior: chosen.behavior,
-    members: membersFor(chosen.behavior, random, spec),
-    duration: durationFor(chosen.behavior, random),
+    members: membersFor(chosen.behavior, random, spec, duration),
+    duration,
     startedAt: now,
     direction: random() < 0.5 ? -1 : 1,
     depth: lerp(spec.depth[0], spec.depth[1], random()),
