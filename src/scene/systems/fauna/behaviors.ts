@@ -18,10 +18,11 @@
  * Módulo puro y sin React: se comprueba fuera del navegador.
  */
 
-import type { FaunaKind, StationEnvironment } from '@/config/journey';
+import type { FaunaKind } from '@/config/journey';
 import { clamp, lerp, mulberry32, smoothstep } from '@/lib/procedural';
 import { bandCenterY, halfWidthAt, screenBandY } from '@/scene/camera/framing';
-import { GROUND_Y, terrainHeight } from '@/scene/systems/elevation';
+import { frameToWorld, PATH } from '@/scene/path/journeyPath';
+import { groundY } from '@/scene/systems/elevation';
 
 import { catPlan, type BehaviorName, type SpeciesSpec } from './bestiary';
 
@@ -39,7 +40,6 @@ export interface FaunaAct {
   readonly direction: 1 | -1;
   /** Profundidad base del acto. */
   readonly depth: number;
-  readonly environment: StationEnvironment;
   readonly seed: number;
 }
 
@@ -103,9 +103,21 @@ interface Point {
   z: number;
 }
 
-/** Dónde está el suelo, en la misma función que dibuja el terreno. */
-export function groundAt(x: number, z: number, env: StationEnvironment): number {
-  return GROUND_Y + terrainHeight(x, z, env);
+const WORLD = { x: 0, z: 0 };
+
+/**
+ * Dónde está el suelo, en las coordenadas del encuadre local en que están
+ * escritas todas las conductas.
+ *
+ * En la Fase 3A la fauna **viaja con el encuadre de la cámara** (`PATH.frame`):
+ * respecto de ella se ve igual que antes. El suelo, en cambio, se lee en la
+ * posición real del mundo, del mismo terreno que se dibuja, así que nada flota
+ * ni se hunde en las cuestas. (La Fase 3B anclará los actos al mundo.)
+ */
+export function groundAt(x: number, z: number): number {
+  const frame = PATH.frame;
+  frameToWorld(frame, x, z, WORLD);
+  return groundY(WORLD.x, WORLD.z) - frame.y;
 }
 
 /**
@@ -115,7 +127,7 @@ export function groundAt(x: number, z: number, env: StationEnvironment): number 
  * hasta el pecho.
  */
 export function standingY(act: FaunaAct, x: number, z: number): number {
-  return groundAt(x, z, act.environment) + act.spec.ride * act.spec.size;
+  return groundAt(x, z) + act.spec.ride * act.spec.size;
 }
 
 /**
@@ -675,7 +687,7 @@ const titilar: Behavior = {
     out.z = act.depth + spreadZ + Math.sin(s * 0.21 + phase) * 0.5;
     out.x = spreadX + Math.sin(s * 0.27 + phase) * 1.1;
     out.y =
-      groundAt(out.x, out.z, act.environment) +
+      groundAt(out.x, out.z) +
       0.35 +
       jitter(act.seed, member, 13) * 0.9 +
       Math.sin(s * 0.5 + phase) * 0.25;

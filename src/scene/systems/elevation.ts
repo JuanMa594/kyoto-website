@@ -1,24 +1,31 @@
-import type { StationEnvironment, HillProfile } from '@/config/journey';
-import { smoothstep } from '@/lib/procedural';
+import { JOURNEY, type HillProfile, type Side } from '@/config/journey';
+import { lerp, smoothstep } from '@/lib/procedural';
+import { pathX, pathY, zoneBlend } from '@/scene/path/journeyPath';
 
 /**
- * El relieve del terreno, como función pura.
+ * El relieve del terreno, como función pura y **global**.
  *
- * La misma función la usan el mesh del suelo y las piedras del camino, así que
- * una piedra nunca flota ni se hunde: apoya exactamente sobre el terreno que se
- * está dibujando.
+ * Desde la Fase 3A el terreno ya no depende de la estación activa: es un solo
+ * mundo, y la altura de cada punto es la del camino a esa profundidad más las
+ * colinas de sus costados. La misma función la usan la malla del suelo, las
+ * piedras, la cámara y la fauna, así que nada flota ni se hunde.
  *
- * La regla dura de composición vive aquí: `sideMask()` vale 0 en el pasillo
- * central, así que **ninguna colina puede invadir el centro del cuadro** —
- * donde van el torii, el cerezo o la pagoda. No depende de acordarse al colocar
- * cada colina a mano; es imposible por construcción.
+ * La regla dura de composición vive aquí: las colinas se miden desde el **eje
+ * del camino** (`u = x − pathX(d)`), no desde x = 0, y `sideMask()` vale 0 en
+ * |u| < 7. Ninguna colina puede invadir el pasillo por donde va el sujeto —
+ * tampoco en las curvas—, y no depende de acordarse: es imposible por
+ * construcción.
+ *
+ * Lo que había en la Fase 1 para que el relieve no apareciera en primer plano
+ * (una máscara por z) era relativo a una cámara quieta. Con la cámara
+ * avanzando, las colinas pasan a los lados, casi siempre fuera de cuadro.
  */
 
 /** Altura del plano base. Todo lo que pisa el suelo parte de aquí. */
 export const GROUND_Y = -1;
 
 /** Semiancho del pasillo central que el relieve nunca invade. */
-const CENTER_CLEAR = 7;
+export const CENTER_CLEAR = 7;
 
 /** Cuánto tarda el relieve en alcanzar su amplitud plena a partir del pasillo. */
 const CENTER_FADE = 11;
@@ -29,22 +36,24 @@ const HILL_AMPLITUDE: Record<HillProfile, number> = {
   montanosa: 9,
 };
 
-/** El relieve tampoco aparece en primer plano: arranca al fondo del camino. */
-const HILL_START_Z = -6;
-const HILL_FULL_Z = -26;
-
-/** Distancia en la que el camino termina de ganar toda su pendiente. */
-const SLOPE_FULL_Z = -22;
+/** Amplitud de cada costado en cada estación, precalculada. */
+const SIDE_AMPLITUDE: readonly Record<Side, number>[] = JOURNEY.map((station) => {
+  const env = station.environment;
+  const amplitude = HILL_AMPLITUDE[env.hills];
+  return {
+    izquierda: env.hillSides.includes('izquierda') ? amplitude : 0,
+    derecha: env.hillSides.includes('derecha') ? amplitude : 0,
+  };
+});
 
 /**
- * 0 en el centro, 1 en los costados — y sólo en los costados que la estación
- * activa. Ésta es la garantía de que el sujeto siempre tiene el cuadro libre.
+ * Amplitud del relieve de un costado en `d`: la de cada estación, mezclada por
+ * pesos de zona. Al ir de Eventos a Fushimi Inari las lomas suaves crecen
+ * hasta montaña poco a poco, sin escalón.
  */
-function sideMask(x: number, env: StationEnvironment): number {
-  const side = x < 0 ? 'izquierda' : 'derecha';
-  if (!env.hillSides.includes(side)) return 0;
-
-  return smoothstep(CENTER_CLEAR, CENTER_CLEAR + CENTER_FADE, Math.abs(x));
+export function hillAmplitude(d: number, side: Side): number {
+  const zone = zoneBlend(d);
+  return lerp(SIDE_AMPLITUDE[zone.from]![side], SIDE_AMPLITUDE[zone.to]![side], zone.t);
 }
 
 /**
@@ -61,21 +70,22 @@ function ridge(x: number, z: number): number {
 }
 
 /**
- * Altura del terreno en (x, z), relativa a `GROUND_Y`.
- *
- * Dos términos que no se estorban:
- *   · las colinas, sólo a los costados y sólo al fondo,
- *   · la pendiente del camino, que sube parejo en todo el ancho (si la
- *     estación la pide) para que el camino se sienta cuesta arriba.
+ * Altura del terreno en (x, z), relativa a `GROUND_Y`: la del camino a esa
+ * profundidad, más las colinas si el punto cae fuera del pasillo.
  */
-export function terrainHeight(x: number, z: number, env: StationEnvironment): number {
+export function terrainHeight(x: number, z: number): number {
+  const d = -z;
+  const u = x - pathX(d);
+  const amplitude = hillAmplitude(d, u < 0 ? 'izquierda' : 'derecha');
   const hills =
-    HILL_AMPLITUDE[env.hills] *
-    sideMask(x, env) *
-    smoothstep(HILL_START_Z, HILL_FULL_Z, z) *
-    ridge(x, z);
+    amplitude === 0
+      ? 0
+      : amplitude * smoothstep(CENTER_CLEAR, CENTER_CLEAR + CENTER_FADE, Math.abs(u)) * ridge(x, z);
 
-  const slope = env.slope * smoothstep(0, SLOPE_FULL_Z, z);
+  return pathY(d) + hills;
+}
 
-  return hills + slope;
+/** La y del mundo en la que está el suelo. */
+export function groundY(x: number, z: number): number {
+  return GROUND_Y + terrainHeight(x, z);
 }

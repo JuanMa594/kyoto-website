@@ -6,7 +6,6 @@ import { usePathname } from '@/i18n/navigation';
 import { selectMotionAllowed, useKyotoStore } from '@/store/useKyotoStore';
 
 import { refreshMotionEngine, startMotionEngine, stopMotionEngine } from './gsap';
-import { useScrollScene } from './useScrollScene';
 
 /**
  * Arranca y apaga el motor de movimiento. No pinta nada.
@@ -16,6 +15,9 @@ import { useScrollScene } from './useScrollScene';
  * movimiento? Con el modo 静 o con `prefers-reduced-motion` el motor no se
  * queda dando vueltas en vacío — se destruye, y el navegador recupera su scroll
  * de siempre. Es la misma regla que ya apaga el bucle de render del `<Canvas>`.
+ *
+ * El puente entre el scroll y la cámara no vive aquí sino en cada página de
+ * estación (`PathTramo` → `useJourneyScroll`), porque depende de su tramo.
  */
 export function MotionEngine() {
   const motionAllowed = useKyotoStore(selectMotionAllowed);
@@ -27,8 +29,6 @@ export function MotionEngine() {
     startMotionEngine();
     return () => stopMotionEngine();
   }, [motionAllowed]);
-
-  useScrollScene(motionAllowed);
 
   useEffect(() => {
     if (!motionAllowed) return;

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-import { getStation, type StationEnvironment, type StationSlug } from '@/config/journey';
+import type { StationSlug } from '@/config/journey';
 import {
   QUALITY_PROFILES,
   resolveTier,
@@ -21,11 +21,21 @@ import {
 
 interface KyotoState {
   /* ── Viaje ─────────────────────────────────────────────────────────── */
+  /** La estación de la ruta: adónde va la cámara. La declara cada página. */
   activeStation: StationSlug;
-  /** Avance sobre el spline del camino, 0–1. Lo escribe ScrollTrigger (Fase 3). */
-  pathProgress: number;
+  /**
+   * La estación en cuyo tramo está la cámara: lo que se ve y se oye. Cambia a
+   * ritmo humano, así que sí vive aquí; el avance fino vive en `PATH`
+   * (`scene/path/journeyPath.ts`), que cambia a 60 fps.
+   */
+  zone: StationSlug;
+  /**
+   * Cuántas veces una página ha declarado su estación. La primera es el
+   * aterrizaje —la cámara aparece allí, sin viaje—; las demás son viajes.
+   */
+  arrivals: number;
   setActiveStation: (slug: StationSlug) => void;
-  setPathProgress: (t: number) => void;
+  setZone: (slug: StationSlug) => void;
 
   /* ── Calidad ───────────────────────────────────────────────────────── */
   detectedTier: QualityTier | null;
@@ -70,9 +80,17 @@ export const useKyotoStore = create<KyotoState>()(
   persist(
     (set) => ({
       activeStation: 'inicio',
-      pathProgress: 0,
-      setActiveStation: (slug) => set({ activeStation: slug }),
-      setPathProgress: (t) => set({ pathProgress: Math.min(1, Math.max(0, t)) }),
+      zone: 'inicio',
+      arrivals: 0,
+      // La primera estación de la visita también fija la zona: así el ambiente
+      // es el correcto antes incluso de que el canvas haya cargado.
+      setActiveStation: (slug) =>
+        set((s) => ({
+          activeStation: slug,
+          arrivals: s.arrivals + 1,
+          zone: s.arrivals === 0 ? slug : s.zone,
+        })),
+      setZone: (slug) => set({ zone: slug }),
 
       detectedTier: null,
       qualitySetting: 'auto',
@@ -123,18 +141,6 @@ export const selectTier = (s: KyotoState): QualityTier =>
   resolveTier(s.qualitySetting, s.detectedTier);
 
 export const selectProfile = (s: KyotoState): QualityProfile => QUALITY_PROFILES[selectTier(s)];
-
-/**
- * El preset de ambiente de la estación activa: relieve, pendiente y tinte de
- * cielo.
- *
- * A propósito es un selector derivado y no un campo más del store. El ambiente
- * ya está determinado por `activeStation` — guardarlo aparte sería una segunda
- * copia que puede quedar desfasada, justo lo que `journey.ts` existe para
- * evitar. Para leerlo: `useKyotoStore(selectEnvironment)`.
- */
-export const selectEnvironment = (s: KyotoState): StationEnvironment =>
-  getStation(s.activeStation).environment;
 
 /**
  * La pregunta que se hace toda la escena: ¿puedo animar?

@@ -2,6 +2,8 @@ import { getTranslations } from 'next-intl/server';
 
 import { ActiveStation } from '@/components/ActiveStation';
 import { StationLinks } from '@/components/nav/StationLinks';
+import { ContentArrival } from '@/components/sections/ContentArrival';
+import { PathTramo } from '@/components/sections/PathTramo';
 import { getStation } from '@/config/journey';
 import { staticLocale } from '@/i18n/params';
 
@@ -24,33 +26,37 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
     <>
       <ActiveStation slug="inicio" />
 
-      <main id="contenido" className="mx-auto min-h-dvh max-w-6xl px-6 py-[14vh]">
-        <p className="brush text-sm tracking-[0.3em] uppercase opacity-60">{t('eyebrow')}</p>
+      <ContentArrival key="inicio">
+        <main id="contenido" className="mx-auto min-h-dvh max-w-6xl px-6 py-[14vh]">
+          <p className="brush text-sm tracking-[0.3em] uppercase opacity-60">{t('eyebrow')}</p>
 
-        {/* El título y el kanji son el otro protagonista del cuadro, junto al
-            objeto 3D. De ahí el tamaño: es un cartel, no un encabezado. */}
-        <h1 className="mt-4">
-          <span
-            className="block"
-            style={{
-              fontSize: 'var(--text-hero)',
-              lineHeight: 'var(--text-hero--line-height)',
-              color: 'var(--color-shu)',
-            }}
-          >
-            {t('title')}
-          </span>
-          <span className="kanji mt-2 block opacity-90">{station.kanji}</span>
-        </h1>
+          {/* El título y el kanji son el otro protagonista del cuadro, junto al
+              objeto 3D. De ahí el tamaño: es un cartel, no un encabezado. */}
+          <h1 className="mt-4">
+            <span
+              className="block"
+              style={{
+                fontSize: 'var(--text-hero)',
+                lineHeight: 'var(--text-hero--line-height)',
+                color: 'var(--color-shu)',
+              }}
+            >
+              {t('title')}
+            </span>
+            <span className="kanji mt-2 block opacity-90">{station.kanji}</span>
+          </h1>
 
-        <p className="mt-8 max-w-prose text-xl">{t('subtitle')}</p>
+          <p className="mt-8 max-w-prose text-xl">{t('subtitle')}</p>
 
-        <p className="paper mt-10 inline-block px-4 py-3 text-sm opacity-80">
-          <strong>{scaffold('phase')}</strong> — {scaffold('sceneLabel')}
-        </p>
+          <p className="paper mt-10 inline-block px-4 py-3 text-sm opacity-80">
+            <strong>{scaffold('phase')}</strong> — {scaffold('sceneLabel')}
+          </p>
 
-        <StationLinks locale={locale} current="inicio" />
-      </main>
+          <StationLinks locale={locale} current="inicio" />
+        </main>
+      </ContentArrival>
+
+      <PathTramo station="inicio" />
     </>
   );
 }

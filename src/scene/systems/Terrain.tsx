@@ -1,61 +1,82 @@
 'use client';
 
 import { useEffect, useMemo } from 'react';
-import { PlaneGeometry, type BufferAttribute } from 'three';
+import { Color, Float32BufferAttribute, PlaneGeometry, type BufferAttribute } from 'three';
 
-import type { StationEnvironment } from '@/config/journey';
+import { JOURNEY } from '@/config/journey';
+import type { ScenePalette } from '@/lib/css-vars';
 import type { QualityProfile } from '@/scene/quality/tiers';
+import { zoneBlend } from '@/scene/path/journeyPath';
 
 import { GROUND_Y, terrainHeight } from './elevation';
 
 /**
- * El suelo, deformado según el ambiente de la estación activa.
+ * El suelo del camino entero, de antes de la Home a después de Gastronomía.
  *
- * Sustituye al plano plano de la primera versión: ahora las colinas no son
- * meshes sueltos puestos a ojo, sino relieve del propio terreno — por eso
- * siempre caen a los costados y nunca en el centro (ver `elevation.ts`).
+ * Es **una sola malla**, calculada una vez al montar: el relieve ya no cambia
+ * con la estación activa porque el mundo es uno solo (`elevation.ts`). Lo que
+ * sí cambia a lo largo del camino es el color: cada vértice lleva el tinte de
+ * suelo de su zona, mezclado con el de la vecina por los mismos pesos que el
+ * relieve, la niebla y el viento.
  *
- * El color se mezcla casi del todo con el fondo a propósito: ninguna de las
- * referencias tiene un "piso" a color pleno, y el suelo no debe competir por
- * espacio con lo que se construya encima.
- *
- * Pendiente para la Fase 2: el musgo y el pasto del tercio inferior se
- * instancian sobre esta misma superficie, muestreando `terrainHeight()`.
+ * El color se mezcla casi del todo con el fondo a propósito (el 30 % del tinte
+ * sobre el washi): ninguna referencia tiene un «piso» a color pleno, y el suelo
+ * no debe competir con lo que se construya encima.
  */
 
-/** Lado del plano. Con la niebla de cada estación, el borde nunca se ve. */
-const SIZE = 300;
+/** Qué parte del tinte de suelo de cada estación llega al color final. */
+const GROUND_TINT = 0.3;
 
-function segmentsFor(tier: QualityProfile['tier']): number {
-  if (tier === 'low') return 56;
-  return tier === 'medium' ? 96 : 128;
+/** Cobertura: el ancho de todo lo que la niebla deja ver, y todo el largo. */
+const WIDTH = 360;
+const NEAR_Z = 60;
+const FAR_Z = -640;
+const DEPTH = NEAR_Z - FAR_Z;
+const CENTER_Z = (NEAR_Z + FAR_Z) / 2;
+
+/** Segmentos en X y en Z: ~2 unidades por segmento en alto. */
+function segmentsFor(tier: QualityProfile['tier']): [number, number] {
+  if (tier === 'low') return [90, 175];
+  return tier === 'medium' ? [144, 280] : [180, 350];
 }
 
 interface TerrainProps {
-  environment: StationEnvironment;
-  color: string;
+  palette: ScenePalette;
   profile: QualityProfile;
 }
 
-export function Terrain({ environment, color, profile }: TerrainProps) {
-  const segments = segmentsFor(profile.tier);
+export function Terrain({ palette, profile }: TerrainProps) {
+  const [segmentsX, segmentsZ] = segmentsFor(profile.tier);
 
   const geometry = useMemo(() => {
-    const geo = new PlaneGeometry(SIZE, SIZE, segments, segments);
+    const geo = new PlaneGeometry(WIDTH, DEPTH, segmentsX, segmentsZ);
     const position = geo.attributes.position as BufferAttribute;
+    const colors = new Float32Array(position.count * 3);
 
-    // El mesh se rota −90° en X, así que el eje local Z es el "arriba" del
-    // mundo y el local Y es el −Z del mundo. Deformamos en local Z.
+    const tints = JOURNEY.map((station) =>
+      new Color(palette.washi).lerp(new Color(station.palette.ground), GROUND_TINT),
+    );
+    const mixed = new Color();
+
+    // El mesh se rota −90° en X: el eje local Z es el "arriba" del mundo y el
+    // local Y es el −Z del mundo, a partir del centro de la malla.
     for (let i = 0; i < position.count; i += 1) {
       const x = position.getX(i);
-      const worldZ = -position.getY(i);
-      position.setZ(i, terrainHeight(x, worldZ, environment));
+      const worldZ = CENTER_Z - position.getY(i);
+      position.setZ(i, terrainHeight(x, worldZ));
+
+      const zone = zoneBlend(-worldZ);
+      mixed.lerpColors(tints[zone.from]!, tints[zone.to]!, zone.t);
+      colors[i * 3] = mixed.r;
+      colors[i * 3 + 1] = mixed.g;
+      colors[i * 3 + 2] = mixed.b;
     }
 
+    geo.setAttribute('color', new Float32BufferAttribute(colors, 3));
     position.needsUpdate = true;
     geo.computeVertexNormals();
     return geo;
-  }, [environment, segments]);
+  }, [segmentsX, segmentsZ, palette.washi]);
 
   useEffect(() => () => geometry.dispose(), [geometry]);
 
@@ -63,10 +84,10 @@ export function Terrain({ environment, color, profile }: TerrainProps) {
     <mesh
       geometry={geometry}
       rotation={[-Math.PI / 2, 0, 0]}
-      position={[0, GROUND_Y, 0]}
+      position={[0, GROUND_Y, CENTER_Z]}
       receiveShadow
     >
-      <meshStandardMaterial color={color} roughness={1} metalness={0} />
+      <meshStandardMaterial vertexColors roughness={1} metalness={0} />
     </mesh>
   );
 }

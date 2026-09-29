@@ -10,6 +10,10 @@
  * de lo que anda. Esa regla está escrita en fracciones de pantalla, pero la
  * escena necesita metros. Traducir una por otra a ojo es cómo se acaba con una
  * garza cruzando por encima del título.
+ *
+ * Desde la Fase 3A todo esto está escrito en el **encuadre local** de la
+ * cámara (`PATH.frame`): la cámara viaja por el camino, pero respecto de ella
+ * el cuadro es siempre el mismo. `pathRig.ts` hace la traducción al mundo.
  */
 
 export interface CameraFraming {
@@ -23,6 +27,14 @@ export const CAMERA_BASE: CameraFraming = {
   target: [0, 1.9, -9],
   fov: 34,
 };
+
+/**
+ * Lo que la cámara real sabe de la pantalla y la matemática pura no: el
+ * aspecto. Lo escribe `CameraRig` en cada frame. Las funciones de abajo siguen
+ * asumiendo 16:9 por defecto; en la Fase 3B la fauna pasará a medir sus
+ * márgenes con este valor.
+ */
+export const VIEW = { aspect: 16 / 9 };
 
 /** Las tres franjas de la regla de tercios, en fracción desde arriba. */
 export const BANDS = {

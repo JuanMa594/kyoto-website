@@ -106,8 +106,19 @@ export interface StationEnvironment {
   readonly hills: HillProfile;
   /** Costados donde se levanta el relieve. Vacío = terreno llano. */
   readonly hillSides: readonly Side[];
-  /** Cuánto sube el camino de cerca a lejos, en unidades de mundo. 0 = llano. */
+  /**
+   * Pendiente del tramo de esta estación: el camino sube `slope` unidades cada
+   * 22 de recorrido (la distancia de la cámara a su punto de interés, así que
+   * en la vista de la estación se ve exactamente esta cuesta). 0 = llano.
+   * Nunca negativa: el camino sólo sube.
+   */
   readonly slope: number;
+  /**
+   * Desvío lateral del camino en el punto de la estación, en unidades. Entre
+   * dos estaciones el camino va de un lateral al otro, y ahí están las curvas.
+   * Entre estaciones consecutivas |Δ| ≤ 10, para que el rumbo no pase de ~13°.
+   */
+  readonly lateral: number;
   readonly skyTint?: SkyTint;
 }
 
@@ -140,7 +151,7 @@ export interface Station {
   readonly group: StationGroup;
   /** Ruta relativa al idioma. Cadena vacía = raíz del idioma. */
   readonly route: string;
-  /** Posición sobre el spline del camino: 0 = inicio, 1 = final. */
+  /** Posición sobre el camino: 0 = inicio, 1 = final. Su profundidad es `pathT × PATH_LENGTH`. */
   readonly pathT: number;
   /** Si aparece como círculo en el sidebar. `inicio` no: es el punto de partida. */
   readonly inSidebar: boolean;
@@ -148,6 +159,13 @@ export interface Station {
   readonly ambient: StationAmbient;
   readonly environment: StationEnvironment;
 }
+
+/**
+ * Profundidad total del camino, en unidades de mundo: de la Home (`pathT` 0)
+ * a Gastronomía (`pathT` 1). Con los `pathT` de abajo, cada estación queda a
+ * unas 64–72 unidades de la siguiente. Ver `scene/path/journeyPath.ts`.
+ */
+export const PATH_LENGTH = 400;
 
 /**
  * El orden es el del camino, y es también el orden de lectura de `13.png`:
@@ -165,7 +183,7 @@ export const JOURNEY: readonly Station[] = [
     inSidebar: false,
     palette: { halo: '#FFFACD', accent: '#D82609', ground: '#EDE6DD' },
     // Home: jardín llano. Sólo una colina insinuada a la izquierda, de fondo.
-    environment: { hills: 'suaves', hillSides: ['izquierda'], slope: 0 },
+    environment: { hills: 'suaves', hillSides: ['izquierda'], slope: 0, lateral: 0 },
     ambient: {
       petals: 'media',
       petalKind: 'bambu',
@@ -186,7 +204,7 @@ export const JOURNEY: readonly Station[] = [
     inSidebar: true,
     palette: { halo: '#FFFFFF', accent: '#C4181A', ground: '#F3EFE4' },
     // Valle abierto: ondulación baja por los dos costados.
-    environment: { hills: 'suaves', hillSides: ['izquierda', 'derecha'], slope: 0 },
+    environment: { hills: 'suaves', hillSides: ['izquierda', 'derecha'], slope: 0, lateral: -8 },
     ambient: {
       petals: 'baja',
       petalKind: 'ninguna',
@@ -212,6 +230,7 @@ export const JOURNEY: readonly Station[] = [
       hills: 'suaves',
       hillSides: ['derecha'],
       slope: 0,
+      lateral: 2,
       skyTint: { color: '#EB81A5', amount: 0.1 },
     },
     ambient: {
@@ -238,6 +257,7 @@ export const JOURNEY: readonly Station[] = [
       hills: 'montanosa',
       hillSides: ['izquierda', 'derecha'],
       slope: 2.4,
+      lateral: -6,
       skyTint: { color: '#D82609', amount: 0.14 },
     },
     ambient: {
@@ -263,7 +283,7 @@ export const JOURNEY: readonly Station[] = [
     inSidebar: true,
     palette: { halo: '#FFCCBC', accent: '#B1341F', ground: '#E8D6C3' },
     // Ladera: el relieve sólo por la derecha, el camino sube un poco menos.
-    environment: { hills: 'montanosa', hillSides: ['derecha'], slope: 1.2 },
+    environment: { hills: 'montanosa', hillSides: ['derecha'], slope: 1.2, lateral: 4 },
     ambient: {
       // Los tres lugares comparten ambiente pasivo: aquí el protagonista es el
       // sitio —la terraza, los toriis, el callejón—, no lo que cae del cielo.
@@ -290,6 +310,7 @@ export const JOURNEY: readonly Station[] = [
       hills: 'suaves',
       hillSides: ['derecha'],
       slope: 0,
+      lateral: -5,
       skyTint: { color: '#FFD699', amount: 0.16 },
     },
     ambient: {
@@ -317,6 +338,7 @@ export const JOURNEY: readonly Station[] = [
       hills: 'ninguna',
       hillSides: [],
       slope: 0,
+      lateral: 0,
       skyTint: { color: '#B4CCAD', amount: 0.12 },
     },
     ambient: {

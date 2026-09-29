@@ -9,8 +9,9 @@
  * los dos.
  */
 
-import type { Density, PetalKind, Station } from '@/config/journey';
+import { JOURNEY, type Density, type PetalKind, type Station } from '@/config/journey';
 import { readCssNumber, type ScenePalette } from '@/lib/css-vars';
+import { zoneBlend } from '@/scene/path/journeyPath';
 
 export type PetalLayerName = 'frente' | 'medio' | 'fondo';
 
@@ -179,14 +180,15 @@ export const PETAL_FADE_BAND = 0.08;
 
 /**
  * Fracción de la reserva que está presente ahora mismo, 0–1. Es lo que el
- * shader recibe como `uDensity`.
+ * shader recibe como `uDensity`. `weight` es el peso de la zona en la posición
+ * de la cámara: entre dos zonas, cada una aporta su parte.
  */
-export function petalPresence(station: Station, surge: number): number {
+export function petalPresence(station: Station, surge: number, weight = 1): number {
   const peak = petalPeakFraction(station);
   if (peak <= 0) return 0;
 
   const base = petalBaseFraction(station);
-  return (base + (peak - base) * surge) / peak;
+  return ((base + (peak - base) * surge) / peak) * weight;
 }
 
 /** Cuántos pétalos se ven ahora mismo en una capa. */
@@ -195,33 +197,70 @@ export function petalPresentCount(
   station: Station,
   particleScale: number,
   surge: number,
+  weight = 1,
 ): number {
-  return Math.round(petalAllocation(layer, station, particleScale) * petalPresence(station, surge));
+  return Math.round(
+    petalAllocation(layer, station, particleScale) * petalPresence(station, surge, weight),
+  );
 }
 
 /**
  * Cuántos entran en el draw call: los que se ven **más la banda de los que
  * están a medio desvanecer**. Es la cuenta que necesita la GPU, no la que
- * describe lo que se percibe — para eso está `petalPresentCount`.
+ * describe lo que se percibe — para eso está `petalPresentCount`. Una zona con
+ * peso 0 no dibuja nada.
  */
 export function petalDrawCount(
   layer: PetalLayer,
   station: Station,
   particleScale: number,
   surge: number,
+  weight = 1,
 ): number {
+  if (weight <= 0) return 0;
   const allocation = petalAllocation(layer, station, particleScale);
-  const presence = petalPresence(station, surge);
+  const presence = petalPresence(station, surge, weight);
 
   return Math.min(allocation, Math.ceil(allocation * (presence + PETAL_FADE_BAND)));
 }
 
-/** Total visible ahora mismo, ya escalado por calidad y accesibilidad. */
-export function petalTotal(station: Station, particleScale: number, surge = 0): number {
+/** Total visible de una zona, ya escalado por calidad, accesibilidad y peso. */
+export function petalTotal(station: Station, particleScale: number, surge = 0, weight = 1): number {
   return petalLayers().reduce(
-    (sum, layer) => sum + petalPresentCount(layer, station, particleScale, surge),
+    (sum, layer) => sum + petalPresentCount(layer, station, particleScale, surge, weight),
     0,
   );
+}
+
+/**
+ * Lo que hay en el aire en la profundidad `d`: las dos zonas del tramo, cada
+ * una con su peso. Es la cuenta que enseña `/diagnostico`.
+ */
+export function petalCountsAt(
+  d: number,
+  particleScale: number,
+  surge: number,
+): { total: number; byLayer: string } {
+  const zone = zoneBlend(d);
+  const parts = [
+    { station: JOURNEY[zone.from]!, weight: 1 - zone.t },
+    { station: JOURNEY[zone.to]!, weight: zone.t },
+  ];
+
+  const byLayer = petalLayers().map((layer) => {
+    const count = parts.reduce(
+      (sum, part) =>
+        sum + petalPresentCount(layer, part.station, particleScale, surge, part.weight),
+      0,
+    );
+    return `${layer.name} ${count}`;
+  });
+  const total = parts.reduce(
+    (sum, part) => sum + petalTotal(part.station, particleScale, surge, part.weight),
+    0,
+  );
+
+  return { total, byLayer: byLayer.join(' · ') };
 }
 
 /**

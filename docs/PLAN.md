@@ -3,7 +3,8 @@
 > Documento de referencia del proyecto. Consolida las decisiones tomadas en la fase de
 > definición. Si algo cambia, se actualiza aquí y no en la memoria de nadie.
 >
-> Estado: **Fase 2 completa** — 2A motor, 2B ambiente y 2C vida. La fauna pasó de primitivas a modelos reales.
+> Estado: **Fase 3 en curso** — 3A (el mundo) implementada, pendiente de revisión; 3B y 3C se
+> diseñan al llegar a ellas. La Fase 2 está completa (2A motor, 2B ambiente, 2C vida).
 > El estado vivo de las fases y las convenciones del repo están en `CLAUDE.md`.
 
 ---
@@ -70,7 +71,7 @@ del sitio, no un adorno. Y los 6 círculos de `13.png` mapean 1:1 con las seccio
 | Render 3D | Three JS principalmente y WebGL, React Three Fiber sobre una **escena persistente** en el layout |
 | Nivel 3D | 3D real en el cuadro cercano, billboards 2.5D al fondo |
 | Cámara | **Observadora en perspectiva**, no primera persona |
-| Animación | **GSAP + ScrollTrigger + MotionPath** como orquestador único |
+| Animación | **GSAP + ScrollTrigger** como orquestador único (`MotionPath` no hizo falta: la curva del camino vive en 3D, ver §5.3) |
 | Scroll | Lenis (smooth scroll) integrado con ScrollTrigger |
 | Estilos | Tailwind v4 + design tokens en CSS custom properties |
 | Estado | Zustand |
@@ -108,7 +109,7 @@ Tailwind v4 + design tokens (CSS vars)
 next-intl                              → rutas /es y /en
 
 lenis 1.3                              → smooth scroll
-gsap 3.15 (ScrollTrigger, MotionPath)  → camino, cámara, animaciones de scroll
+gsap 3.15 (ScrollTrigger)              → scroll del camino, viaje de cámara, animaciones
 Motion                                 → UI en DOM únicamente
 
 Three JS                               → Animaciones, interacciones 3D
@@ -155,13 +156,30 @@ Debe ser **sutil**. Es lo que separa "elegante" de "efecto barato":
 ### 5.3 El camino
 
 El scroll mueve la cámara como un **travelling de cine que sigue el sendero** — un dolly
-lateral/diagonal sobre un spline. `ScrollTrigger` ata el scroll al recorrido; `MotionPath`
-define la curva.
+lateral/diagonal sobre el sendero. `ScrollTrigger` ata el scroll al recorrido; la curva la
+define `scene/path/journeyPath.ts` a partir de `journey.ts`.
 
 Cambiar de sección **no** es un fundido: la cámara viaja por el camino hasta la siguiente
 estación. La escena nunca se desmonta. En el camino se van encontrado cosas relacionadas con la sección, y algunos mensajes, información o datos curiosos sobre ello.
 
 La idea del camino no es que siempre de la impresión de ir siempre adelante, también hacer cambios de dirección, o como en la imagen `5.png`, dar la impresión que se esta subiendo por escaleras rodeadas de Toris, hasta llegar al Fushimi Inari Taisha.
+
+**Cómo está hecho (Fase 3A).** El camino es un mundo continuo que avanza siempre hacia el
+fondo, con curvas laterales entre estaciones (`lateral`) y pendiente por zona (`slope`):
+`scene/path/journeyPath.ts`. La tangente es nula en cada estación, así que su vista sigue
+siendo frontal, de cartel, y las curvas ocurren entre ellas. La cámara está en *objetivo del
+scroll + desfase de viaje*: cada página termina en un **tramo** de 220vh cuyo scroll (curva
+`power2.inOut`: arranca con peso y llega frenando) lleva la cámara a la siguiente estación, y
+al terminarlo se llega sola (`PathTramo`). Los saltos —enlaces, «atrás»— se absorben en el
+desfase y GSAP lo lleva a cero con la curva `piedra` (1,8 s por estación, 4 s el camino
+entero). Contra el mareo, el rumbo está acotado a ±15° y 12°/s, y en los viajes rápidos el
+encuadre recorta las curvas. El ambiente —niebla, cielo, viento, pétalos, sonido y elenco de
+fauna— lo decide la posición de la cámara, no la ruta: al viajar se ven pasar los paisajes
+intermedios. Con modo 静 o movimiento reducido no hay viaje ni llegada automática: la cámara
+salta y el tramo se reduce a su enlace.
+
+**`MotionPath` no se usa**: la curva vive en 3D y la de three da tangentes y longitudes. GSAP
+sigue siendo el orquestador de las transiciones del viaje y de ScrollTrigger.
 
 ### 5.4 Navegación (basada en `13.png`)
 
@@ -435,8 +453,15 @@ ninguno sirve, se consulta antes de dibujar.
 
 ```ts
 // una estación = un punto del camino
-{ slug, kanji, romaji, icon, pathT: 0.34, palette, ambient: { … } }
+{ slug, kanji, romaji, icon, pathT: 0.34, palette, ambient: { … },
+  environment: { hills, hillSides, slope, lateral, skyTint } }
 ```
+
+Su profundidad en el mundo es `pathT × PATH_LENGTH` (400 unidades). El avance fino de la
+cámara no vive en el store: cambia a 60 fps y está en el objeto de módulo `PATH`
+(`scene/path/journeyPath.ts`), con un único escritor, el rig de cámara. El store guarda sólo
+`zone`, la estación en cuyo tramo está la cámara, que es lo que leen el ambiente, el audio y
+la fauna.
 
 De ese único array se derivan **al mismo tiempo**:
 
@@ -538,7 +563,10 @@ fase** para revisión antes de seguir.
 | **2A** | · Motor | Lenis + GSAP en un solo RAF · easings leídos de `tokens.css` · `WindField` con ráfagas · parallax de cursor · lectura en `/diagnostico` | ✅ |
 | **2B** | · Ambiente | `PetalSystem` en `InstancedMesh` con la posición calculada en el shader, en tres capas de profundidad · profundidad de campo en tier alto | ✅ |
 | **2C** | · Vida | Los tres rigs de fauna · repertorio de conductas · `FaunaDirector` · motor de audio sintetizado · controles de sonido y modo 静 | ✅ |
-| **3** | **El Camino** | Piedras procedurales · spline + MotionPath · cámara scroll-driven · sidebar radial (`13.png`) · transiciones entre rutas · nav móvil | ⏸ |
+| **3** | **El Camino** | Se parte en tres bloques con parada propia, ver abajo | ⏳ |
+| **3A** | · El mundo | Sendero desde `journey.ts` · terreno continuo · piedras en todo el recorrido · cámara sobre el camino con scroll · tramo y llegada automática · viaje entre estaciones | ✅ pendiente de revisión |
+| **3B** | · La fauna en el camino | Actos anclados al mundo · cercanía por estación · márgenes con la cámara real | ⏸ |
+| **3C** | · La navegación | Sidebar radial (`13.png`) con íconos generados por código · progreso del camino · nav móvil · teclado · transiciones | ⏸ |
 | **4** | Home 京都 | Torii 3D, bambú, título tipográfico, composición del hero | ⏸ |
 | **5** | Ubicación 位置 | Mapa de Japón extruido e interactivo, zoom a Kyoto | ⏸ |
 | **6** | Lugares | Plantilla + Fushimi Inari, Kiyomizu-dera, Gion | ⏸ |
@@ -557,7 +585,7 @@ buena medida rellenar contenido sobre una plantilla que ya funciona.
 |---|---|
 | Licencia de One Jinja y Gaze Nozarashi | ⚠️ Ambas son versiones **Demo** con "All Rights Reserved". `fsType = 0` permite incrustarlas técnicamente, pero si el sitio se publica con ánimo comercial hay que comprar licencia o sustituirlas. Detalle en `assets/fonts/LICENSES.md` |
 | Fuente de kanji | ⏳ Zen Old Mincho vs Yuji Syuku — comparar en `/es/tipografia/` |
-| Slugs por idioma | ⏳ Hoy `/en/ubicacion` usa el slug español. Si se quieren traducidos, se resuelve en Fase 3 con `pathnames` de next-intl |
+| Slugs por idioma | ✅ Decidido en la Fase 3: se quedan en español. El export estático no tiene middleware que reescriba `/en/location` → `ubicacion`; traducirlos obligaría a una ruta comodín generada desde `journey.ts`. Se reconsidera en la Fase 9 |
 | Pagoda, casas de Gion y platos | ⏳ Se resuelve en sus fases (ver §7) |
 | Kitsune | ⏳ Aplazado a la Fase 6, entre los toriis. El modelo está en `assets/models/source/` |
 | Carpa koi | ⏳ Aplazada hasta que haya agua: un estanque en alguno de los templos o en la home. El koi que había es un asset de Animal Crossing y **no se puede publicar**; se hará uno propio (los peces son el caso de libro de la deformación en el shader) |

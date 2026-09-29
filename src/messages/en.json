@@ -72,6 +72,11 @@
     "subtitle": "Follow the stone path.",
     "enter": "Start the path"
   },
+  "tramo": {
+    "label": "Path to {station}",
+    "continue": "Continue the path",
+    "hint": "Keep scrolling: the path goes on"
+  },
   "scaffold": {
     "phase": "Phase 1 — Foundation",
     "note": "The scene, the tokens and the path already exist. This station's content lands in its own phase.",

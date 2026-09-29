@@ -1,55 +1,50 @@
 'use client';
 
 import { useFrame, useThree } from '@react-three/fiber';
-import { useEffect, useMemo } from 'react';
-import { Vector3, type PerspectiveCamera } from 'three';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import type { Camera, PerspectiveCamera } from 'three';
 
+import { scrollTargetDepth } from '@/animation/journeyScroll';
+import { absorbJump, cancelTravel, JUMP_THRESHOLD, TRAVEL } from '@/animation/travel';
+import { JOURNEY, PATH_LENGTH, type StationSlug } from '@/config/journey';
 import { readCssNumber } from '@/lib/css-vars';
 import { clamp, damp } from '@/lib/procedural';
-import { CAMERA_BASE } from '@/scene/camera/framing';
+import { VIEW } from '@/scene/camera/framing';
+import { CAMERA_BACK, createRig, snapRig, stepRig } from '@/scene/camera/pathRig';
+import { dominantZone, PATH } from '@/scene/path/journeyPath';
 import { selectMotionAllowed, useKyotoStore } from '@/store/useKyotoStore';
 
 /**
- * El encuadre, y el parallax de cursor que lo reencuadra.
+ * La cámara sobre el camino, y el parallax de cursor que la reencuadra.
  *
- * **El encuadre base vive en `framing.ts`**, junto a la matemática que traduce
- * la regla de tercios a unidades de mundo: la posición, el punto al que mira y
- * el campo de visión son un mismo ajuste, y repartirlos entre archivos es cómo
- * se acaba con una cámara que mira a un sitio distinto del que dice el
- * comentario. En la Fase 3 ese encuadre dejará de ser constante y lo escribirá
- * el spline del camino; el parallax seguirá sumándose encima igual.
+ * Desde la Fase 3A la cámara **viaja**: su punto de interés está en la
+ * profundidad `d = objetivo del scroll + desfase de viaje`, y `pathRig.ts`
+ * traduce esa `d` a posición, rumbo e inclinación con sus topes anti-mareo.
+ * Este componente es el **único escritor de `PATH`**: todo lo que depende de
+ * dónde está la cámara —pétalos, fauna, niebla, sol, viento— lo lee de ahí.
  *
- * Sin un `lookAt` explícito la cámara miraría perfectamente horizontal
- * (rotación identidad, eje −Z) y el horizonte quedaría a media pantalla. Con
- * `y = 4.2` mirando a `(0, 1.9, −9)` la inclinación es de ~6° y el horizonte
- * cae al 32 % desde arriba: el tercio superior libre para copas, hojas y aves;
- * el medio para el texto; el inferior para el camino.
+ * Cuándo se viaja y cuándo se salta:
  *
- * Dos mandos que no hay que confundir: **la altura** decide dónde cae el camino
- * en el cuadro; **la inclinación**, dónde cae el horizonte. Para bajar el
- * camino sin perder cielo se sube la cámara, no se inclina.
+ *   · un salto del objetivo (cambio de estación, «atrás», la tecla Fin) se
+ *     absorbe en el desfase y GSAP lo lleva a cero (`travel.ts`);
+ *   · **la primera estación de la visita** es un aterrizaje: la cámara aparece
+ *     allí sin recorrer el camino desde la Home;
+ *   · con modo 静 o `prefers-reduced-motion` no hay viaje: la cámara salta.
  *
- * **El parallax es deliberadamente sutil** — es lo que separa "elegante" de
- * "efecto barato". Tres límites, los tres en `tokens.css`:
+ * **El parallax sigue siendo deliberadamente sutil**, con los tres límites de
+ * `tokens.css`: el 3,5 % del cuadro visible (medido a la distancia real del
+ * punto de interés), 2° de giro y una amortiguación que convierte el token por
+ * frame en una exponencial independiente del framerate. Se suma en los ejes
+ * locales de la cámara, así que en una curva sigue siendo «a la derecha» de lo
+ * que se ve.
  *
- *   · `--parallax-max` acota el desplazamiento al 3,5 % del cuadro *visible*,
- *     no a un número fijo de unidades: se calcula desde el fov y la distancia
- *     al punto de interés, así que se mantiene igual de discreto en un móvil
- *     vertical que en un monitor ancho;
- *   · `--parallax-tilt` acota el giro a 2°. Como el `lookAt` queda clavado en
- *     el punto de interés, mover la cámara ya produce el giro — y a esta
- *     distancia el 3,5 % equivale justo a esos ~2°. El tope está igualmente,
- *     porque en la Fase 3 la distancia cambiará con el camino;
- *   · `--parallax-damping` hace que la cámara persiga al cursor con inercia y
- *     nunca 1:1. El token es el factor por frame a 60 fps, que aquí se
- *     convierte a la constante de una exponencial para que la amortiguación no
- *     dependa del framerate real.
+ * Sin un `lookAt` explícito la cámara miraría perfectamente horizontal; aquí
+ * mira siempre al punto de interés, y es el rig el que decide su altura.
  */
 
 /**
  * Desplazamiento actual del parallax, en unidades de mundo. Mismo criterio que
- * `WIND`: cambia cada frame, así que no puede vivir en el store sin provocar un
- * render por frame. Sólo lo escribe el rig; `/diagnostico` lo lee.
+ * `WIND`: cambia cada frame. Sólo lo escribe el rig; `/diagnostico` lo lee.
  */
 export const PARALLAX = { x: 0, y: 0 };
 
@@ -78,51 +73,95 @@ export function CameraRig() {
   const camera = useThree((state) => state.camera);
   const invalidate = useThree((state) => state.invalidate);
   const motionAllowed = useKyotoStore(selectMotionAllowed);
+  const activeStation = useKyotoStore((s) => s.activeStation);
 
-  const base = useMemo(() => new Vector3(...CAMERA_BASE.position), []);
-  const target = useMemo(() => new Vector3(...CAMERA_BASE.target), []);
   const config = useMemo(readParallaxConfig, []);
+  const rig = useMemo(createRig, []);
+  const lastTarget = useRef<number | null>(null);
+  const lastStation = useRef<StationSlug | null>(null);
 
-  useEffect(() => {
-    camera.position.copy(base);
-    camera.lookAt(target);
-  }, [camera, base, target]);
+  const advance = useCallback(
+    (view: Camera, dt: number) => {
+      const perspective = view as PerspectiveCamera;
+      const store = useKyotoStore.getState();
+      const motion = selectMotionAllowed(store);
 
-  // Sin movimiento el bucle pasa a `demand` y `useFrame` deja de correr, así
-  // que la cámara se quedaría con el último desplazamiento puesto. Se devuelve
-  // al encuadre limpio y se pide un último frame para que se vea.
+      const target = scrollTargetDepth(store.activeStation);
+      const previous = lastTarget.current;
+      const stationChanged = lastStation.current !== null && lastStation.current !== store.activeStation;
+      lastTarget.current = target;
+      lastStation.current = store.activeStation;
+
+      let snap = previous === null || !motion;
+      if (!snap && previous !== null && Math.abs(target - previous) > JUMP_THRESHOLD) {
+        if (stationChanged && store.arrivals <= 1) snap = true;
+        else absorbJump(previous, target);
+      }
+      if (snap) cancelTravel();
+
+      const before = rig.d;
+      const wasReady = rig.initialized;
+      if (snap) snapRig(rig, target);
+      else stepRig(rig, target + TRAVEL.offset, dt);
+
+      // Un salto seco no es avance: los pétalos no deben fluir cuatrocientas
+      // unidades de golpe.
+      if (wasReady && !snap) PATH.advance += rig.d - before;
+      PATH.d = rig.d;
+      PATH.progress = clamp(rig.d / PATH_LENGTH, 0, 1);
+      PATH.offset = TRAVEL.offset;
+      Object.assign(PATH.frame, rig.frame);
+      Object.assign(PATH.focus, rig.focus);
+
+      const zone = JOURNEY[dominantZone(rig.d)]!.slug;
+      if (zone !== store.zone) store.setZone(zone);
+
+      VIEW.aspect = perspective.aspect;
+
+      // Tamaño del cuadro a la distancia del punto de interés: es la referencia
+      // honesta para un desplazamiento "del 3,5 %".
+      const distance = Math.hypot(CAMERA_BACK, rig.camera.y - rig.focus.y);
+      const viewHeight = 2 * Math.tan((perspective.fov * Math.PI) / 360) * distance;
+      const viewWidth = viewHeight * perspective.aspect;
+      const limit = Math.tan(config.tilt) * distance;
+
+      if (motion) {
+        const { pointer } = store;
+        const wantedX = clamp(pointer.x * viewWidth * config.max, -limit, limit);
+        // El cursor cuenta la Y hacia abajo; la escena, hacia arriba.
+        const wantedY = clamp(-pointer.y * viewHeight * config.max, -limit, limit);
+        PARALLAX.x = damp(PARALLAX.x, wantedX, config.lambda, dt);
+        PARALLAX.y = damp(PARALLAX.y, wantedY, config.lambda, dt);
+      } else {
+        PARALLAX.x = 0;
+        PARALLAX.y = 0;
+      }
+
+      // El eje X local de la cámara, en mundo: (cos, 0, −sen) del rumbo.
+      const cos = Math.cos(rig.yaw);
+      const sin = Math.sin(rig.yaw);
+      perspective.position.set(
+        rig.camera.x + PARALLAX.x * cos,
+        rig.camera.y + PARALLAX.y,
+        rig.camera.z - PARALLAX.x * sin,
+      );
+      perspective.lookAt(rig.focus.x, rig.focus.y, rig.focus.z);
+    },
+    [rig, config],
+  );
+
+  // Sin movimiento el bucle pasa a `demand` y `useFrame` deja de correr: cada
+  // cambio de estación (o de modo) pide su propio frame, con la cámara ya en
+  // su sitio.
   useEffect(() => {
     if (motionAllowed) return;
-
-    PARALLAX.x = 0;
-    PARALLAX.y = 0;
-    camera.position.copy(base);
-    camera.lookAt(target);
+    advance(camera, 0);
     invalidate();
-  }, [motionAllowed, camera, base, target, invalidate]);
+  }, [motionAllowed, activeStation, camera, advance, invalidate]);
 
-  useFrame((state, delta) => {
-    const perspective = state.camera as PerspectiveCamera;
-    const { pointer } = useKyotoStore.getState();
-    const dt = Math.min(delta, 0.1);
-
-    // Tamaño del cuadro a la distancia del punto de interés: es la referencia
-    // honesta para un desplazamiento "del 3,5 %".
-    const distance = base.distanceTo(target);
-    const viewHeight = 2 * Math.tan((perspective.fov * Math.PI) / 360) * distance;
-    const viewWidth = viewHeight * perspective.aspect;
-    const limit = Math.tan(config.tilt) * distance;
-
-    const wantedX = clamp(pointer.x * viewWidth * config.max, -limit, limit);
-    // El cursor cuenta la Y hacia abajo; la escena, hacia arriba.
-    const wantedY = clamp(-pointer.y * viewHeight * config.max, -limit, limit);
-
-    PARALLAX.x = damp(PARALLAX.x, wantedX, config.lambda, dt);
-    PARALLAX.y = damp(PARALLAX.y, wantedY, config.lambda, dt);
-
-    perspective.position.set(base.x + PARALLAX.x, base.y + PARALLAX.y, base.z);
-    perspective.lookAt(target);
-  });
+  // Prioridad −1: el rig escribe `PATH` antes de que nadie lo lea en el frame.
+  // (Una prioridad positiva le quitaría a R3F el render automático.)
+  useFrame((state, delta) => advance(state.camera, Math.min(delta, 0.1)), -1);
 
   return null;
 }

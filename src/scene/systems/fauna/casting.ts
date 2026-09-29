@@ -61,6 +61,11 @@ export interface AdvanceParams {
   cast: readonly FaunaKind[];
   config: CastingConfig;
   random: () => number;
+  /**
+   * Falso durante un viaje: la cámara pasa de largo, y lo que naciera ahora
+   * se quedaría atrás antes de verse.
+   */
+  canSpawn: boolean;
 }
 
 export interface AdvanceResult {
@@ -100,7 +105,9 @@ export function advanceCasting(params: AdvanceParams): AdvanceResult {
   if (acts !== params.acts) FAUNA_STAGE.live = acts.map(describe);
   FAUNA_STAGE.nextIn = Math.max(0, memory.nextAt - now);
 
-  if (cast.length === 0 || live.length >= config.maxActs) return { acts, spawned: null };
+  if (!params.canSpawn || cast.length === 0 || live.length >= config.maxActs) {
+    return { acts, spawned: null };
+  }
 
   // La recompensa por quedarse quieto: nadie hace scroll **y** hace un rato que
   // no pasa nada. Las dos condiciones importan — sin la segunda, la recompensa
@@ -182,7 +189,6 @@ function castAct(
     startedAt: now,
     direction: random() < 0.5 ? -1 : 1,
     depth: lerp(spec.depth[0], spec.depth[1], random()),
-    environment: station.environment,
     seed: Math.floor(random() * 10000),
   };
 }

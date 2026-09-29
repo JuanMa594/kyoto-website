@@ -2,6 +2,8 @@ import { getTranslations } from 'next-intl/server';
 
 import { ActiveStation } from '@/components/ActiveStation';
 import { StationLinks } from '@/components/nav/StationLinks';
+import { ContentArrival } from '@/components/sections/ContentArrival';
+import { PathTramo } from '@/components/sections/PathTramo';
 import { getStation, type Locale, type StationSlug } from '@/config/journey';
 
 /**
@@ -26,27 +28,31 @@ export async function StationShell({
     <>
       <ActiveStation slug={slug} />
 
-      <main id="contenido" className="mx-auto min-h-dvh max-w-5xl px-6 py-[18vh]">
-        <p className="brush text-sm tracking-[0.25em] uppercase opacity-60">{station.romaji}</p>
+      <ContentArrival key={slug}>
+        <main id="contenido" className="mx-auto min-h-dvh max-w-5xl px-6 py-[18vh]">
+          <p className="brush text-sm tracking-[0.25em] uppercase opacity-60">{station.romaji}</p>
 
-        <h1 className="mt-2 flex flex-wrap items-baseline gap-x-6 gap-y-2">
-          <span className="text-[clamp(2.5rem,8vw,6rem)] leading-none">
-            {t(`${slug}.name`)}
-          </span>
-          <span className="kanji" style={{ color: station.palette.accent }}>
-            {station.kanji}
-          </span>
-        </h1>
+          <h1 className="mt-2 flex flex-wrap items-baseline gap-x-6 gap-y-2">
+            <span className="text-[clamp(2.5rem,8vw,6rem)] leading-none">
+              {t(`${slug}.name`)}
+            </span>
+            <span className="kanji" style={{ color: station.palette.accent }}>
+              {station.kanji}
+            </span>
+          </h1>
 
-        <p className="mt-6 max-w-prose text-lg">{t(`${slug}.tagline`)}</p>
-        <p className="mt-2 max-w-prose opacity-70">{t(`${slug}.summary`)}</p>
+          <p className="mt-6 max-w-prose text-lg">{t(`${slug}.tagline`)}</p>
+          <p className="mt-2 max-w-prose opacity-70">{t(`${slug}.summary`)}</p>
 
-        <p className="paper mt-10 inline-block px-4 py-3 text-sm opacity-80">
-          <strong>{scaffold('phase')}</strong> — {scaffold('note')}
-        </p>
+          <p className="paper mt-10 inline-block px-4 py-3 text-sm opacity-80">
+            <strong>{scaffold('phase')}</strong> — {scaffold('note')}
+          </p>
 
-        <StationLinks locale={locale} current={slug} />
-      </main>
+          <StationLinks locale={locale} current={slug} />
+        </main>
+      </ContentArrival>
+
+      <PathTramo station={slug} />
     </>
   );
 }

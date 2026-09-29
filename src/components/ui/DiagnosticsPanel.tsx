@@ -7,12 +7,11 @@ import { getLenis } from '@/animation/gsap';
 import { audioReadout } from '@/audio/engine';
 import { getStation } from '@/config/journey';
 import { PARALLAX } from '@/scene/camera/CameraRig';
+import { PATH } from '@/scene/path/journeyPath';
 import {
   petalBaseFraction,
-  petalPresentCount,
-  petalLayers,
+  petalCountsAt,
   petalPeakFraction,
-  petalTotal,
   PETAL_SURGE,
 } from '@/scene/systems/petals';
 import { FAUNA_STAGE } from '@/scene/systems/fauna/casting';
@@ -47,6 +46,8 @@ interface MotionReadout {
   pointerX: number;
   pointerY: number;
   progress: number;
+  depth: number;
+  travelOffset: number;
   smoothScroll: boolean;
   surge: number;
   petalsNow: number;
@@ -86,13 +87,14 @@ function useMotionReadout(active: boolean): MotionReadout | null {
 
       if (now - last >= 250) {
         const state = useKyotoStore.getState();
-        const { pointer, pathProgress } = state;
+        const { pointer } = state;
 
         // La densidad sube y baja con cada ráfaga, así que la cuenta de pétalos
         // se muestrea aquí y no en el render: es un valor vivo, no un ajuste.
-        const station = getStation(state.activeStation);
+        // Entre dos estaciones cuenta las dos lluvias, cada una con su peso.
         const scale = selectParticleScale(state);
         const surge = PETAL_SURGE.value;
+        const petals = petalCountsAt(PATH.d, scale, surge);
         const audio = audioReadout();
 
         setReadout({
@@ -105,13 +107,13 @@ function useMotionReadout(active: boolean): MotionReadout | null {
           parallaxY: PARALLAX.y,
           pointerX: pointer.x,
           pointerY: pointer.y,
-          progress: pathProgress,
+          progress: PATH.progress,
+          depth: PATH.d,
+          travelOffset: PATH.offset,
           smoothScroll: getLenis() !== null,
           surge,
-          petalsNow: petalTotal(station, scale, surge),
-          petalsByLayer: petalLayers()
-            .map((layer) => `${layer.name} ${petalPresentCount(layer, station, scale, surge)}`)
-            .join(' · '),
+          petalsNow: petals.total,
+          petalsByLayer: petals.byLayer,
           faunaLive: FAUNA_STAGE.live.join(' · ') || '—',
           faunaTotal: FAUNA_STAGE.total,
           faunaNextIn: FAUNA_STAGE.nextIn,
@@ -170,6 +172,7 @@ export function DiagnosticsPanel() {
   const audible = useKyotoStore(selectAudioAudible);
   const particleScale = useKyotoStore(selectParticleScale);
   const activeStation = useKyotoStore((s) => s.activeStation);
+  const zone = useKyotoStore((s) => s.zone);
 
   if (!mounted) {
     return <p className="paper px-5 py-4 text-sm opacity-70">{t('loading')}</p>;
@@ -178,7 +181,7 @@ export function DiagnosticsPanel() {
   // Las mismas funciones que usa el sistema de partículas: el panel no
   // reimplementa la cuenta, la pregunta. Si dijeran cosas distintas, una de las
   // dos estaría mintiendo.
-  const station = getStation(activeStation);
+  const station = getStation(zone);
   const petalBase = petalBaseFraction(station);
   const petalPeak = petalPeakFraction(station);
 
@@ -187,7 +190,8 @@ export function DiagnosticsPanel() {
       <section className="paper px-5 py-4">
         <h2 className="mb-2 text-lg">Escena</h2>
         <dl>
-          <Row label="Estación activa" value={activeStation} />
+          <Row label="Estación de la ruta" value={activeStation} />
+          <Row label="Zona de la cámara" value={zone} />
           <Row label="Tier detectado" value={detectedTier ?? '—'} />
           <Row label="Tier efectivo" value={tier} />
           <Row label="DPR" value={`${profile.dpr[0]} – ${profile.dpr[1]}`} />
@@ -211,6 +215,14 @@ export function DiagnosticsPanel() {
           <Row
             label="Avance del camino"
             value={motion ? `${(motion.progress * 100).toFixed(1)} %` : '—'}
+          />
+          <Row
+            label="Profundidad de la cámara"
+            value={motion ? `${motion.depth.toFixed(1)} u` : '—'}
+          />
+          <Row
+            label="Desfase de viaje"
+            value={motion ? `${motion.travelOffset.toFixed(1)} u` : '—'}
           />
           <Row
             label="Viento · dirección"

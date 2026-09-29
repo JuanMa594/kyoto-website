@@ -14,8 +14,19 @@ Contiene dos cosas que son la misma decisión y por eso no viven separadas:
 En un móvil el puntero lo alimenta el giroscopio (ver `EnvironmentProbe`): el
 rig no distingue una fuente de la otra.
 
-En la **Fase 3** `CAMERA_BASE` deja de ser constante y lo escribe el spline del
-camino con `ScrollTrigger` + `MotionPath`; el parallax se seguirá sumando
-encima igual.
+Desde la **Fase 3A** la cámara viaja por el camino:
+
+- `framing.ts` — `CAMERA_BASE` es el **encuadre local** (22 u detrás del punto
+  de interés, 2,3 por encima, ~6°) y la matemática de la regla de tercios, en
+  coordenadas de ese encuadre. `VIEW.aspect` es el aspecto real de la pantalla.
+- `pathRig.ts` — puro. Lleva el encuadre local a cualquier profundidad `d` del
+  camino, con topes anti-mareo: rumbo ±15° y 12°/s, inclinación 3,5°–8,7° (si
+  una cuesta la saca de la banda, sube la cámara, no la inclina), y un filtro
+  de paso bajo que recorta las curvas en los viajes rápidos. `bun run
+  check:path` lo recorre entero.
+- `CameraRig.tsx` — el **único escritor de `PATH`**. La cámara está en
+  *objetivo del scroll + desfase de viaje* (`animation/travel.ts`); la primera
+  estación de la visita es un aterrizaje y con modo 静 no hay viaje. El
+  parallax se suma encima, en los ejes locales.
 
 La cámara es siempre **observadora**: nunca entra en la escena.

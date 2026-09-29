@@ -1,100 +1,112 @@
 'use client';
 
-import { useMemo } from 'react';
-import { CatmullRomCurve3, Vector3 } from 'three';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import {
+  Euler,
+  Matrix4,
+  MeshStandardMaterial,
+  Quaternion,
+  Vector3,
+  type BufferGeometry,
+  type InstancedMesh,
+} from 'three';
 
-import type { StationEnvironment } from '@/config/journey';
-import { mulberry32 } from '@/lib/procedural';
-import { Stone } from '@/scene/objects/Stone';
+import { stoneGeometry } from '@/scene/objects/stoneGeometry';
+import { STONE_VARIANTS, stoneLayout, stoneSeed, type StoneInstance } from '@/scene/path/stones';
 import type { QualityProfile } from '@/scene/quality/tiers';
 
-import { GROUND_Y, terrainHeight } from './elevation';
-
 /**
- * El camino de piedras.
+ * El camino de piedras, entero.
  *
- * No es una fuga recta hacia el punto de fuga: es una **curva en S** que entra
- * por la esquina inferior derecha, cruza hacia la izquierda y vuelve al centro
- * al fondo, como en `3.png`. Una recta perfecta delata la geometría; la S se
- * lee como un sendero.
- *
- * Cada piedra se apoya sobre `terrainHeight()`, la misma función que dibuja el
- * suelo, así que en las estaciones con pendiente (Fushimi Inari) el camino sube
- * de verdad en vez de flotar.
- *
- * En la Fase 3 esta curva local la reemplaza el spline del viaje completo —el
- * que recorre las siete estaciones y por el que viaja la cámara—, pero la
- * técnica (curva → muestreo → instancias apoyadas en el terreno) se queda.
+ * Unas trescientas piedras de la Home a Gastronomía, en **doce
+ * `InstancedMesh`** —una por forma—: doce llamadas de dibujo en vez de
+ * trescientas. Dónde va cada una lo decide `scene/path/stones.ts`, que es puro
+ * y está comprobado por `bun run check:path`: todas dentro del pasillo y
+ * apoyadas en el mismo terreno que se dibuja.
  */
 
-/** Puntos de control de la S, en XZ. La Y la pone el terreno. */
-const CONTROL_POINTS = [
-  new Vector3(4.6, 0, 1.4),
-  new Vector3(2.6, 0, -2.4),
-  new Vector3(-1.2, 0, -5.2),
-  new Vector3(-2.8, 0, -8.6),
-  new Vector3(-1.0, 0, -12.0),
-  new Vector3(1.2, 0, -15.4),
-];
-
-/** Escala de la piedra más cercana y de la más lejana. */
-const SCALE_NEAR = 0.86;
-const SCALE_FAR = 0.52;
-
 interface StonePathProps {
-  environment: StationEnvironment;
   color: string;
   profile: QualityProfile;
 }
 
-interface StoneSpec {
-  seed: number;
-  position: [number, number, number];
-  scale: number;
-  rotation: number;
-}
-
-export function StonePath({ environment, color, profile }: StonePathProps) {
-  const stones = useMemo<StoneSpec[]>(() => {
-    const curve = new CatmullRomCurve3(CONTROL_POINTS, false, 'catmullrom', 0.5);
-    const random = mulberry32(1204);
-    const count = profile.tier === 'low' ? 9 : 14;
-
-    return Array.from({ length: count }, (_, i) => {
-      const t = i / (count - 1);
-      const point = curve.getPointAt(t);
-
-      // Un poco de desorden lateral: un camino real no está alineado a hilo.
-      const x = point.x + (random() - 0.5) * 0.55;
-      const z = point.z + (random() - 0.5) * 0.35;
-
-      const scale = (SCALE_NEAR + (SCALE_FAR - SCALE_NEAR) * t) * (0.88 + random() * 0.24);
-
-      return {
-        seed: 100 + i * 37,
-        // Ligeramente enterradas: pisaderas, no peñascos apoyados encima.
-        position: [x, GROUND_Y + terrainHeight(x, z, environment) - 0.12 * scale, z],
-        scale,
-        rotation: random() * Math.PI * 2,
-      };
-    });
-  }, [environment, profile.tier]);
-
+export function StonePath({ color, profile }: StonePathProps) {
+  // En tier bajo la piedra se ve igual de lejos con menos triángulos.
   const detail = profile.tier === 'low' ? 0 : 1;
+
+  const geometries = useMemo(
+    () =>
+      Array.from({ length: STONE_VARIANTS }, (_, variant) => stoneGeometry(stoneSeed(variant), detail)),
+    [detail],
+  );
+  useEffect(() => () => geometries.forEach((geometry) => geometry.dispose()), [geometries]);
+
+  const material = useMemo(
+    () => new MeshStandardMaterial({ color, flatShading: true, roughness: 0.95, metalness: 0 }),
+    [color],
+  );
+  useEffect(() => () => material.dispose(), [material]);
+
+  const batches = useMemo(() => {
+    const groups = Array.from({ length: STONE_VARIANTS }, () => [] as StoneInstance[]);
+    for (const stone of stoneLayout()) groups[stone.variant]!.push(stone);
+    return groups;
+  }, []);
 
   return (
     <>
-      {stones.map((stone) => (
-        <Stone
-          key={stone.seed}
-          seed={stone.seed}
-          position={stone.position}
-          scale={stone.scale}
-          rotation={stone.rotation}
-          color={color}
-          detail={detail}
-        />
-      ))}
+      {batches.map((instances, variant) =>
+        instances.length > 0 ? (
+          <StoneBatch
+            key={variant}
+            geometry={geometries[variant]!}
+            material={material}
+            instances={instances}
+          />
+        ) : null,
+      )}
     </>
+  );
+}
+
+interface StoneBatchProps {
+  geometry: BufferGeometry;
+  material: MeshStandardMaterial;
+  instances: readonly StoneInstance[];
+}
+
+function StoneBatch({ geometry, material, instances }: StoneBatchProps) {
+  const mesh = useRef<InstancedMesh>(null);
+
+  useLayoutEffect(() => {
+    const node = mesh.current;
+    if (!node) return;
+
+    const matrix = new Matrix4();
+    const position = new Vector3();
+    const rotation = new Quaternion();
+    const scale = new Vector3();
+    const euler = new Euler();
+
+    instances.forEach((stone, i) => {
+      position.set(stone.x, stone.y, stone.z);
+      rotation.setFromEuler(euler.set(0, stone.rotation, 0));
+      scale.setScalar(stone.scale);
+      node.setMatrixAt(i, matrix.compose(position, rotation, scale));
+    });
+
+    node.instanceMatrix.needsUpdate = true;
+    // La caja de un InstancedMesh cubre todas sus instancias sólo si se le
+    // pide: sin esto, el frustum lo recortaría con la caja de una sola piedra.
+    node.computeBoundingSphere();
+  }, [instances, geometry]);
+
+  return (
+    <instancedMesh
+      ref={mesh}
+      args={[geometry, material, instances.length]}
+      castShadow
+      receiveShadow
+    />
   );
 }

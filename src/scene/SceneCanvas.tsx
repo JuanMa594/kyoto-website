@@ -38,9 +38,10 @@ const PostProcessing = dynamic(() => import('@/scene/PostProcessing'), {
 export default function SceneCanvas() {
   const profile = useKyotoStore(selectProfile);
   const motionAllowed = useKyotoStore(selectMotionAllowed);
-  const activeStation = useKyotoStore((s) => s.activeStation);
+  // La zona en la que está la cámara —no la de la ruta— decide el ambiente.
+  const zone = useKyotoStore((s) => s.zone);
 
-  const station = getStation(activeStation);
+  const station = getStation(zone);
   const palette = useMemo(() => scenePalette(), []);
 
   return (
@@ -61,7 +62,7 @@ export default function SceneCanvas() {
 
       {/* Un solo viento para toda la escena: lo que despeina el bambú es lo
           mismo que arrastra los pétalos y lo que después se oirá. */}
-      <WindDriver base={station.ambient.wind} enabled={motionAllowed} />
+      <WindDriver enabled={motionAllowed} />
 
       <FoundationScene station={station} palette={palette} profile={profile} />
 

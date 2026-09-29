@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "fonts": "bun run scripts/subset-fonts.ts",
     "models": "bun run scripts/optimize-models.ts",
-    "palette": "bun run scripts/sample-palette.ts"
+    "palette": "bun run scripts/sample-palette.ts",
+    "check:path": "bun run scripts/check-path.ts"
   },
   "dependencies": {
     "@react-three/drei": "10.7.8",

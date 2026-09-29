@@ -1,8 +1,15 @@
 # `scene/systems` — sistemas de ambiente
 
-- `elevation.ts` — **Fase 1**. Altura del terreno como función pura. La usan el
-  suelo, las piedras y (Fase 2C) todo lo que camine.
-- `Terrain.tsx`, `StonePath.tsx` — **Fase 1**.
+- `elevation.ts` — **Fase 1**, global desde la **3A**. Altura del terreno como
+  función pura: la del camino a esa profundidad más las colinas, medidas desde
+  el eje del camino y mezcladas entre estaciones. La usan el suelo, las
+  piedras, la cámara y todo lo que camine.
+- `Terrain.tsx` — una sola malla para todo el camino, calculada al montar, con
+  el tinte de suelo de cada zona por vértice.
+- `StonePath.tsx` — las ~310 piedras del recorrido en doce `InstancedMesh`;
+  dónde va cada una lo decide `scene/path/stones.ts`.
+- `Atmosphere.tsx` — **Fase 3A**. Niebla, fondo y sol, mezclados por la zona en
+  la que está la cámara; el sol y su caja de sombras siguen al encuadre.
 - `WindField.ts` — **Fase 2A**. Un solo viento para todo el sitio, con máquina
   de ráfagas (espera → sube → sostiene → baja) y tiempos en `tokens.css`. No es
   un hook ni vive en el store: cambia sesenta veces por segundo y eso serían
@@ -18,6 +25,10 @@
   `petals.ts` es puro y sin React a propósito: la cuenta de pétalos la comparten
   el sistema y el panel de `/diagnostico`, y si cada uno la calculara por su
   cuenta acabarían diciendo cosas distintas.
+  Desde la **Fase 3A** exporta `PetalZones`: un sistema por estación con
+  pétalos, reservado al cargar, que sólo dibuja cuando su zona pesa algo donde
+  está la cámara. Las cajas viajan con el encuadre y fluyen hacia la cámara con
+  el avance (`uAdvance`), desvaneciéndose en los bordes de profundidad.
 - `fauna/` — **Fase 2C**. Cuatro piezas, tres de ellas puras y comprobables sin
   navegador:
   - `bestiary.ts` — qué es cada especie: modelo, tamaño, **regiones que se

@@ -3,7 +3,9 @@
 import { useGLTF } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import type { Group } from 'three';
 
+import { isTraveling } from '@/animation/travel';
 import { playFauna } from '@/audio/engine';
 import type { FaunaKind, Station } from '@/config/journey';
 import { readCssSeconds, type ScenePalette } from '@/lib/css-vars';
@@ -11,6 +13,7 @@ import { mulberry32 } from '@/lib/procedural';
 import { FireflyRig } from '@/scene/objects/fauna/FireflyRig';
 import { ModelCreature } from '@/scene/objects/fauna/ModelCreature';
 import { SkinnedCreature } from '@/scene/objects/fauna/SkinnedCreature';
+import { PATH } from '@/scene/path/journeyPath';
 import type { QualityProfile } from '@/scene/quality/tiers';
 import { WIND } from '@/scene/systems/WindField';
 import { selectMotionAllowed, useKyotoStore } from '@/store/useKyotoStore';
@@ -74,6 +77,7 @@ export function FaunaDirector({ station, palette, profile }: FaunaDirectorProps)
 
   const random = useRef(mulberry32(20260915));
   const memory = useRef(newMemory(0, random.current));
+  const stage = useRef<Group>(null);
 
   // Los modelos del elenco se piden en cuanto se llega a la estación. Pesan
   // decenas de KB, pero si se pidieran al empezar el acto la garza aparecería a
@@ -86,13 +90,25 @@ export function FaunaDirector({ station, palette, profile }: FaunaDirectorProps)
     }
   }, [cast]);
 
-  // Al cambiar de estación no se hereda nada: el elenco es otro.
+  // Al apagar o encender el movimiento se empieza de cero. Al cambiar de zona
+  // no: los actos vivos terminan su acto y la zona nueva sólo cuenta para el
+  // siguiente reparto. Borrarlos de golpe se veía como un corte en mitad del
+  // camino.
   useEffect(() => {
     setActs([]);
     memory.current = newMemory(WIND.time, random.current);
-  }, [station, motionAllowed]);
+  }, [motionAllowed]);
 
   useFrame(() => {
+    // En la Fase 3A la fauna viaja con el encuadre de la cámara (ver
+    // `groundAt`). La Fase 3B la anclará al mundo.
+    const node = stage.current;
+    if (node) {
+      const frame = PATH.frame;
+      node.position.set(frame.x, frame.y, frame.z);
+      node.rotation.set(0, frame.yaw, 0);
+    }
+
     if (!motionAllowed) return;
 
     const now = WIND.time;
@@ -107,6 +123,7 @@ export function FaunaDirector({ station, palette, profile }: FaunaDirectorProps)
       cast,
       config,
       random: random.current,
+      canSpawn: !isTraveling(),
     });
 
     if (result.acts !== acts) setActs(result.acts);
@@ -121,11 +138,11 @@ export function FaunaDirector({ station, palette, profile }: FaunaDirectorProps)
   if (!motionAllowed) return null;
 
   return (
-    <>
+    <group ref={stage}>
       {acts.map((act) => (
         <ActView key={act.id} act={act} palette={palette} />
       ))}
-    </>
+    </group>
   );
 }
 

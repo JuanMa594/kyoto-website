@@ -72,6 +72,11 @@
     "subtitle": "Sigue el camino de piedras.",
     "enter": "Empezar el camino"
   },
+  "tramo": {
+    "label": "Camino hacia {station}",
+    "continue": "Seguir el camino",
+    "hint": "Sigue bajando: el camino continúa"
+  },
   "scaffold": {
     "phase": "Fase 1 — Fundación",
     "note": "La escena, los tokens y el camino ya existen. El contenido de esta estación llega en su fase.",

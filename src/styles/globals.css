@@ -102,6 +102,57 @@
   .skip-link:focus-visible {
     translate: 0 0;
   }
+
+  /* El tramo: la parte de cada página que es camino (`PathTramo`). Mientras
+     se recorre, lo que hay dentro queda fijo abajo y el cartel de la
+     siguiente estación gana nitidez con `--tramo`, que escribe el scroll. */
+  .path-tramo {
+    height: 220vh;
+  }
+
+  .path-tramo__stage {
+    position: sticky;
+    top: 0;
+    display: flex;
+    min-height: 100dvh;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0 1.5rem 16vh;
+    text-align: center;
+  }
+
+  .path-tramo__sign {
+    opacity: clamp(0, calc((var(--tramo, 0) - 0.3) * 2.2), 1);
+  }
+
+  /* Sin movimiento no hay recorrido: el tramo se reduce a su enlace. */
+  .path-tramo[data-motion='off'] {
+    height: auto;
+    padding-block: 12vh;
+  }
+
+  .path-tramo[data-motion='off'] .path-tramo__stage {
+    position: static;
+    min-height: 0;
+    padding-bottom: 0;
+  }
+
+  .path-tramo[data-motion='off'] .path-tramo__sign {
+    opacity: 1;
+  }
+
+  /* La entrada del contenido de una estación (`ContentArrival`). */
+  .content-arrival {
+    transition:
+      opacity var(--dur-largo) var(--ease-washi),
+      translate var(--dur-largo) var(--ease-washi);
+  }
+
+  .content-arrival[data-arrival='pending'] {
+    opacity: 0;
+    translate: 0 0.75rem;
+  }
 }
 
 /* Respeto al sistema: si la persona pidió menos movimiento, se lo damos antes

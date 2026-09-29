@@ -37,6 +37,7 @@ bun run typecheck    # tsc --noEmit
 bun run fonts        # regenera los .woff2 subseteados
 bun run models       # assets/models/source → public/models (fauna optimizada)
 bun run palette      # muestrea los colores de docs/referencias/*.png
+bun run check:path   # comprobaciones puras del camino, el terreno, la cámara y el scroll
 ```
 
 En desarrollo, **`?fauna=<especie>`** en cualquier página (`/es/ubicacion?fauna=libelula`)
@@ -91,31 +92,38 @@ src/
 ├─ audio/                      ← ambiente sonoro sintetizado (Fase 2C)
 │   ├─ engine.ts               ← Web Audio: lechos, eventos y voces de fauna
 │   └─ AmbientAudio.tsx        ← puente store ↔ motor; nunca antes de un gesto
-├─ animation/                  ← orquestación (Fase 2A)
+├─ animation/                  ← orquestación (Fase 2A, 3A)
 │   ├─ gsap.ts                 ← GSAP + Lenis bajo un solo rAF
-│   ├─ presets.ts              ← curvas de tokens.css → easings de GSAP
-│   ├─ useScrollScene.ts       ← scroll → `pathProgress` del store
+│   ├─ presets.ts              ← curvas de tokens.css → easings de GSAP; curva del tramo
+│   ├─ journeyScroll.ts        ← scroll → profundidad de cámara, y la llegada (puro)
+│   ├─ useJourneyScroll.ts     ← ScrollTrigger del contenido y del tramo
+│   ├─ travel.ts               ← desfase de viaje: los saltos se recorren, no se saltan
 │   └─ MotionEngine.tsx        ← enciende/apaga el motor desde el layout
 ├─ scene/                      ← el mundo R3F
 │   ├─ SceneRoot.tsx           ← se monta en el layout y NUNCA se desmonta
 │   ├─ SceneCanvas.tsx         ← el único <Canvas>
-│   ├─ FoundationScene.tsx     ← escena de calibración de la Fase 1
-│   ├─ objects/Stone.tsx       ← piedra procedural
+│   ├─ FoundationScene.tsx     ← el mundo del camino (terreno, piedras, aire, vida)
+│   ├─ path/journeyPath.ts     ← ★ el sendero: eje, altura, pesos de zona y `PATH`
+│   ├─ path/stones.ts          ← dónde va cada piedra (puro)
+│   ├─ objects/stoneGeometry.ts← piedra procedural (12 formas instanciadas)
 │   ├─ objects/PetalGeometry.ts← pétalo, arce y hoja de bambú por contorno
 │   ├─ objects/fauna/          ← cuerpos: modelo + deformación, animado, luz
 │   ├─ PostProcessing.tsx      ← profundidad de campo (sólo tier alto)
-│   ├─ systems/elevation.ts    ← ★ altura del terreno (función pura)
-│   ├─ systems/Terrain.tsx     ← malla del suelo, deformada por estación
-│   ├─ systems/StonePath.tsx   ← curva en S + piedras apoyadas en el terreno
+│   ├─ systems/elevation.ts    ← ★ altura del terreno, global (función pura)
+│   ├─ systems/Terrain.tsx     ← una malla para todo el camino, color por zona
+│   ├─ systems/StonePath.tsx   ← las piedras de todo el recorrido, instanciadas
+│   ├─ systems/Atmosphere.tsx  ← niebla, cielo y sol que siguen a la cámara
 │   ├─ systems/WindField.ts    ← ★ un solo viento, con ráfagas (Fase 2A)
 │   ├─ systems/WindDriver.tsx  ← lo hace avanzar dentro del <Canvas>
 │   ├─ systems/PetalSystem.tsx ← ★ pétalos: posición calculada en el shader
 │   ├─ systems/petals.ts       ← capas, densidad y colores (puro, sin React)
 │   ├─ systems/fauna/          ← ★ bestiario, conductas, casting y director
 │   ├─ quality/tiers.ts        ← detección de tier + perfiles
-│   ├─ camera/framing.ts       ← ★ encuadre y regla de tercios en unidades
-│   ├─ camera/CameraRig.tsx    ← aplica el encuadre + parallax de cursor
-├─ store/useKyotoStore.ts      ← Zustand: viaje, calidad, a11y, audio, cursor
+│   ├─ camera/framing.ts       ← ★ encuadre local y regla de tercios en unidades
+│   ├─ camera/pathRig.ts       ← ★ el encuadre sobre el camino, topes anti-mareo (puro)
+│   ├─ camera/CameraRig.tsx    ← único escritor de `PATH` + parallax de cursor
+├─ store/useKyotoStore.ts      ← Zustand: estación, zona, calidad, a11y, audio, cursor
+├─ components/sections/        ← StationShell, PathTramo (el tramo), ContentArrival
 ├─ i18n/                       ← routing, request, navigation, params
 ├─ messages/{es,en}.json       ← textos
 ├─ styles/
@@ -136,8 +144,14 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
 ### Cómo se conectan las piezas
 
 - Una ruta **no dibuja 3D**. Renderiza `<ActiveStation slug="…" />` y con eso le
-  dice a la escena dónde está. La escena decide cómo llegar (Fase 1: cambia
-  niebla y suelo; Fase 3: la cámara viaja por el spline).
+  dice a la escena **adónde ir**; la cámara viaja por el camino hasta allí (la
+  primera estación de la visita es un aterrizaje, sin viaje). Y termina en
+  `<PathTramo>`, cuyo scroll lleva la cámara a la siguiente estación.
+- **La posición de la cámara decide qué se ve y qué se oye**, no la ruta. Vive
+  en `PATH` (`scene/path/journeyPath.ts`), con un único escritor, `CameraRig`;
+  el store guarda sólo `zone`, que leen el ambiente, el audio y la fauna. La
+  cámara está siempre en *objetivo del scroll + desfase de viaje*: un salto del
+  objetivo se absorbe en el desfase (`animation/travel.ts`).
 - La **paleta vive una sola vez**, en `tokens.css`. La escena 3D la lee en
   caliente con `scenePalette()` (`src/lib/css-vars.ts`). No dupliques colores en
   TypeScript; los acentos *por estación* sí van en `journey.ts`.
@@ -183,11 +197,12 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   posible. Si el canvas alguna vez vuelve a verse en blanco al cargar, es lo
   primero que hay que revisar.
 - **Sin un `lookAt` explícito, la cámara del `<Canvas>` mira perfectamente
-  horizontal** (rotación identidad, eje −Z), no hacia el suelo. `CameraRig` en
-  `scene/camera/CameraRig.tsx` aplica un `camera.lookAt` fijo (~6°) hacia el
-  camino; el rig de scroll de la Fase 3 hereda el mismo criterio. El encuadre
-  entero (posición, objetivo y fov) vive en `CAMERA_BASE`, en ese archivo: el
-  `<Canvas>` lo importa en vez de tener su propia copia.
+  horizontal** (rotación identidad, eje −Z), no hacia el suelo. `CameraRig`
+  hace `lookAt` en cada frame al punto de interés del camino (~6° de
+  inclinación, acotada a 3,5°–8,7°). El encuadre local entero (posición,
+  objetivo y fov) vive en `CAMERA_BASE`, en `scene/camera/framing.ts`, y
+  `pathRig.ts` lo lleva a cualquier punto del camino: el `<Canvas>` lo importa
+  en vez de tener su propia copia.
 - **Lenis y GSAP comparten un único `requestAnimationFrame`.** Lenis arranca con
   `autoRaf: false` y lo hace avanzar `gsap.ticker`. Si alguien le añade su
   propio bucle, el scroll se actualiza dos veces por frame y aparece el temblor
@@ -319,15 +334,39 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
 - **El suelo no debe leerse como un "piso".** En las referencias (`1.png`,
   `3.png`, `5.png`) no hay plano de suelo: son objetos sobre el cartel crema con
   mucho espacio libre alrededor. Por eso el terreno se mezcla en un 70 % con el
-  color de fondo (`groundColor` en `FoundationScene.tsx`): recibe sombra y
-  niebla, pero no compite por espacio con lo que se construya encima.
+  color de fondo (`GROUND_TINT` en `systems/Terrain.tsx`, por vértice y por
+  zona): recibe sombra y niebla, pero no compite por espacio con lo que se
+  construya encima.
+- **ScrollTrigger repone `history.scrollRestoration` en cada `refresh()`.** Al
+  registrarse guarda el valor que había (`auto`) y lo vuelve a escribir en cada
+  refresh, que el motor pide en cada cambio de ruta. Con `auto`, al volver con
+  «atrás» el navegador devolvía la página al fondo de su tramo **después** de
+  que la página lo pusiera a cero: la URL decía Home y la cámara estaba en
+  Ubicación. Asignar `history.scrollRestoration = 'manual'` a mano no dura ni
+  una navegación; hay que decírselo a ScrollTrigger:
+  `ScrollTrigger.clearScrollMemory('manual')` (en `useJourneyScroll`).
+- **Un `template.tsx` sólo se vuelve a montar cuando cambia su propio
+  segmento hijo.** Entre `/lugares/fushimi-inari` y `/lugares/gion` el hijo de
+  `[locale]` es `lugares` en los dos casos, así que un fundido en
+  `[locale]/template.tsx` no se vería entre lugares. El fundido del contenido va
+  en `ContentArrival`, un componente cliente con `key={slug}` en cada página.
+- **Lo que se mueve con la cámara tiene que decidir si está anclado al mundo o
+  a ella.** Terreno y piedras, al mundo. Pétalos: sus cajas viajan con el
+  encuadre, pero fluyen hacia la cámara con el avance integrado (`uAdvance`),
+  y como ese borde en profundidad está en cuadro, se desvanecen en él. Fauna:
+  en 3A viaja con el encuadre (y patina con el scroll); 3B la ancla al mundo.
+  Sol y caja de sombras: siguen al encuadre, o las sombras desaparecen al
+  avanzar.
 
 ---
 
 ## Composición del cuadro (regla de tercios)
 
 El encuadre de la escena está calibrado a esta división, y **todo lo que se
-añada en las fases siguientes tiene que respetarla**:
+añada en las fases siguientes tiene que respetarla**. Desde la Fase 3A los
+números son del **encuadre local** de la cámara (`PATH.frame`): la cámara viaja,
+pero respecto de ella el cuadro es siempre el mismo. La vista de cada estación
+es frontal porque la tangente del camino es nula en ella:
 
 | Franja | Desde arriba | Qué vive ahí |
 |---|---|---|
@@ -335,7 +374,7 @@ añada en las fases siguientes tiene que respetarla**:
 | Tercio medio | 30–65 % | Texto, y la base de los objetos: troncos, pies de torii, faroles |
 | Tercio inferior | 65–100 % | El camino de piedras y, en la Fase 2, el musgo |
 
-Números concretos del encuadre actual (`CAMERA_BASE`, en `camera/CameraRig.tsx`): cámara en
+Números concretos del encuadre local (`CAMERA_BASE`, en `camera/framing.ts`): cámara en
 `(0, 4.2, 13)` mirando a `(0, 1.9, −9)` con `fov: 34`. Eso da una inclinación de
 ~6° y deja el horizonte al **32 % desde arriba**.
 
@@ -348,11 +387,13 @@ inclina.
 ### El relieve nunca invade el centro
 
 Las colinas son **relieve del propio terreno**, no meshes puestos a ojo, y salen
-de `station.environment` (`journey.ts`). `sideMask()` en
-`scene/systems/elevation.ts` vale 0 en el pasillo central (|x| < 7), así que es
-**imposible por construcción** que una colina aparezca donde va el sujeto. Si
-hace falta cambiar el ancho del pasillo, se cambia ahí y se aplica a todas las
-estaciones a la vez.
+de `station.environment` (`journey.ts`). En `scene/systems/elevation.ts` el
+relieve se mide desde el **eje del camino** (`u = x − pathX(d)`) y vale 0 en el
+pasillo central (|u| < 7, `CENTER_CLEAR`), así que es **imposible por
+construcción** que una colina aparezca donde va el sujeto, también en las
+curvas (`bun run check:path` lo recorre entero). Si hace falta cambiar el ancho
+del pasillo, se cambia ahí y se aplica a todas las estaciones a la vez. Entre
+estaciones, la amplitud de cada costado se mezcla por pesos de zona.
 
 Cada estación declara su propio ambiente — llano, ondulado, montañoso, con
 pendiente, con tinte de cielo — para que el fondo no sea siempre el mismo. La
@@ -370,7 +411,10 @@ llega en las fases 4–8 y se cuelga de ese mismo objeto.
 | 2A | Motor: Lenis + GSAP, `WindField` con ráfagas, parallax de cursor | ✅ |
 | 2B | Ambiente: pétalos por capas en el shader, profundidad de campo | ✅ |
 | 2C | Vida: rigs de fauna + `FaunaDirector` + audio sintetizado + controles | ✅ pendiente de revisión |
-| 3 | El Camino (piedras sobre spline, cámara con scroll, sidebar radial) | ⏸ |
+| 3 | El Camino, en tres bloques: | ⏳ |
+| 3A | · El mundo: sendero, terreno continuo, cámara con scroll, tramo y llegada | ✅ pendiente de revisión |
+| 3B | · La fauna en el camino (anclada al mundo, cercanía por estación) | ⏸ |
+| 3C | · La navegación (sidebar radial, íconos por código, móvil, teclado) | ⏸ |
 | 4 | Home 京都 | ⏸ |
 | 5 | Ubicación 位置 | ⏸ |
 | 6 | Lugares | ⏸ |
@@ -382,8 +426,10 @@ llega en las fases 4–8 y se cuelga de ese mismo objeto.
 
 - **Fuente de kanji**: Zen Old Mincho (propuesta) vs Yuji Syuku. Comparar en
   `/es/tipografia/`.
-- **Slugs por idioma**: hoy `/en/ubicacion` usa el slug español. Si se quieren
-  slugs traducidos, se decide en la Fase 3 con `pathnames` de next-intl.
+
+Decidido en la Fase 3: los **slugs se quedan en español** (`/en/ubicacion`). El
+export estático no tiene middleware que reescriba rutas traducidas; se
+reconsidera en la Fase 9.
 
 Ya decididas: titulares con **One Jinja** y párrafos/texto de lectura con
 **Gaze Nozarashi** — son las dos fuentes de partida, no hubo comparación que

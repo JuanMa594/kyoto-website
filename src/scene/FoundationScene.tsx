@@ -1,32 +1,31 @@
 'use client';
 
-import { useMemo } from 'react';
-import { Color } from 'three';
-
 import type { Station } from '@/config/journey';
 import type { ScenePalette } from '@/lib/css-vars';
 import type { QualityProfile } from '@/scene/quality/tiers';
+import { Atmosphere, Sun } from '@/scene/systems/Atmosphere';
 import { FaunaDirector } from '@/scene/systems/fauna/FaunaDirector';
-import { PetalSystem } from '@/scene/systems/PetalSystem';
+import { PetalZones } from '@/scene/systems/PetalSystem';
 import { StonePath } from '@/scene/systems/StonePath';
 import { Terrain } from '@/scene/systems/Terrain';
 
 /**
- * Escena de calibración de la Fase 1.
+ * El mundo del camino.
  *
- * No es la escena definitiva: es la prueba de que los cimientos funcionan —
- * cámara en perspectiva, niebla, luz rasante, geometría procedural, relieve por
- * estación y recorte por tier de calidad.
+ * Desde la Fase 3A es **un solo mundo continuo**: el terreno, las piedras y el
+ * aire cubren el recorrido entero y se transforman de una estación a la
+ * siguiente por los pesos de zona de `scene/path/journeyPath.ts`. La cámara
+ * viaja por él (`camera/CameraRig.tsx`); nada se reconstruye al cambiar de
+ * ruta.
  *
- * **Composición (regla de tercios).** El encuadre está calibrado para que:
- *   · el tercio inferior sea del camino de piedras (y del musgo, en la Fase 2),
- *   · el tercio medio lleve el texto y la base de los objetos —troncos, pies de
- *     torii, faroles—,
- *   · el tercio superior quede despejado para la copa de los cerezos, las hojas
- *     al viento, las nubes y las garzas.
+ * `station` es la **zona** en la que está la cámara, no la de la ruta: decide
+ * qué fauna puede salir.
  *
- * El relieve es **modular por estación** (`station.environment`) y sale siempre
- * a los costados: el centro pertenece al sujeto. Ver `systems/elevation.ts`.
+ * **Composición (regla de tercios)**, en el encuadre local de la cámara:
+ *   · el tercio inferior es del camino de piedras,
+ *   · el medio, del texto y de la base de los objetos,
+ *   · el superior queda despejado para copas, hojas al viento y aves.
+ * El relieve sale siempre a los costados del eje del camino (`elevation.ts`).
  */
 
 interface FoundationSceneProps {
@@ -35,66 +34,25 @@ interface FoundationSceneProps {
   profile: QualityProfile;
 }
 
-/** Mezcla un color base con el tinte de cielo de la estación, si lo tiene. */
-function tinted(base: string, station: Station): Color {
-  const color = new Color(base);
-  const tint = station.environment.skyTint;
-  return tint ? color.lerp(new Color(tint.color), tint.amount) : color;
-}
-
 export function FoundationScene({ station, palette, profile }: FoundationSceneProps) {
-  const fogNear = station.ambient.fog.near * profile.fogScale;
-  const fogFar = station.ambient.fog.far * profile.fogScale;
-
-  // El fondo y la niebla llevan el tinte de la estación: es lo que hace que
-  // Fushimi Inari se sienta cálido y Gion al anochecer, sin cambiar de escena.
-  const skyColor = useMemo(() => tinted(palette.washi, station), [palette.washi, station]);
-  const fogColor = useMemo(() => tinted(palette.washiFog, station), [palette.washiFog, station]);
-
-  // El suelo casi desaparece en el fondo: sólo un 30 % del tinte de la
-  // estación sobre el washi. Ninguna referencia tiene un "piso" a color pleno.
-  const groundColor = useMemo(
-    () => new Color(palette.washi).lerp(new Color(station.palette.ground), 0.3),
-    [palette.washi, station.palette.ground],
-  );
-
   return (
     <>
-      {/* El fondo es el mismo washi del DOM: el canvas no debe notarse como
-          una ventana pegada encima de la página, sino como su continuación. */}
-      <color attach="background" args={[skyColor]} />
-      <fog attach="fog" args={[fogColor, fogNear, fogFar]} />
+      <Atmosphere palette={palette} profile={profile} />
 
-      {/* Luz rasante desde la izquierda, como en las referencias: da relieve a
-          las caras planas de las piedras sin necesidad de postproceso. */}
       <hemisphereLight args={[palette.washi, palette.ishiDeep, 1.5]} />
-      <directionalLight
-        position={[-6, 7, 4]}
-        intensity={1.9}
-        color={palette.washi}
-        castShadow={profile.shadows}
-        shadow-mapSize={[1024, 1024]}
-        shadow-camera-left={-12}
-        shadow-camera-right={12}
-        shadow-camera-top={12}
-        shadow-camera-bottom={-12}
-      />
+      <Sun palette={palette} profile={profile} />
 
-      <Terrain
-        environment={station.environment}
-        color={`#${groundColor.getHexString()}`}
-        profile={profile}
-      />
+      <Terrain palette={palette} profile={profile} />
+      <StonePath color={palette.ishi} profile={profile} />
 
-      <StonePath environment={station.environment} color={palette.ishi} profile={profile} />
+      {/* Lo que cae del cielo en cada zona —sakura en eventos, momiji en los
+          templos, hojas de bambú en la home—, fundido entre estaciones.
+          Cruza por delante y por detrás del sujeto: es la capa que da la
+          profundidad. */}
+      <PetalZones palette={palette} />
 
-      {/* Lo que cae del cielo en esta zona, según `station.ambient`: sakura en
-          eventos, momiji en los templos, hojas de bambú en la home. Cruzan por
-          delante y por detrás del sujeto — es la capa que da la profundidad. */}
-      <PetalSystem station={station} palette={palette} />
-
-      {/* La vida del cuadro: quién sale y qué hace lo decide el director a
-          partir de las especies que declara la estación. */}
+      {/* La vida del cuadro: quién sale lo decide el director a partir de las
+          especies de la zona en la que está la cámara. */}
       <FaunaDirector station={station} palette={palette} profile={profile} />
     </>
   );

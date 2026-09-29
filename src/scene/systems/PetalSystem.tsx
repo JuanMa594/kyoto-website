@@ -12,14 +12,16 @@ import {
   UniformsUtils,
   Vector3,
   type BufferGeometry,
+  type Group,
   type InstancedMesh,
 } from 'three';
 
 import { registerPresets } from '@/animation/presets';
-import type { Station } from '@/config/journey';
+import { JOURNEY, type Station } from '@/config/journey';
 import { readCssSeconds, type ScenePalette } from '@/lib/css-vars';
 import { mulberry32 } from '@/lib/procedural';
 import { petalGeometry } from '@/scene/objects/PetalGeometry';
+import { PATH, zoneWeight } from '@/scene/path/journeyPath';
 import { WIND } from '@/scene/systems/WindField';
 import { selectParticleScale, useKyotoStore } from '@/store/useKyotoStore';
 
@@ -63,6 +65,11 @@ import {
  * sujeto** —es la que de verdad vende la profundidad, y la que el desenfoque de
  * campo convierte en bokeh—, la media acompaña al sujeto y la del fondo apenas
  * se insinúa entre la niebla.
+ *
+ * **Con la cámara en movimiento (Fase 3A)**, las cajas viajan con ella y el
+ * avance del camino, integrado en la CPU (`uAdvance`), las hace fluir hacia la
+ * cámara. En profundidad envuelven, y como ese borde está siempre en cuadro,
+ * se desvanecen en los dos extremos de la caja.
  */
 
 const VERTEX = /* glsl */ `
@@ -70,6 +77,7 @@ const VERTEX = /* glsl */ `
   uniform float uFallPhase;
   uniform float uDrift;
   uniform float uDepthSway;
+  uniform float uAdvance;
   uniform float uStrength;
   uniform float uDensity;
   uniform float uFadeBand;
@@ -110,6 +118,11 @@ const VERTEX = /* glsl */ `
     float life = fract(aOffset.y + uFallPhase * (0.65 + 0.7 * seed));
 
     float x01 = fract(aOffset.x + uDrift / uSize.x);
+    // La cámara avanza por el camino: los pétalos fluyen hacia ella en la
+    // misma medida, y así se atraviesa la lluvia en vez de llevarla pegada.
+    // El avance se integra en la CPU, así que es continuo aunque la velocidad
+    // cambie.
+    float z01 = fract(aOffset.z + uAdvance / uSize.z);
 
     float sway = sin(uTime * (0.6 + seed * 0.9) + seed * 31.4) * (0.25 + uStrength * 1.1);
     float bob = cos(uTime * (0.5 + seed * 0.7) + seed * 17.3) * 0.12;
@@ -117,8 +130,7 @@ const VERTEX = /* glsl */ `
     vec3 place = vec3(
       uCenter.x + (x01 - 0.5) * uSize.x + sway,
       uCenter.y + (0.5 - life) * uSize.y + bob,
-      // La profundidad NO envuelve, y es a propósito: ver uDepthSway.
-      uCenter.z + (aOffset.z - 0.5) * uSize.z + uDepthSway
+      uCenter.z + (z01 - 0.5) * uSize.z + uDepthSway
     );
 
     // Entran y salen encogiendo por los dos motivos: porque terminan su caída,
@@ -126,11 +138,15 @@ const VERTEX = /* glsl */ `
     // vería el salto de abajo a arriba y el estallido al empezar a soplar.
     float ciclo = smoothstep(0.0, 0.06, life) * (1.0 - smoothstep(0.88, 1.0, life));
     float presente = 1.0 - smoothstep(uDensity, uDensity + uFadeBand, aIndex);
-    // El lado sí envuelve, porque el viento tiene que poder empujar sin fin.
-    // A 16:9 ese borde cae holgadamente fuera de cuadro, pero en una pantalla
-    // muy ancha entraría, así que también se desvanece ahí.
+    // El lado envuelve porque el viento tiene que poder empujar sin fin. A
+    // 16:9 ese borde cae fuera de cuadro, pero en una pantalla muy ancha
+    // entraría, así que también se desvanece ahí.
     float borde = smoothstep(0.0, 0.03, x01) * (1.0 - smoothstep(0.97, 1.0, x01));
-    float fade = ciclo * presente * borde;
+    // La profundidad envuelve con el avance de la cámara, y ese borde sí está
+    // siempre dentro de cuadro: por eso se desvanece en los dos extremos de
+    // la caja, en vez de saltar de delante a atrás.
+    float hondo = smoothstep(0.0, 0.12, z01) * (1.0 - smoothstep(0.88, 1.0, z01));
+    float fade = ciclo * presente * borde * hondo;
 
     float angle = uTime * uSpin * (0.5 + seed) + seed * 6.283;
     mat3 spin = axisRotation(vec3(0.4 + seed * 0.6, 1.0, 0.25 - seed * 0.5), angle);
@@ -179,6 +195,9 @@ const DRIFT_SCALE = 2.6;
  * siempre en pantalla, así que dar la vuelta ahí significa que el pétalo salta
  * varias unidades hacia la cámara o hacia el fondo, cambiando de tamaño de
  * golpe. Eso es lo que se veía como un teletransporte.
+ *
+ * (Lo que sí envuelve en profundidad desde la Fase 3A es el avance de la
+ * cámara, `uAdvance`, y precisamente por eso se desvanece en los dos bordes.)
  */
 const DEPTH_SWAY = 1;
 
@@ -238,12 +257,14 @@ function GustSurge() {
 interface LayerProps {
   layer: PetalLayer;
   station: Station;
+  /** Índice de la estación en `JOURNEY`: de él sale su peso de zona. */
+  zone: number;
   palette: ScenePalette;
   particleScale: number;
   allocation: number;
 }
 
-function PetalLayerMesh({ layer, station, palette, particleScale, allocation }: LayerProps) {
+function PetalLayerMesh({ layer, station, zone, palette, particleScale, allocation }: LayerProps) {
   const kind = station.ambient.petalKind;
   const mesh = useRef<InstancedMesh>(null);
 
@@ -251,8 +272,11 @@ function PetalLayerMesh({ layer, station, palette, particleScale, allocation }: 
     const geo = petalGeometry(kind);
 
     // Semilla estable por capa: el reparto es el mismo en cada carga, que es lo
-    // que permite comparar dos capturas al calibrar.
-    const random = mulberry32(layer.name.length * 977 + allocation);
+    // que permite comparar dos capturas al calibrar. La zona entra en la
+    // semilla para que dos estaciones con la misma cuenta (los dos templos) no
+    // compartan posiciones: en el fundido se verían como una sola lluvia que
+    // pierde la mitad de sus pétalos.
+    const random = mulberry32(layer.name.length * 977 + allocation + zone * 7919);
     const offsets = new Float32Array(allocation * 3);
     const seeds = new Float32Array(allocation);
     const scales = new Float32Array(allocation);
@@ -276,7 +300,7 @@ function PetalLayerMesh({ layer, station, palette, particleScale, allocation }: 
     geo.setAttribute('aIndex', new InstancedBufferAttribute(indices, 1));
 
     return geo;
-  }, [kind, allocation, layer.name]);
+  }, [kind, allocation, layer.name, zone]);
 
   const material = useMemo(() => {
     const [light, dark] = petalColors(kind, palette);
@@ -288,6 +312,7 @@ function PetalLayerMesh({ layer, station, palette, particleScale, allocation }: 
         uFallPhase: { value: 0 },
         uDrift: { value: 0 },
         uDepthSway: { value: 0 },
+        uAdvance: { value: 0 },
         uStrength: { value: 0 },
         uDensity: { value: 1 },
         uFadeBand: { value: PETAL_FADE_BAND },
@@ -346,13 +371,20 @@ function PetalLayerMesh({ layer, station, palette, particleScale, allocation }: 
     // La profundidad no se integra: es el viento de este frame y nada más.
     uniforms.uDepthSway!.value = WIND.z * DEPTH_SWAY;
     uniforms.uStrength!.value = WIND.strength;
-    uniforms.uDensity!.value = petalPresence(station, PETAL_SURGE.value);
+
+    // Cuánto pesa esta zona donde está la cámara: entre dos estaciones, sus
+    // lluvias se funden en vez de cortarse.
+    const weight = zoneWeight(PATH.d, zone);
+    // Envuelto a la profundidad de la caja: si creciera sin límite, el float
+    // del shader perdería resolución en una sesión larga.
+    uniforms.uAdvance!.value = PATH.advance % layer.size[2];
+    uniforms.uDensity!.value = petalPresence(station, PETAL_SURGE.value, weight);
 
     // Los que no están presentes ni siquiera entran en el draw call: el
     // `uDensity` de arriba sólo se encarga del puñado que está a medio
     // desvanecer en el borde.
     if (mesh.current) {
-      mesh.current.count = petalDrawCount(layer, station, particleScale, PETAL_SURGE.value);
+      mesh.current.count = petalDrawCount(layer, station, particleScale, PETAL_SURGE.value, weight);
     }
   });
 
@@ -368,36 +400,57 @@ function PetalLayerMesh({ layer, station, palette, particleScale, allocation }: 
   );
 }
 
-interface PetalSystemProps {
-  station: Station;
-  palette: ScenePalette;
-}
-
-export function PetalSystem({ station, palette }: PetalSystemProps) {
+/**
+ * Todas las lluvias del camino. Cada estación con pétalos tiene su sistema,
+ * reservado una sola vez al cargar, y dibuja sólo cuando su zona pesa algo
+ * donde está la cámara: entre dos estaciones conviven dos, cada una con su
+ * parte. No se monta ni se desmonta nada al viajar, así que no hay tirones de
+ * compilación a mitad de camino.
+ *
+ * Las cajas viajan con el encuadre de la cámara (`PATH.frame`); lo que las hace
+ * fluir hacia ella es `uAdvance`.
+ */
+export function PetalZones({ palette }: { palette: ScenePalette }) {
   const particleScale = useKyotoStore(selectParticleScale);
   const layers = petalLayers();
+  const stage = useRef<Group>(null);
 
-  if (station.ambient.petalKind === 'ninguna' || particleScale <= 0) return null;
+  useFrame(() => {
+    const node = stage.current;
+    if (!node) return;
+    const frame = PATH.frame;
+    node.position.set(frame.x, frame.y, frame.z);
+    node.rotation.set(0, frame.yaw, 0);
+  });
+
+  if (particleScale <= 0) return null;
 
   return (
     <>
       <GustSurge />
 
-      {layers.map((layer) => {
-        const allocation = petalAllocation(layer, station, particleScale);
-        if (allocation <= 0) return null;
+      <group ref={stage}>
+        {JOURNEY.map((station, zone) =>
+          station.ambient.petalKind === 'ninguna'
+            ? null
+            : layers.map((layer) => {
+                const allocation = petalAllocation(layer, station, particleScale);
+                if (allocation <= 0) return null;
 
-        return (
-          <PetalLayerMesh
-            key={`${layer.name}-${station.ambient.petalKind}-${allocation}`}
-            layer={layer}
-            station={station}
-            palette={palette}
-            particleScale={particleScale}
-            allocation={allocation}
-          />
-        );
-      })}
+                return (
+                  <PetalLayerMesh
+                    key={`${station.slug}-${layer.name}-${allocation}`}
+                    layer={layer}
+                    station={station}
+                    zone={zone}
+                    palette={palette}
+                    particleScale={particleScale}
+                    allocation={allocation}
+                  />
+                );
+              }),
+        )}
+      </group>
     </>
   );
 }

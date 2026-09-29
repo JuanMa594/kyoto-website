@@ -28,7 +28,7 @@ import { setAudioLayers, setAudioVolume, startAudio, stopAudio, updateAudio } fr
 export function AmbientAudio() {
   const audible = useKyotoStore(selectAudioAudible);
   const volume = useKyotoStore((s) => s.volume);
-  const activeStation = useKyotoStore((s) => s.activeStation);
+  const zone = useKyotoStore((s) => s.zone);
 
   useEffect(() => {
     if (!audible) {
@@ -72,10 +72,12 @@ export function AmbientAudio() {
   }, [volume]);
 
   // Cada zona tiene su paisaje sonoro, declarado en `journey.ts` junto al resto
-  // de su ambiente: Gion suena a ciudad y a fuego, Kiyomizu a agua.
+  // de su ambiente: Gion suena a ciudad y a fuego, Kiyomizu a agua. Suena la
+  // zona en la que está la cámara, no la de la ruta: al viajar, el sonido
+  // cambia cuando cambia el paisaje.
   useEffect(() => {
-    setAudioLayers(getStation(activeStation).ambient.sounds);
-  }, [activeStation]);
+    setAudioLayers(getStation(zone).ambient.sounds);
+  }, [zone]);
 
   return null;
 }
