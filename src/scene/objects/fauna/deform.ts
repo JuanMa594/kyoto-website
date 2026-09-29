@@ -328,10 +328,11 @@ export interface DeformLook {
 }
 
 /**
- * El material de un individuo: su color es el que se horneó en los vértices, y
- * encima lleva dos gestos de cartel —un tinte leve hacia el washi y un filo de
- * tinta en la silueta— para que el animal pertenezca al dibujo en vez de
- * parecer recortado de una foto.
+ * El material de un individuo: su color es el que se horneó en los vértices,
+ * algo más saturado para que se note sobre el crema, y encima lleva dos gestos
+ * de cartel —un tinte leve hacia el washi y un filo de tinta en la silueta—
+ * para que el animal pertenezca al dibujo en vez de parecer recortado de una
+ * foto.
  */
 export function createDeformMaterial(profile: DeformProfile, look: DeformLook): DeformMaterial {
   const uniforms: Uniforms = {
@@ -411,9 +412,18 @@ export function createDeformMaterial(profile: DeformProfile, look: DeformLook): 
         // Modelo sin color propio: lo opaco es cuerpo, lo translúcido es ala.
         if (uPaint > 0.5) {
           diffuseColor.rgb = diffuseColor.a > 0.99 ? uPaintBody : uPaintWing;
+        } else {
+          // Un 20 % más de saturación en el color horneado, sin tocar el
+          // brillo: se separa el color de su luminancia y se amplía la
+          // diferencia. El calicó sale más naranja y negro, pero ningún
+          // animal pasa a chillar sobre el cartel. Los pintados desde la
+          // paleta (la libélula) ya traen sus colores y no se tocan.
+          float faunaLuma = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+          diffuseColor.rgb = max(mix(vec3(faunaLuma), diffuseColor.rgb, 1.2), 0.0);
         }
-        // Un 10 % de washi en la piel: el animal toma la luz del papel.
-        diffuseColor.rgb = mix(diffuseColor.rgb, uWashi, 0.1);`,
+        // Un 5 % de washi en la piel: el animal toma la luz del papel sin
+        // apagar su color.
+        diffuseColor.rgb = mix(diffuseColor.rgb, uWashi, 0.05);`,
       )
       .replace(
         '#include <opaque_fragment>',
