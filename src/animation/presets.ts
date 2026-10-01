@@ -38,16 +38,6 @@ const FALLBACK_DURATIONS = {
 export type DurationName = keyof typeof FALLBACK_DURATIONS;
 
 /**
- * La curva del tramo: el scroll del final de cada página no mueve la cámara a
- * velocidad constante, sino que **arranca con peso, cruza a buen paso y llega
- * frenando**. Es la marcha de quien echa a andar y se detiene al llegar.
- *
- * Va aparte de las cuatro curvas de `tokens.css` porque no la usa el DOM: sólo
- * traduce el progreso del tramo en profundidad de cámara (`useJourneyScroll`).
- */
-export const TRAMO_EASE = 'power2.inOut';
-
-/**
  * Evalúa una curva cúbica de Bézier con extremos fijos en (0,0) y (1,1), que
  * es la forma que tiene `cubic-bezier()` en CSS.
  *

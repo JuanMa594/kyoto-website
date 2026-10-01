@@ -75,7 +75,24 @@
   "tramo": {
     "label": "Path to {station}",
     "continue": "Continue the path",
-    "hint": "Keep scrolling: the path goes on"
+    "hint": "Keep scrolling: the path goes on",
+    "mapPlaceholder": "Old map · coming in Phase 5"
+  },
+  "tramos": {
+    "ubicacion": {
+      "japon": {
+        "title": "In the heart of Japan",
+        "body": "Kyoto lies on Honshū, the main island of the archipelago, about 370 km west of Tokyo. It was the imperial capital for more than a thousand years, from 794 to 1868."
+      },
+      "kansai": {
+        "title": "A basin among mountains",
+        "body": "It belongs to the Kansai region, alongside Osaka and Nara, each less than an hour away by train. Mountains enclose it to the north, east and west, and the Kamo River runs through it from north to south."
+      },
+      "resena": {
+        "title": "What Kyoto is like",
+        "body": "A city of nearly one and a half million people, laid out on a grid, with more than 1,600 Buddhist temples and some 400 Shinto shrines. Its historic monuments — seventeen sites across Kyoto, Uji and Ōtsu — have been a World Heritage Site since 1994: here the ancient and the everyday share the same street."
+      }
+    }
   },
   "scaffold": {
     "phase": "Phase 1 — Foundation",

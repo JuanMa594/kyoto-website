@@ -5,9 +5,16 @@ import { useEffect, useRef, type RefObject } from 'react';
 import type { StationSlug } from '@/config/journey';
 import { clamp } from '@/lib/procedural';
 
-import { getLenis, gsap, ScrollTrigger } from './gsap';
-import { createArrivalGate, passTramo, resetScrollPath, SCROLL_PATH } from './journeyScroll';
-import { registerPresets, TRAMO_EASE } from './presets';
+import { getLenis, ScrollTrigger } from './gsap';
+import {
+  createArrivalGate,
+  passTramo,
+  resetScrollPath,
+  SCROLL_PATH,
+  tramoCardOpacity,
+  tramoFraction,
+  tramoSignOpacity,
+} from './journeyScroll';
 
 /**
  * El puente entre el scroll de una página de estación y la cámara.
@@ -18,11 +25,17 @@ import { registerPresets, TRAMO_EASE } from './presets';
  * cámara necesita saber del DOM. Así el scroll y la escena siguen sin llamarse
  * directamente.
  *
+ * **El tramo se camina y se lee.** Cómo avanza la cámara, cuándo aparece cada
+ * tarjeta y cuándo el cartel de la siguiente estación lo deciden funciones
+ * puras de `journeyScroll.ts` (comprobadas en `bun run check:path`); aquí sólo
+ * se escriben sus resultados: en `SCROLL_PATH`, en la opacidad de cada tarjeta
+ * (`--card`) y en la del cartel (`--llegada`).
+ *
  * **La llegada automática.** Al terminar el tramo con scroll hacia abajo se
  * llama a `onArrive`, una sola vez por página y sólo si el tramo estaba armado
- * (`passTramo`, comprobado en `bun run check:path`).
+ * (`passTramo`).
  *
- * Cada estación empieza arriba: al montar, el scroll vuelve a cero. «Atrás»
+ * Cada estación empieza arriba: al llegar, el scroll vuelve a cero. «Atrás»
  * significa desandar el camino, no volver al fondo del tramo.
  */
 
@@ -34,12 +47,23 @@ interface JourneyScrollOptions {
   station: StationSlug;
   /** La sección del tramo; vacía en la última estación, que no tiene. */
   tramo: RefObject<HTMLElement | null>;
+  /** Cuántas tarjetas tiene el tramo: cada una es una parada de lectura. */
+  cards: number;
+  /** Lo que se camina en el tramo, en vh (`tramoWalkVh`). */
+  walkVh: number;
   /** Falso con modo 静 o movimiento reducido: el scroll no mueve la cámara. */
   enabled: boolean;
   onArrive: () => void;
 }
 
-export function useJourneyScroll({ station, tramo, enabled, onArrive }: JourneyScrollOptions): void {
+export function useJourneyScroll({
+  station,
+  tramo,
+  cards,
+  walkVh,
+  enabled,
+  onArrive,
+}: JourneyScrollOptions): void {
   const arrive = useRef(onArrive);
   useEffect(() => {
     arrive.current = onArrive;
@@ -61,11 +85,19 @@ export function useJourneyScroll({ station, tramo, enabled, onArrive }: JourneyS
   }, [station]);
 
   useEffect(() => {
+    const section = tramo.current;
+    const cardNodes = section
+      ? Array.from(section.querySelectorAll<HTMLElement>('[data-tramo-card]'))
+      : [];
+
     if (!enabled) {
       // Sin movimiento el scroll no mueve la cámara: se queda en la estación,
-      // no donde la dejó el último avance.
+      // no donde la dejó el último avance. Y las tarjetas se ven todas, como
+      // una lista: se borra la opacidad que les hubiera puesto el scroll.
       SCROLL_PATH.content = 0;
       SCROLL_PATH.tramo = 0;
+      cardNodes.forEach((node) => node.style.removeProperty('--card'));
+      section?.style.removeProperty('--llegada');
       return;
     }
 
@@ -73,10 +105,6 @@ export function useJourneyScroll({ station, tramo, enabled, onArrive }: JourneyS
     // repone en cada refresh —que el motor pide en cada cambio de ruta—: el
     // 'manual' de arriba no duraría ni una navegación. Hay que decírselo a él.
     ScrollTrigger.clearScrollMemory('manual');
-
-    registerPresets();
-    const ease = gsap.parseEase(TRAMO_EASE);
-    const section = tramo.current;
 
     const content = ScrollTrigger.create({
       start: 0,
@@ -97,9 +125,11 @@ export function useJourneyScroll({ station, tramo, enabled, onArrive }: JourneyS
           end: 'bottom bottom',
           onUpdate: (self) => {
             const progress = unit(self.progress);
-            SCROLL_PATH.tramo = ease(progress);
-            // El cartel de la siguiente estación se lee de esta variable en CSS.
-            section.style.setProperty('--tramo', progress.toFixed(3));
+            SCROLL_PATH.tramo = tramoFraction(progress, cards, walkVh);
+            cardNodes.forEach((node, index) => {
+              node.style.setProperty('--card', tramoCardOpacity(progress, cards, index, walkVh).toFixed(3));
+            });
+            section.style.setProperty('--llegada', tramoSignOpacity(progress, cards, walkVh).toFixed(3));
             if (passTramo(gate, progress, self.direction)) arrive.current();
           },
         })
@@ -109,5 +139,5 @@ export function useJourneyScroll({ station, tramo, enabled, onArrive }: JourneyS
       content.kill();
       walk?.kill();
     };
-  }, [station, enabled, tramo]);
+  }, [station, enabled, tramo, cards, walkVh]);
 }

@@ -3,7 +3,7 @@
 import { useEffect, useMemo } from 'react';
 import { Color, Float32BufferAttribute, PlaneGeometry, type BufferAttribute } from 'three';
 
-import { JOURNEY } from '@/config/journey';
+import { JOURNEY, PATH_LENGTH } from '@/config/journey';
 import type { ScenePalette } from '@/lib/css-vars';
 import type { QualityProfile } from '@/scene/quality/tiers';
 import { zoneBlend } from '@/scene/path/journeyPath';
@@ -30,14 +30,17 @@ const GROUND_TINT = 0.3;
 /** Cobertura: el ancho de todo lo que la niebla deja ver, y todo el largo. */
 const WIDTH = 360;
 const NEAR_Z = 60;
-const FAR_Z = -640;
+const FAR_Z = -(PATH_LENGTH + 240);
 const DEPTH = NEAR_Z - FAR_Z;
 const CENTER_Z = (NEAR_Z + FAR_Z) / 2;
 
-/** Segmentos en X y en Z: ~2 unidades por segmento en alto. */
+/** Unidades de mundo por segmento: ~2 en alto, ~2,5 en medio, ~4 en bajo. */
+const SPACING: Record<QualityProfile['tier'], number> = { high: 2, medium: 2.5, low: 4 };
+
+/** Segmentos en X y en Z, con el mismo espaciado en los dos ejes. */
 function segmentsFor(tier: QualityProfile['tier']): [number, number] {
-  if (tier === 'low') return [90, 175];
-  return tier === 'medium' ? [144, 280] : [180, 350];
+  const spacing = SPACING[tier];
+  return [Math.round(WIDTH / spacing), Math.round(DEPTH / spacing)];
 }
 
 interface TerrainProps {

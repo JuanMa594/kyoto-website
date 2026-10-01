@@ -9,8 +9,10 @@
  *   · la cámara queda 22 unidades por detrás siguiendo su rumbo, a 5,2 sobre el
  *     terreno que tiene debajo;
  *   · **la inclinación queda acotada** a 3,5°–8,7° (horizonte al 25–40 %). En
- *     una cuesta, si la mirada se saliera de esa banda, se sube la cámara:
- *     nunca se inclina más. Altura e inclinación son dos mandos distintos.
+ *     una cuesta arriba, si la mirada se saliera de esa banda, se sube la
+ *     cámara; en una bajada, se baja: nunca se inclina más. Altura e
+ *     inclinación son dos mandos distintos. Que al bajarla no se acerque al
+ *     suelo lo comprueba `check:path` (la bajada a Gion se calibró con eso).
  *
  * **El rumbo está acotado dos veces, contra el mareo**: en ángulo (±15°) y en
  * velocidad (12°/s). Y en los viajes rápidos el encuadre sigue una versión
@@ -49,9 +51,16 @@ export const RIG_LIMITS = {
 /** El rumbo mira la tangente promediada en ±10 unidades, no la puntual. */
 const TANGENT_SPAN = 10;
 
-/** Constante del filtro en reposo y en viaje (1/τ, en 1/s). */
+/** Constante del filtro en reposo (1/τ, en 1/s): sigue al camino casi al pie. */
 const SETTLE_LAMBDA = 12;
-const TRAVEL_LAMBDA = 2;
+/**
+ * En viaje, el **giro** se filtra mucho (τ ≈ 0,5 s): girar deprisa es lo que
+ * marea. El **desplazamiento lateral** se filtra menos: deslizarse de lado
+ * siguiendo el camino se lee como mirar por la ventanilla de un tren, y con el
+ * mismo filtro que el giro el punto de interés se salía del pasillo.
+ */
+const TRAVEL_YAW_LAMBDA = 2;
+const TRAVEL_SHIFT_LAMBDA = 6;
 
 /** Entre estas velocidades (u/s) el filtro pasa de uno a otro. */
 const SPEED_SETTLED = 15;
@@ -109,11 +118,11 @@ export function stepRig(rig: RigState, d: number, dt: number): void {
   }
 
   rig.speed = damp(rig.speed, Math.abs(d - rig.d) / dt, 8, dt);
-  const lambda = lerp(SETTLE_LAMBDA, TRAVEL_LAMBDA, smoothstep(SPEED_SETTLED, SPEED_TRAVEL, rig.speed));
+  const traveling = smoothstep(SPEED_SETTLED, SPEED_TRAVEL, rig.speed);
 
-  rig.focusX = damp(rig.focusX, pathX(d), lambda, dt);
+  rig.focusX = damp(rig.focusX, pathX(d), lerp(SETTLE_LAMBDA, TRAVEL_SHIFT_LAMBDA, traveling), dt);
 
-  const wanted = damp(rig.yaw, pathYaw(d), lambda, dt);
+  const wanted = damp(rig.yaw, pathYaw(d), lerp(SETTLE_LAMBDA, TRAVEL_YAW_LAMBDA, traveling), dt);
   const maxStep = RIG_LIMITS.maxYawRate * dt;
   rig.yaw = clamp(
     rig.yaw + clamp(wanted - rig.yaw, -maxStep, maxStep),

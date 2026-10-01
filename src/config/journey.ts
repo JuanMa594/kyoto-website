@@ -98,8 +98,8 @@ export interface SkyTint {
 
 /**
  * El "preset de ambiente" de la estación: qué forma tiene el terreno, por qué
- * lado se levanta y cuánto sube el camino. Es lo que evita que el fondo sea
- * siempre el mismo. La decoración concreta (cerezos, toriis repetidos,
+ * lado se levanta, a qué altura está el camino. Es lo que evita que el fondo
+ * sea siempre el mismo. La decoración concreta (cerezos, toriis repetidos,
  * machiya, chochin) llega en las fases 4–8 y se colgará de este mismo objeto.
  */
 export interface StationEnvironment {
@@ -107,19 +107,45 @@ export interface StationEnvironment {
   /** Costados donde se levanta el relieve. Vacío = terreno llano. */
   readonly hillSides: readonly Side[];
   /**
-   * Pendiente del tramo de esta estación: el camino sube `slope` unidades cada
-   * 22 de recorrido (la distancia de la cámara a su punto de interés, así que
-   * en la vista de la estación se ve exactamente esta cuesta). 0 = llano.
-   * Nunca negativa: el camino sólo sube.
+   * Altura del camino en el punto de la estación, en unidades, relativa a la
+   * Home. El camino sube o baja **en los tramos**, entre la altura de una
+   * estación y la de la siguiente, y queda llano en cada estación: la cuesta
+   * de Fushimi Inari es la de llegada, y la bajada a Gion, la de salida de
+   * Kiyomizu-dera.
    */
-  readonly slope: number;
+  readonly altitude: number;
   /**
    * Desvío lateral del camino en el punto de la estación, en unidades. Entre
    * dos estaciones el camino va de un lateral al otro, y ahí están las curvas.
-   * Entre estaciones consecutivas |Δ| ≤ 10, para que el rumbo no pase de ~13°.
+   * Entre estaciones consecutivas |Δ| ≤ 20, para que el rumbo no pase de ~13°.
    */
   readonly lateral: number;
   readonly skyTint?: SkyTint;
+}
+
+/**
+ * Una tarjeta del tramo: lo que se lee a un lado del camino al caminar hacia la
+ * siguiente estación. Al llegar a ella la cámara casi se detiene mientras la
+ * tarjeta aparece (`animation/journeyScroll.ts`). Sus textos viven en
+ * `messages/*.json`, en `tramos.<estación>.<id>`.
+ */
+export interface TramoCard {
+  readonly id: string;
+  /** A qué lado del camino aparece. En móvil, siempre centrada. */
+  readonly side: Side;
+  /** `mapa` deja además el hueco del mapa (Fase 5); `texto` es sólo lectura. */
+  readonly kind: 'texto' | 'mapa';
+}
+
+/** Lo que hay en el camino entre esta estación y la siguiente. */
+export interface StationTramo {
+  readonly cards: readonly TramoCard[];
+  /**
+   * Unidades de camino llano y recto al salir de la estación, antes de que
+   * empiecen la curva y la cuesta hacia la siguiente. Mientras dura, la zona
+   * sigue siendo ésta. Sin él, el tramo empieza a cambiar desde la estación.
+   */
+  readonly flat?: number;
 }
 
 export interface StationPalette {
@@ -158,14 +184,45 @@ export interface Station {
   readonly palette: StationPalette;
   readonly ambient: StationAmbient;
   readonly environment: StationEnvironment;
+  /**
+   * El tramo que sale de esta estación hacia la siguiente. Cada tarjeta suma
+   * su parada de lectura al largo del tramo. La última estación no tiene.
+   */
+  readonly tramo: StationTramo;
 }
 
 /**
  * Profundidad total del camino, en unidades de mundo: de la Home (`pathT` 0)
- * a Gastronomía (`pathT` 1). Con los `pathT` de abajo, cada estación queda a
- * unas 64–72 unidades de la siguiente. Ver `scene/path/journeyPath.ts`.
+ * a Gastronomía (`pathT` 1). Los `pathT` de abajo se escriben como
+ * «profundidad / PATH_LENGTH» para que se lea la distancia real: de la Home a
+ * Ubicación hay 64 unidades —medio tramo: se llega pronto a la primera
+ * sección—; entre las demás, 128–144 (más 50 de llano entre los cerezos al
+ * salir de Eventos), sitio para caminar y para leer lo que
+ * hay a los lados. Ver `scene/path/journeyPath.ts`.
  */
-export const PATH_LENGTH = 400;
+export const PATH_LENGTH = 786;
+
+/** Un tramo sin nada que leer: sólo camino. */
+const NO_CARDS: StationTramo = { cards: [] };
+
+/**
+ * De Ubicación a la sakura: dónde está Kyoto y cómo es, antes de llegar a los
+ * cerezos. Provisional: las dos tarjetas de mapa dejan el hueco del mapa
+ * antiguo desplegable, que se hace en la Fase 5.
+ */
+/**
+ * De la sakura a Fushimi Inari: 50 unidades llanas entre los cerezos antes de
+ * que empiece la subida. Sin ellas, al llegar a Eventos ya se veía la cuesta.
+ */
+const TRAMO_EVENTOS: StationTramo = { cards: [], flat: 50 };
+
+const TRAMO_UBICACION: StationTramo = {
+  cards: [
+    { id: 'japon', side: 'izquierda', kind: 'mapa' },
+    { id: 'kansai', side: 'derecha', kind: 'mapa' },
+    { id: 'resena', side: 'izquierda', kind: 'texto' },
+  ],
+};
 
 /**
  * El orden es el del camino, y es también el orden de lectura de `13.png`:
@@ -183,7 +240,8 @@ export const JOURNEY: readonly Station[] = [
     inSidebar: false,
     palette: { halo: '#FFFACD', accent: '#D82609', ground: '#EDE6DD' },
     // Home: jardín llano. Sólo una colina insinuada a la izquierda, de fondo.
-    environment: { hills: 'suaves', hillSides: ['izquierda'], slope: 0, lateral: 0 },
+    environment: { hills: 'suaves', hillSides: ['izquierda'], altitude: 0, lateral: 0 },
+    tramo: NO_CARDS,
     ambient: {
       petals: 'media',
       petalKind: 'bambu',
@@ -200,11 +258,12 @@ export const JOURNEY: readonly Station[] = [
     icon: 'mapa',
     group: 'ubicacion',
     route: 'ubicacion',
-    pathT: 0.16,
+    pathT: 64 / PATH_LENGTH,
     inSidebar: true,
     palette: { halo: '#FFFFFF', accent: '#C4181A', ground: '#F3EFE4' },
     // Valle abierto: ondulación baja por los dos costados.
-    environment: { hills: 'suaves', hillSides: ['izquierda', 'derecha'], slope: 0, lateral: -8 },
+    environment: { hills: 'suaves', hillSides: ['izquierda', 'derecha'], altitude: 0, lateral: -8 },
+    tramo: TRAMO_UBICACION,
     ambient: {
       petals: 'baja',
       petalKind: 'ninguna',
@@ -222,17 +281,18 @@ export const JOURNEY: readonly Station[] = [
     icon: 'sakura',
     group: 'eventos',
     route: 'eventos',
-    pathT: 0.32,
+    pathT: 192 / PATH_LENGTH,
     inSidebar: true,
     palette: { halo: '#FFCCBC', accent: '#EB81A5', ground: '#FFDDE8' },
     // Sakura: relieve suave a la derecha; los cerezos van a los lados (Fase 7).
     environment: {
       hills: 'suaves',
       hillSides: ['derecha'],
-      slope: 0,
-      lateral: 2,
+      altitude: 0,
+      lateral: 4,
       skyTint: { color: '#EB81A5', amount: 0.1 },
     },
+    tramo: TRAMO_EVENTOS,
     ambient: {
       petals: 'alta',
       petalKind: 'sakura',
@@ -249,17 +309,18 @@ export const JOURNEY: readonly Station[] = [
     icon: 'torii',
     group: 'lugares',
     route: 'lugares/fushimi-inari',
-    pathT: 0.5,
+    pathT: 386 / PATH_LENGTH,
     inSidebar: true,
     palette: { halo: '#EDE6DD', accent: '#D82609', ground: '#C8BFAF' },
-    // El monte Inari: relieve montañoso a ambos lados y el camino subiendo.
+    // El monte Inari: relieve montañoso a ambos lados; el camino llega subiendo.
     environment: {
       hills: 'montanosa',
       hillSides: ['izquierda', 'derecha'],
-      slope: 2.4,
-      lateral: -6,
+      altitude: 14,
+      lateral: -12,
       skyTint: { color: '#D82609', amount: 0.14 },
     },
+    tramo: NO_CARDS,
     ambient: {
       petals: 'baja',
       petalKind: 'momiji',
@@ -268,7 +329,8 @@ export const JOURNEY: readonly Station[] = [
       sounds: ['viento', 'grillos', 'pajaros'],
       // Antes era 8/45 ("túnel"), pero a esa distancia la niebla se tragaba la
       // montaña por completo. La sensación de subida la da ahora la pendiente
-      // del camino (`environment.slope`) y, en la Fase 6, los toriis repetidos.
+      // del tramo de llegada (`environment.altitude`) y, en la Fase 6, las
+      // gradas con los toriis repetidos.
       fog: { near: 12, far: 95 },
     },
   },
@@ -279,11 +341,13 @@ export const JOURNEY: readonly Station[] = [
     icon: 'pagoda',
     group: 'lugares',
     route: 'lugares/kiyomizu-dera',
-    pathT: 0.66,
+    pathT: 514 / PATH_LENGTH,
     inSidebar: true,
     palette: { halo: '#FFCCBC', accent: '#B1341F', ground: '#E8D6C3' },
-    // Ladera: el relieve sólo por la derecha, el camino sube un poco menos.
-    environment: { hills: 'montanosa', hillSides: ['derecha'], slope: 1.2, lateral: 4 },
+    // Ladera: el relieve sólo por la derecha; el camino sube un poco más y,
+    // de aquí a Gion, baja.
+    environment: { hills: 'montanosa', hillSides: ['derecha'], altitude: 17, lateral: 8 },
+    tramo: NO_CARDS,
     ambient: {
       // Los tres lugares comparten ambiente pasivo: aquí el protagonista es el
       // sitio —la terraza, los toriis, el callejón—, no lo que cae del cielo.
@@ -302,17 +366,18 @@ export const JOURNEY: readonly Station[] = [
     icon: 'farol',
     group: 'lugares',
     route: 'lugares/gion',
-    pathT: 0.83,
+    pathT: 650 / PATH_LENGTH,
     inSidebar: true,
     palette: { halo: '#FFD699', accent: '#942D2D', ground: '#D8C4A0' },
     // Gion al anochecer: apenas la sombra de una colina a la derecha, luz ámbar.
     environment: {
       hills: 'suaves',
       hillSides: ['derecha'],
-      slope: 0,
-      lateral: -5,
+      altitude: 8,
+      lateral: -10,
       skyTint: { color: '#FFD699', amount: 0.16 },
     },
+    tramo: NO_CARDS,
     ambient: {
       petals: 'baja',
       petalKind: 'sakura',
@@ -337,10 +402,11 @@ export const JOURNEY: readonly Station[] = [
     environment: {
       hills: 'ninguna',
       hillSides: [],
-      slope: 0,
+      altitude: 8,
       lateral: 0,
       skyTint: { color: '#B4CCAD', amount: 0.12 },
     },
+    tramo: NO_CARDS,
     ambient: {
       petals: 'ninguna',
       petalKind: 'ninguna',

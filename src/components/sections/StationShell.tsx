@@ -30,7 +30,7 @@ export async function StationShell({
 
       <ContentArrival key={slug}>
         <main id="contenido" className="mx-auto min-h-dvh max-w-5xl px-6 py-[18vh]">
-          <p className="brush text-sm tracking-[0.25em] uppercase opacity-60">{station.romaji}</p>
+          <p className="brush tracking-[0.25em] uppercase opacity-60">{station.romaji}</p>
 
           <h1 className="mt-2 flex flex-wrap items-baseline gap-x-6 gap-y-2">
             <span className="text-[clamp(2.5rem,8vw,6rem)] leading-none">
@@ -41,10 +41,10 @@ export async function StationShell({
             </span>
           </h1>
 
-          <p className="mt-6 max-w-prose text-lg">{t(`${slug}.tagline`)}</p>
+          <p className="mt-6 max-w-prose">{t(`${slug}.tagline`)}</p>
           <p className="mt-2 max-w-prose opacity-70">{t(`${slug}.summary`)}</p>
 
-          <p className="paper mt-10 inline-block px-4 py-3 text-sm opacity-80">
+          <p className="paper mt-10 inline-block px-4 py-3 opacity-80">
             <strong>{scaffold('phase')}</strong> — {scaffold('note')}
           </p>
 

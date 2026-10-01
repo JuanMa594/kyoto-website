@@ -308,3 +308,91 @@ sustituye el sidebar en 3C).
   pulido de transiciones → **3C**.
 - Carteles con datos en los tramos → fases de contenido (4–8).
 - Decoración por estación (toriis, cerezos, machiya) → fases 4–8.
+
+## 13. Anexo (2026-10-01): tramos largos con ritmo de lectura
+
+Tras la primera revisión, el usuario encontró los tramos cortos: entre estación
+y estación irá información a los lados del camino. Se amplía 3A con lo que le
+corresponde; lo que es de cada sección se anota en el PLAN, en su fase.
+
+### 13.1 Escala
+
+- `PATH_LENGTH` pasa de 400 a **800** (unas 130–145 u entre estaciones).
+- Los `lateral` se escalan ×2 (|Δ| ≤ 20): las curvas conservan su forma y su
+  ángulo máximo (~13°).
+- Terreno y piedras se alargan con la misma densidad.
+- **Viajes (ajustado al implementar).** Con 800 u en 4 s, el viaje de punta a
+  punta iba a 200 u/s de media y el punto de interés se salía 12 u del eje:
+  filtrar más el encuadre lo retrasa, filtrar menos lo zarandea. Se resolvió
+  con un **tope de 160 u/s de media** (una estación sigue en 1,8 s; el camino
+  entero pasa a 5 s) y con **dos filtros** en el rig: el giro muy amortiguado
+  (λ = 2) y el desplazamiento lateral más ágil (λ = 6). Exigencias en
+  `check:path`: en un viaje de una estación el punto de interés no sale del
+  pasillo (≤ 6 u; da 4,5); en el de punta a punta el eje del camino no sale del
+  cuadro a 16:9 (≤ 80 % del medio ancho visible, 9,6 u; da 8,6).
+
+### 13.2 Altura por estación (sustituye a `slope`)
+
+- Cada estación declara su **`altitude`**. El camino sube o baja **en los
+  tramos** con un `smoothstep` entre las alturas de dos estaciones, y queda
+  llano en cada estación (vista frontal). Así puede bajar, que con `slope`
+  (sólo subía) no era posible.
+- Perfil inicial: Home, Ubicación y Eventos 0 · Fushimi Inari 14 (subida más
+  marcada que antes, ~8°) · Kiyomizu-dera 17 · Gion 8 (bajada paulatina,
+  ~5–6°) · Gastronomía 8 (llano). Los valores finales los fijan las
+  comprobaciones de inclinación y de distancia al suelo de `check:path`: si la
+  cámara no cabe, se suaviza la cuesta, no la cámara.
+
+### 13.3 Tramo con ritmo de lectura
+
+- Altura del tramo: **440vh de caminar + 80vh por tarjeta**. Sin tarjetas,
+  440vh (el doble de antes con la misma velocidad de cámara).
+- El caminar se reparte en `n + 1` trechos iguales entre las `n` tarjetas.
+  Cada trecho usa la curva del tramo (`power2.inOut`: arranca con peso y
+  frena). En cada tarjeta la cámara casi se detiene —deriva un 0,8 % del tramo
+  con un `smoothstep`, para que el scroll no se sienta muerto— mientras la
+  tarjeta entra y sale con un fundido.
+- Las tarjetas se declaran por estación en `journey.ts`
+  (`tramo.cards: { id, side, kind }`), con sus textos en `messages`. Son DOM
+  real: a los costados en el tercio medio del cuadro; centradas en móvil;
+  como lista con modo 静 o movimiento reducido.
+- El cartel de la siguiente estación aparece después de la última tarjeta.
+- La correspondencia scroll → avance y las opacidades son funciones puras
+  (`journeyScroll.ts`), comprobadas en `check:path`.
+
+### 13.4 Contenido provisional
+
+El tramo Ubicación → Eventos lleva tres tarjetas provisionales: dos de mapa
+(texto real y un hueco donde irá el mapa antiguo desplegable de la Fase 5) y la
+reseña breve de Kyoto. Sirven para revisar el largo del tramo, las paradas y
+los fundidos.
+
+### 13.5 Anotado para otras fases (no se hace en 3A)
+
+- **Fase 5 · Ubicación**: las tarjetas de mapa antiguo, desplegables.
+- **Fase 6 · Lugares**: paso por los costados del santuario; la subida a
+  Fushimi escalonada (gradas en la malla) con toriis; bosque denso de bambú y
+  puente de madera sobre una vaguada antes de la plataforma de Kiyomizu-dera;
+  calzadas y faroles de Gion.
+- **Fase 7 · Eventos**: el bosque de cerezos al llegar a la sakura.
+- **Fase 8 · Gastronomía**: el tramo final culmina en el espacio gastronómico.
+
+### 13.6 Segunda revisión (2026-10-01)
+
+- **De la Home a Ubicación, medio tramo.** El usuario lo notaba demasiado largo:
+  pasa de 128 a 64 u, y `PATH_LENGTH` de 800 a 736 (los `pathT` se escriben
+  como «profundidad / PATH_LENGTH»). El lateral de Ubicación baja a −8 para que
+  la curva corta siga por debajo de 15°.
+- **El caminar de cada tramo es proporcional a su distancia** (`tramoWalkVh`,
+  ~3,3vh por unidad): la cámara avanza igual de rápido en todos y el tramo
+  corto dura la mitad (211vh frente a 422vh). Los 440vh fijos de §13.3 quedan
+  como valor por defecto de las funciones puras.
+- **Gaze Nozarashi a 1,2rem en todo el sitio**: el `body` sube a 1,2rem y las
+  páginas dejan de forzarle `text-sm`/`text-lg`. Las tarjetas de texto, con el
+  marco algo translúcido (§5.3 del PLAN).
+- **Llano antes de la subida a Fushimi.** Al llegar a Eventos ya se veía
+  empezar la cuesta. El tramo puede declarar un llano inicial
+  (`tramo.flat`): Eventos lleva 50 u rectas, llanas y aún en zona de sakura;
+  después, la curva, la subida y el fundido son los mismos de antes (144 u,
+  ~8°). `PATH_LENGTH` pasa a 786. Los demás tramos crecerán cuando lleguen sus
+  tarjetas.

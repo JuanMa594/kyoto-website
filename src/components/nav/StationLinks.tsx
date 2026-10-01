@@ -31,7 +31,7 @@ export async function StationLinks({
               <Link
                 href={stationPath(station)}
                 aria-current={isCurrent ? 'page' : undefined}
-                className="paper flex items-baseline gap-2 px-3 py-2 text-sm transition-transform duration-200 hover:-translate-y-0.5"
+                className="paper flex items-baseline gap-2 px-3 py-2 transition-transform duration-200 hover:-translate-y-0.5"
                 style={{
                   borderLeft: `3px solid ${station.palette.accent}`,
                   opacity: isCurrent ? 1 : 0.82,

@@ -164,19 +164,28 @@ estación. La escena nunca se desmonta. En el camino se van encontrado cosas rel
 
 La idea del camino no es que siempre de la impresión de ir siempre adelante, también hacer cambios de dirección, o como en la imagen `5.png`, dar la impresión que se esta subiendo por escaleras rodeadas de Toris, hasta llegar al Fushimi Inari Taisha.
 
-**Cómo está hecho (Fase 3A).** El camino es un mundo continuo que avanza siempre hacia el
-fondo, con curvas laterales entre estaciones (`lateral`) y pendiente por zona (`slope`):
-`scene/path/journeyPath.ts`. La tangente es nula en cada estación, así que su vista sigue
-siendo frontal, de cartel, y las curvas ocurren entre ellas. La cámara está en *objetivo del
-scroll + desfase de viaje*: cada página termina en un **tramo** de 220vh cuyo scroll (curva
-`power2.inOut`: arranca con peso y llega frenando) lleva la cámara a la siguiente estación, y
-al terminarlo se llega sola (`PathTramo`). Los saltos —enlaces, «atrás»— se absorben en el
-desfase y GSAP lo lleva a cero con la curva `piedra` (1,8 s por estación, 4 s el camino
-entero). Contra el mareo, el rumbo está acotado a ±15° y 12°/s, y en los viajes rápidos el
-encuadre recorta las curvas. El ambiente —niebla, cielo, viento, pétalos, sonido y elenco de
-fauna— lo decide la posición de la cámara, no la ruta: al viajar se ven pasar los paisajes
-intermedios. Con modo 静 o movimiento reducido no hay viaje ni llegada automática: la cámara
-salta y el tramo se reduce a su enlace.
+**Cómo está hecho (Fase 3A).** El camino es un mundo continuo de 786 unidades que avanza
+siempre hacia el fondo, con medio tramo (64 u) de la Home a Ubicación, unas 128–144 entre las demás y 50 de llano entre los cerezos al salir de Eventos, antes de la subida (`tramo.flat`): sitio para caminar y para leer lo que
+hay a los lados. Entre estaciones tiene curvas laterales (`lateral`) y sube o baja hacia la
+altura de la siguiente (`altitude`): `scene/path/journeyPath.ts`. En cada estación el camino es
+recto y llano,
+así que su vista sigue siendo frontal, de cartel; las curvas y las cuestas —la subida a Fushimi
+Inari, la bajada a Gion— ocurren en los tramos. La cámara está en *objetivo del scroll + desfase
+de viaje*: cada página termina en un **tramo** cuyo scroll lleva la cámara a la siguiente
+estación, y al terminarlo se llega sola (`PathTramo`). **El tramo se camina y se lee**: mide
+un caminar proporcional a su distancia (~3,3vh por unidad: 211vh el de la Home, unos 420–475vh los demás) más 80vh por cada tarjeta que declare la estación (`tramo.cards` en
+`journey.ts`); la cámara anda entre tarjeta y tarjeta con la curva `power2.inOut` (arranca con
+peso y frena), casi se detiene en cada una mientras aparece a su lado del camino, y al final se
+ve la siguiente estación. **Estilo de las tarjetas de texto**, para todas las páginas: el marco
+es un poco translúcido —lo justo para que el texto se lea bien y la tarjeta se mezcle con el
+ambiente— y la letra de lectura es algo más grande que el texto base. Una sección puede pedir
+otra forma (los mapas de Ubicación serán carteles de madera en el camino, Fase 5). Los saltos —enlaces, «atrás»— se absorben en el desfase y GSAP lo lleva a cero con la
+curva `piedra` (1,8 s por estación, nunca más de 160 u/s de media: 4,9 s el camino entero). Contra el
+mareo, el rumbo está acotado a ±15° y 12°/s, y en los viajes rápidos el encuadre recorta las
+curvas sin perder el camino de vista. El ambiente —niebla, cielo, viento, pétalos, sonido y
+elenco de fauna— lo decide la posición de la cámara, no la ruta: al viajar se ven pasar los
+paisajes intermedios. Con modo 静 o movimiento reducido no hay viaje ni llegada automática: la
+cámara salta y el tramo se reduce a su contenido.
 
 **`MotionPath` no se usa**: la curva vive en 3D y la de three da tangentes y longitudes. GSAP
 sigue siendo el orquestador de las transiciones del viaje y de ScrollTrigger.
@@ -454,7 +463,8 @@ ninguno sirve, se consulta antes de dibujar.
 ```ts
 // una estación = un punto del camino
 { slug, kanji, romaji, icon, pathT: 0.34, palette, ambient: { … },
-  environment: { hills, hillSides, slope, lateral, skyTint } }
+  environment: { hills, hillSides, altitude, lateral, skyTint },
+  tramo: { cards: [{ id, side, kind }] } }
 ```
 
 Su profundidad en el mundo es `pathT × PATH_LENGTH` (400 unidades). El avance fino de la
@@ -568,10 +578,10 @@ fase** para revisión antes de seguir.
 | **3B** | · La fauna en el camino | Actos anclados al mundo · cercanía por estación · márgenes con la cámara real | ⏸ |
 | **3C** | · La navegación | Sidebar radial (`13.png`) con íconos generados por código · progreso del camino · nav móvil · teclado · transiciones | ⏸ |
 | **4** | Home 京都 | Torii 3D, bambú, título tipográfico, composición del hero | ⏸ |
-| **5** | Ubicación 位置 | Mapa de Japón extruido e interactivo, zoom a Kyoto | ⏸ |
-| **6** | Lugares | Plantilla + Fushimi Inari, Kiyomizu-dera, Gion | ⏸ |
-| **7** | Eventos | Sakura + rueda de estaciones / calendario del año | ⏸ |
-| **8** | Gastronomía 京料理 | Platos interactivos | ⏸ |
+| **5** | Ubicación 位置 | Mapa de Japón extruido e interactivo, zoom a Kyoto · **tramo hacia Eventos**: los dos mapas antiguos, desplegables, **no como tarjetas sino como carteles de madera insertados en el camino** (en 3A son tarjetas provisionales, con el hueco del mapa), junto a la reseña breve de Kyoto | ⏸ |
+| **6** | Lugares | Plantilla + Fushimi Inari, Kiyomizu-dera, Gion · **tramos**: de Eventos a Fushimi, paso por los costados del santuario y subida escalonada —gradas en la malla del terreno— con toriis (`5.png`); de Fushimi a Kiyomizu-dera, un bosque denso de bambú y un puente de madera sobre una pequeña vaguada antes de la plataforma del templo; de Kiyomizu-dera a Gion, la bajada termina en calzadas tradicionales y faroles | ⏸ |
+| **7** | Eventos | Sakura + rueda de estaciones / calendario del año · **tramo de llegada**: el bosque de cerezos al acercarse a la sakura (el aumento progresivo de pétalos ya lo hace 3A) | ⏸ |
+| **8** | Gastronomía 京料理 | Platos interactivos · **tramo final**: llano, culmina en el espacio gastronómico | ⏸ |
 | **9** | Pulido | Presupuesto de rendimiento · Lighthouse · auditoría a11y · móvil real · SEO/OG · deploy | ⏸ |
 
 **Las fases 1–3 son la inversión clave.** Si el camino queda bien, las páginas 4–8 son en

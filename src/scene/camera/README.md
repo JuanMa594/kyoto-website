@@ -21,9 +21,10 @@ Desde la **Fase 3A** la cámara viaja por el camino:
   coordenadas de ese encuadre. `VIEW.aspect` es el aspecto real de la pantalla.
 - `pathRig.ts` — puro. Lleva el encuadre local a cualquier profundidad `d` del
   camino, con topes anti-mareo: rumbo ±15° y 12°/s, inclinación 3,5°–8,7° (si
-  una cuesta la saca de la banda, sube la cámara, no la inclina), y un filtro
-  de paso bajo que recorta las curvas en los viajes rápidos. `bun run
-  check:path` lo recorre entero.
+  una cuesta la saca de la banda, sube o baja la cámara, no la inclina), y dos
+  filtros de paso bajo en los viajes rápidos: el giro muy amortiguado y el
+  desplazamiento lateral más ágil, que recortan las curvas sin perder el camino
+  de vista. `bun run check:path` lo recorre entero.
 - `CameraRig.tsx` — el **único escritor de `PATH`**. La cámara está en
   *objetivo del scroll + desfase de viaje* (`animation/travel.ts`); la primera
   estación de la visita es un aterrizaje y con modo 静 no hay viaje. El

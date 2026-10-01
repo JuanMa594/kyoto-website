@@ -11,15 +11,21 @@ Implementado en la **Fase 2A**.
   Así `ease: 'washi'` en GSAP y `var(--ease-washi)` en CSS son la misma curva.
 - `journeyScroll.ts` — **Fase 3A**, puro. Del scroll de una página a la
   profundidad de la cámara: el contenido avanza 4 u, el tramo lleva a la
-  siguiente estación. Escribe `SCROLL_PATH` (lo lee el rig de cámara) y decide
+  siguiente estación. El tramo **se camina y se lee**: un caminar proporcional a su distancia (`tramoWalkVh`, ~3,3vh por unidad) más
+  80vh por tarjeta (`tramoHeightVh`), trechos con la curva `power2.inOut`
+  (`walkEase`) y una parada casi quieta por tarjeta (`tramoFraction`), con la
+  opacidad de cada tarjeta y del cartel final (`tramoCardOpacity`,
+  `tramoSignOpacity`). Escribe `SCROLL_PATH` (lo lee el rig de cámara) y decide
   la llegada automática (`passTramo`: armada, una vez, hacia abajo).
 - `useJourneyScroll.ts` — **Fase 3A**. Los dos ScrollTrigger de cada página de
-  estación (contenido y tramo), con la curva `power2.inOut` en el tramo. Pone
-  el scroll a cero al montar y fija `scrollRestoration = 'manual'` a través de
-  ScrollTrigger (ver la trampa en `CLAUDE.md`).
+  estación (contenido y tramo), que vuelcan lo anterior en `SCROLL_PATH` y en
+  las variables CSS `--card` y `--llegada`. Pone el scroll a cero al llegar a
+  una estación y fija `scrollRestoration = 'manual'` a través de ScrollTrigger
+  (ver la trampa en `CLAUDE.md`).
 - `travel.ts` — **Fase 3A**. El desfase de viaje: cuando el objetivo de la
   cámara salta, el salto se guarda en `TRAVEL.offset` y GSAP lo lleva a cero
-  con la curva `piedra` (1,8 s por estación, 4 s el camino entero).
+  con la curva `piedra` (1,8 s por estación, nunca más de 160 u/s de media:
+  4,9 s el camino entero).
 - `MotionEngine.tsx` — componente del layout que enciende y apaga todo lo
   anterior según `selectMotionAllowed`, y vuelve a medir la página al navegar.
 

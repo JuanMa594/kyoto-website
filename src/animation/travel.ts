@@ -16,7 +16,6 @@
 import { gsap } from 'gsap';
 
 import { JOURNEY, PATH_LENGTH } from '@/config/journey';
-import { clamp } from '@/lib/procedural';
 
 import { motionDurations, registerPresets } from './presets';
 
@@ -36,15 +35,24 @@ export const JUMP_THRESHOLD = 6;
 /** Una estación, en profundidad media. */
 const SEGMENT = PATH_LENGTH / (JOURNEY.length - 1);
 const SHORTEST = 0.6;
-const LONGEST = 4;
+
+/**
+ * Velocidad media máxima de un viaje, en u/s. Más deprisa, ni filtrando el
+ * encuadre consigue seguir las curvas: el punto de interés se sale del
+ * pasillo. Es lo que fija la duración de los viajes largos (el camino entero,
+ * 800 u, en 5 s).
+ */
+const MAX_TRAVEL_SPEED = 160;
 
 /**
  * Cuánto dura un viaje: `--dur-viaje` (1,8 s) para una estación, y crece con
- * la raíz de la distancia hasta 4 s para el camino entero. Más lejos es más
- * tiempo, pero no proporcionalmente: nadie quiere diez segundos de travelling.
+ * la raíz de la distancia —más lejos es más tiempo, pero no
+ * proporcionalmente: nadie quiere diez segundos de travelling—, sin pasar
+ * nunca de `MAX_TRAVEL_SPEED` de media.
  */
 export function travelDuration(distance: number, base = 1.8): number {
-  return clamp(base * Math.sqrt(Math.abs(distance) / SEGMENT), SHORTEST, LONGEST);
+  const span = Math.abs(distance);
+  return Math.max(SHORTEST, base * Math.sqrt(span / SEGMENT), span / MAX_TRAVEL_SPEED);
 }
 
 /** El desfase nuevo tras un salto del objetivo: la cámara no se mueve. */

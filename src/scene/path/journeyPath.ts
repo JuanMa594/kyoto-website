@@ -4,8 +4,8 @@
  * Las siete estaciones de `journey.ts` son puntos de un único camino que avanza
  * siempre hacia el fondo (−Z). El parámetro es la **profundidad recorrida** `d`
  * (con z = −d): cada estación está en `d = pathT × PATH_LENGTH`, y entre dos
- * estaciones el camino se desvía de lado (`lateral`) y sube si la zona tiene
- * pendiente (`slope`).
+ * estaciones el camino se desvía de lado (`lateral`) y sube o baja hacia la
+ * altura de la siguiente (`altitude`).
  *
  * Dos decisiones sostienen todo lo demás:
  *
@@ -14,9 +14,10 @@
  *     ambientes se consultan en O(1), sin buscar el punto más cercano de una
  *     curva. El precio es no tener curvas en U, que una cámara observadora
  *     tampoco querría tomar.
- *   · **La tangente es nula en cada estación.** El desvío va de una estación a
- *     la siguiente con un `smoothstep`, así que la vista de cada estación es
- *     frontal, de cartel, y las curvas ocurren entre ellas.
+ *   · **La tangente es nula en cada estación.** El desvío y la altura van de
+ *     una estación a la siguiente con un `smoothstep`, así que la vista de cada
+ *     estación es frontal y llana, de cartel, y las curvas y las cuestas
+ *     ocurren entre ellas.
  *
  * Usar la profundidad y no la longitud de arco es una simplificación
  * deliberada: con rumbos de 13° la diferencia es < 3 %.
@@ -29,14 +30,7 @@
  */
 
 import { JOURNEY, PATH_LENGTH, type Station, type StationSlug } from '@/config/journey';
-import { clamp, lerp, smoothstep } from '@/lib/procedural';
-
-/**
- * Sobre cuántas unidades se mide la `slope` de una estación: la distancia de la
- * cámara a su punto de interés. Así la cuesta que se ve en la vista de cada
- * estación es la misma que con la cámara quieta de la Fase 1.
- */
-export const SLOPE_RUN = 22;
+import { lerp, smoothstep } from '@/lib/procedural';
 
 /** Fracción de cada tramo que ocupa el fundido entre sus dos estaciones. */
 const BLEND_WIDTH = 0.5;
@@ -52,6 +46,15 @@ export function stationIndex(slug: StationSlug): number {
 
 export function stationDepth(slug: StationSlug): number {
   return STATION_DEPTHS[stationIndex(slug)] ?? 0;
+}
+
+/**
+ * Dónde empieza a cambiar el tramo que sale de la estación `i`: en la propia
+ * estación o, si el tramo declara un llano (`tramo.flat`), al terminarlo. Hasta
+ * ahí el camino sigue recto, a la misma altura y en la misma zona.
+ */
+function segmentStart(i: number): number {
+  return STATION_DEPTHS[i]! + (JOURNEY[i]!.tramo.flat ?? 0);
 }
 
 /**
@@ -73,7 +76,7 @@ export function pathX(d: number): number {
   const i = segmentAt(d);
   const from = JOURNEY[i]!.environment.lateral;
   const to = JOURNEY[i + 1]!.environment.lateral;
-  return lerp(from, to, smoothstep(STATION_DEPTHS[i]!, STATION_DEPTHS[i + 1]!, d));
+  return lerp(from, to, smoothstep(segmentStart(i), STATION_DEPTHS[i + 1]!, d));
 }
 
 /** Mezcla entre las dos estaciones de un tramo: `t` es el peso de `to`. */
@@ -91,7 +94,7 @@ export interface ZoneBlend {
  */
 export function zoneBlend(d: number): ZoneBlend {
   const i = segmentAt(d);
-  const d0 = STATION_DEPTHS[i]!;
+  const d0 = segmentStart(i);
   const d1 = STATION_DEPTHS[i + 1]!;
   const middle = (d0 + d1) / 2;
   const half = ((d1 - d0) * BLEND_WIDTH) / 2;
@@ -121,44 +124,18 @@ export function blendByZone(d: number, value: (station: Station) => number): num
 /* ── Altura del camino ─────────────────────────────────────────────────── */
 
 /**
- * La altura es la **integral de la pendiente**, así que no tiene fórmula
- * cerrada: se integra una vez en una tabla uniforme y se interpola. El terreno
- * la consulta decenas de miles de veces al construirse.
+ * Altura del eje del camino en `d`, relativa a la Home.
+ *
+ * Cada estación declara su altura y el camino va de una a otra con el mismo
+ * `smoothstep` que el desvío lateral: las cuestas —la subida a Fushimi Inari,
+ * la bajada a Gion— ocurren **en los tramos**, y en cada estación el camino
+ * queda llano, con la vista frontal de cartel.
  */
-const LUT_STEP = 0.5;
-const LUT_FROM = -200;
-const LUT_TO = PATH_LENGTH + 400;
-
-function gradeAt(d: number): number {
-  return blendByZone(d, (station) => station.environment.slope / SLOPE_RUN);
-}
-
-function buildElevation(): Float64Array {
-  const count = Math.ceil((LUT_TO - LUT_FROM) / LUT_STEP) + 1;
-  const table = new Float64Array(count);
-  let previous = gradeAt(LUT_FROM);
-  for (let i = 1; i < count; i += 1) {
-    const current = gradeAt(LUT_FROM + i * LUT_STEP);
-    table[i] = table[i - 1]! + ((previous + current) / 2) * LUT_STEP;
-    previous = current;
-  }
-  return table;
-}
-
-const ELEVATION = buildElevation();
-
-function sampleElevation(d: number): number {
-  const at = (clamp(d, LUT_FROM, LUT_TO) - LUT_FROM) / LUT_STEP;
-  const i = Math.min(ELEVATION.length - 2, Math.floor(at));
-  return lerp(ELEVATION[i]!, ELEVATION[i + 1]!, at - i);
-}
-
-/** El camino empieza a ras en la Home: la altura se mide desde ahí. */
-const ELEVATION_ORIGIN = sampleElevation(0);
-
-/** Altura del eje del camino en `d`, relativa a la Home. Sólo sube. */
 export function pathY(d: number): number {
-  return sampleElevation(d) - ELEVATION_ORIGIN;
+  const i = segmentAt(d);
+  const from = JOURNEY[i]!.environment.altitude;
+  const to = JOURNEY[i + 1]!.environment.altitude;
+  return lerp(from, to, smoothstep(segmentStart(i), STATION_DEPTHS[i + 1]!, d));
 }
 
 /* ── Dónde está la cámara ──────────────────────────────────────────────── */

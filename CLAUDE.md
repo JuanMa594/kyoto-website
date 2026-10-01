@@ -94,8 +94,8 @@ src/
 │   └─ AmbientAudio.tsx        ← puente store ↔ motor; nunca antes de un gesto
 ├─ animation/                  ← orquestación (Fase 2A, 3A)
 │   ├─ gsap.ts                 ← GSAP + Lenis bajo un solo rAF
-│   ├─ presets.ts              ← curvas de tokens.css → easings de GSAP; curva del tramo
-│   ├─ journeyScroll.ts        ← scroll → profundidad de cámara, y la llegada (puro)
+│   ├─ presets.ts              ← curvas de tokens.css → easings de GSAP
+│   ├─ journeyScroll.ts        ← scroll → profundidad; el tramo, sus paradas y la llegada (puro)
 │   ├─ useJourneyScroll.ts     ← ScrollTrigger del contenido y del tramo
 │   ├─ travel.ts               ← desfase de viaje: los saltos se recorren, no se saltan
 │   └─ MotionEngine.tsx        ← enciende/apaga el motor desde el layout
@@ -146,7 +146,14 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
 - Una ruta **no dibuja 3D**. Renderiza `<ActiveStation slug="…" />` y con eso le
   dice a la escena **adónde ir**; la cámara viaja por el camino hasta allí (la
   primera estación de la visita es un aterrizaje, sin viaje). Y termina en
-  `<PathTramo>`, cuyo scroll lleva la cámara a la siguiente estación.
+  `<PathTramo>`, cuyo scroll lleva la cámara a la siguiente estación. **El
+  tramo se camina y se lee**: lo que hay a los lados del camino se declara en
+  `journey.ts` (`station.tramo.cards`, con sus textos en `messages`), cada
+  tarjeta alarga el tramo con una parada de lectura y la cámara casi se detiene
+  en ella. Sin tarjetas, el tramo es sólo camino, proporcional a su distancia (el de la Home, 64 u, mide la mitad que los demás).
+  Un tramo puede empezar con un llano recto (`tramo.flat`, en unidades): el de
+  Eventos camina 50 u entre los cerezos antes de que empiece la subida a
+  Fushimi. Los tramos crecen cuando una página les pone tarjetas.
 - **La posición de la cámara decide qué se ve y qué se oye**, no la ruta. Vive
   en `PATH` (`scene/path/journeyPath.ts`), con un único escritor, `CameraRig`;
   el store guarda sólo `zone`, que leen el ambiente, el audio y la fauna. La
@@ -357,6 +364,15 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   en 3A viaja con el encuadre (y patina con el scroll); 3B la ancla al mundo.
   Sol y caja de sombras: siguen al encuadre, o las sombras desaparecen al
   avanzar.
+- **Un viaje no puede ir más deprisa de lo que el encuadre puede seguir.** Al
+  doblar el camino a 800 u con las mismas duraciones, el viaje de punta a punta
+  pasó a 200 u/s de media y el punto de interés se salía 12 u del eje: filtrar
+  más el encuadre lo empeora (va más retrasado) y filtrarlo menos lo zarandea.
+  Se resolvió en dos partes: un **tope de velocidad media** del viaje (160 u/s,
+  `travel.ts`) y **dos filtros distintos** en `pathRig.ts` —el giro muy
+  amortiguado, porque girar es lo que marea; el desplazamiento lateral más
+  ágil, porque deslizarse de lado se lee como la ventanilla de un tren—. Si el
+  camino vuelve a crecer, `check:path` lo dirá antes que la revisión.
 
 ---
 

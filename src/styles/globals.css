@@ -12,8 +12,13 @@
     text-rendering: optimizeLegibility;
   }
 
+  /* Gaze Nozarashi es de pincel y a 16 px se lee pequeña: todo el texto que
+     va en ella parte de 1,2rem. En las páginas no se le fuerzan tamaños
+     menores (`text-sm`, `text-lg`); sólo crece lo que tiene que ser más
+     grande. */
   body {
     font-family: var(--font-body);
+    font-size: 1.2rem;
     min-height: 100dvh;
     overscroll-behavior-y: none;
   }
@@ -103,13 +108,11 @@
     translate: 0 0;
   }
 
-  /* El tramo: la parte de cada página que es camino (`PathTramo`). Mientras
-     se recorre, lo que hay dentro queda fijo abajo y el cartel de la
-     siguiente estación gana nitidez con `--tramo`, que escribe el scroll. */
-  .path-tramo {
-    height: 220vh;
-  }
-
+  /* El tramo: la parte de cada página que es camino (`PathTramo`). Su alto lo
+     pone el componente (caminar + una parada por tarjeta). Mientras se
+     recorre, lo que hay dentro queda fijo en pantalla: las tarjetas a los
+     costados, en el tercio medio, con la opacidad `--card` que escribe el
+     scroll; el cartel de la siguiente estación abajo, con `--llegada`. */
   .path-tramo__stage {
     position: sticky;
     top: 0;
@@ -119,16 +122,79 @@
     align-items: center;
     justify-content: flex-end;
     padding: 0 1.5rem 16vh;
+  }
+
+  .path-tramo__arrival {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     text-align: center;
   }
 
   .path-tramo__sign {
-    opacity: clamp(0, calc((var(--tramo, 0) - 0.3) * 2.2), 1);
+    opacity: var(--llegada, 0);
   }
 
-  /* Sin movimiento no hay recorrido: el tramo se reduce a su enlace. */
+  .tramo-card {
+    position: absolute;
+    top: 30vh;
+    width: min(26rem, 34vw);
+    padding: 1.25rem 1.5rem 1.4rem;
+    opacity: var(--card, 0);
+    translate: 0 calc((1 - var(--card, 0)) * 0.75rem);
+  }
+
+  /* Se lee caminando: la letra de pincel, un poco más grande que el texto
+     base. */
+  .tramo-card__body {
+    font-size: 1.2rem;
+    line-height: 1.6;
+  }
+
+  /* Las tarjetas de texto dejan ver un poco el paisaje: lo justo para que el
+     texto se lea bien y la tarjeta se mezcle con el ambiente en vez de tapar
+     la escena. Es el estilo de todas las que vengan en las otras páginas. Las
+     de mapa de Ubicación se quedan opacas: en la Fase 5 serán carteles de
+     madera insertados en el camino. */
+  .tramo-card[data-kind='texto'] {
+    background: color-mix(in srgb, var(--surface-paper) 78%, transparent);
+    backdrop-filter: blur(6px);
+  }
+
+  .tramo-card[data-side='izquierda'] {
+    left: 6vw;
+  }
+
+  .tramo-card[data-side='derecha'] {
+    right: 6vw;
+  }
+
+  /* El hueco del mapa antiguo desplegable, que llega en la Fase 5. */
+  .tramo-card__map {
+    display: grid;
+    aspect-ratio: 4 / 3;
+    margin-bottom: 1rem;
+    place-items: center;
+    border: 1px dashed var(--color-sumi-faint);
+    border-radius: 0.5rem;
+    background: color-mix(in srgb, var(--color-ishi) 55%, transparent);
+    opacity: 0.75;
+  }
+
+  /* En un móvil no hay costados: la tarjeta va centrada, por encima del
+     camino. */
+  @media (max-width: 767px) {
+    .tramo-card {
+      top: 12vh;
+      right: 1.25rem;
+      left: 1.25rem;
+      width: auto;
+    }
+  }
+
+  /* Sin movimiento no hay recorrido: el tramo se reduce a su contenido, y las
+     tarjetas se leen como una lista. */
   .path-tramo[data-motion='off'] {
-    height: auto;
     padding-block: 12vh;
   }
 
@@ -136,6 +202,14 @@
     position: static;
     min-height: 0;
     padding-bottom: 0;
+  }
+
+  .path-tramo[data-motion='off'] .tramo-card {
+    position: static;
+    width: min(40rem, 100%);
+    margin-bottom: 1.5rem;
+    opacity: 1;
+    translate: none;
   }
 
   .path-tramo[data-motion='off'] .path-tramo__sign {

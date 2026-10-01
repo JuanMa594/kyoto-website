@@ -14,10 +14,19 @@ import {
   passTramo,
   READING_DRIFT,
   scrollTargetDepth,
+  tramoCardOpacity,
+  tramoFraction,
+  tramoHeightVh,
+  tramoSignOpacity,
+  tramoWalkVh,
+  walkEase,
 } from '../src/animation/journeyScroll';
 import { cubicBezierEase } from '../src/animation/presets';
 import { jumpOffset, travelDuration } from '../src/animation/travel';
 import { JOURNEY, PATH_LENGTH } from '../src/config/journey';
+import messagesEn from '../src/messages/en.json';
+import messagesEs from '../src/messages/es.json';
+import { CAMERA_BASE } from '../src/scene/camera/framing';
 import { CAMERA_BACK, createRig, RIG_LIMITS, stepRig } from '../src/scene/camera/pathRig';
 import {
   dominantZone,
@@ -83,9 +92,36 @@ const lateralJumps = JOURNEY.slice(1).map((station, i) =>
   Math.abs(station.environment.lateral - JOURNEY[i]!.environment.lateral),
 );
 check(
-  '|Δlateral| ≤ 10 entre estaciones consecutivas',
-  Math.max(...lateralJumps) <= 10,
+  '|Δlateral| ≤ 20 entre estaciones consecutivas',
+  Math.max(...lateralJumps) <= 20,
   `máx ${Math.max(...lateralJumps)}`,
+);
+const gaps = STATION_DEPTHS.slice(1).map((d, i) => d - STATION_DEPTHS[i]!);
+check('de la Home a Ubicación, medio tramo (60–70 u)', gaps[0]! >= 60 && gaps[0]! <= 70, `${gaps[0]} u`);
+// Sin contar el llano con que puede empezar un tramo: lo que hay después es
+// el tramo de siempre.
+const curved = gaps.map((gap, i) => gap - (JOURNEY[i]!.tramo.flat ?? 0));
+check(
+  'entre las demás estaciones hay espacio para caminar y leer (120–150 u)',
+  curved.slice(1).every((gap) => gap >= 120 && gap <= 150),
+  curved.slice(1).join(' · '),
+);
+
+const eventosAt = STATION_DEPTHS[stationIndex('eventos')]!;
+const eventosFlat = JOURNEY[stationIndex('eventos')]!.tramo.flat ?? 0;
+check('al salir de Eventos hay un llano de 40–60 u antes de la subida', eventosFlat >= 40 && eventosFlat <= 60, `${eventosFlat} u`);
+let flatWorst = 0;
+for (const d of range(eventosAt, eventosAt + eventosFlat, 0.5)) {
+  flatWorst = Math.max(flatWorst, Math.abs(pathY(d)), Math.abs(pathX(d) - pathX(eventosAt)));
+}
+check('ese llano es llano y recto', flatWorst < 1e-9);
+check(
+  'la subida a Fushimi conserva su largo (144 u después del llano)',
+  STATION_DEPTHS[stationIndex('fushimi-inari')]! - eventosAt - eventosFlat === 144,
+);
+check(
+  'en ese llano sigue siendo la sakura (pesa 1 la zona de Eventos)',
+  range(eventosAt, eventosAt + eventosFlat, 1).every((d) => zoneWeight(d, stationIndex('eventos')) === 1),
 );
 
 check(
@@ -127,23 +163,34 @@ check(
   JOURNEY.every((_, i) => dominantZone(STATION_DEPTHS[i]!) === i),
 );
 
-let descends = false;
-let previousY = pathY(-60);
-for (const d of range(-60, PATH_LENGTH + 250, 0.5)) {
-  const y = pathY(d);
-  if (y < previousY - 1e-9) descends = true;
-  previousY = y;
-}
-check('el camino nunca baja', !descends);
-check('la Home está a ras (pathY(0) = 0)', Math.abs(pathY(0)) < 1e-9);
-
-const fushimi = STATION_DEPTHS[stationIndex('fushimi-inari')]!;
-const rise = pathY(fushimi + 11) - pathY(fushimi - 11);
 check(
-  'en Fushimi Inari el camino sube su slope (2,4) cada 22 unidades',
-  Math.abs(rise - 2.4) < 0.05,
-  `sube ${rise.toFixed(2)}`,
+  'el camino pasa por la altura de cada estación',
+  JOURNEY.every((station, i) => Math.abs(pathY(STATION_DEPTHS[i]!) - station.environment.altitude) < 1e-9),
 );
+const gradeAt = (d: number) => (pathY(d + 0.01) - pathY(d - 0.01)) / 0.02;
+check(
+  'en cada estación el camino está llano (vista frontal)',
+  STATION_DEPTHS.every((d) => Math.abs(gradeAt(d)) < 1e-3),
+);
+
+/** La cuesta más empinada de un tramo, en grados (con signo: + sube, − baja). */
+function steepestIn(from: Parameters<typeof stationIndex>[0], to: Parameters<typeof stationIndex>[0]): number {
+  let steepestGrade = 0;
+  // Sólo dentro del tramo: en sus extremos la diferencia centrada toca el
+  // tramo vecino.
+  for (const d of range(STATION_DEPTHS[stationIndex(from)]! + 0.5, STATION_DEPTHS[stationIndex(to)]! - 0.5, 0.5)) {
+    const grade = gradeAt(d);
+    if (Math.abs(grade) > Math.abs(steepestGrade)) steepestGrade = grade;
+  }
+  return Math.atan(steepestGrade) / DEG;
+}
+
+const climb = steepestIn('eventos', 'fushimi-inari');
+check('la subida a Fushimi Inari es más marcada que antes (> 6°)', climb > 6, `${climb.toFixed(1)}°`);
+const descent = steepestIn('kiyomizu-dera', 'gion');
+check('de Kiyomizu-dera a Gion el camino baja', descent < -2, `${descent.toFixed(1)}°`);
+const lastStretch = steepestIn('gion', 'gastronomia');
+check('de Gion a Gastronomía es llano', Math.abs(lastStretch) < 1e-6, `${lastStretch.toFixed(2)}°`);
 
 /* ── 2. El terreno ─────────────────────────────────────────────────────── */
 
@@ -237,12 +284,28 @@ function simulate(depthAt: (t: number) => number, duration: number): RigRun {
 }
 
 const piedra = cubicBezierEase(0.65, 0, 0.35, 1);
-const TRAVEL_SECONDS = 4;
+const wholeTrip = travelDuration(PATH_LENGTH);
+const fromEventos = STATION_DEPTHS[stationIndex('eventos')]!;
+const toFushimi = STATION_DEPTHS[stationIndex('fushimi-inari')]!;
+const shortTrip = travelDuration(toFushimi - fromEventos);
+const trip = (from: number, to: number, seconds: number) => (t: number) =>
+  from + (to - from) * piedra(Math.min(1, t / seconds));
+
+// En el viaje largo (de punta a punta, ~350 u/s en el pico) seguir cada curva
+// sería un zarandeo: el encuadre las recorta. Lo que se exige ahí es que el eje
+// del camino no salga nunca del cuadro a 16:9, con margen: el 80 % del medio
+// ancho visible a la distancia del punto de interés.
+const inFrame = 0.8 * Math.tan((CAMERA_BASE.fov * Math.PI) / 360) * CAMERA_BACK * (16 / 9);
 
 const runs: [string, RigRun, number][] = [
   ['scroll (16 u/s)', simulate((t) => 16 * t, PATH_LENGTH / 16), 0.6],
-  ['viaje de ida (4 s)', simulate((t) => PATH_LENGTH * piedra(t / TRAVEL_SECONDS), TRAVEL_SECONDS), 6],
-  ['viaje de vuelta (4 s)', simulate((t) => PATH_LENGTH * (1 - piedra(t / TRAVEL_SECONDS)), TRAVEL_SECONDS), 6],
+  [`viaje de ida (${wholeTrip.toFixed(1)} s)`, simulate(trip(0, PATH_LENGTH, wholeTrip), wholeTrip), inFrame],
+  [`viaje de vuelta (${wholeTrip.toFixed(1)} s)`, simulate(trip(PATH_LENGTH, 0, wholeTrip), wholeTrip), inFrame],
+  [
+    `una estación, la subida a Fushimi (${shortTrip.toFixed(1)} s)`,
+    simulate(trip(fromEventos, toFushimi, shortTrip), shortTrip),
+    6,
+  ],
 ];
 
 const EPS = 1e-6;
@@ -260,7 +323,7 @@ for (const [name, run, deviationLimit] of runs) {
   );
   check(`${name}: la cámara nunca a menos de 3 u del suelo`, run.minClearance >= 3, `mín ${run.minClearance.toFixed(2)}`);
   check(
-    `${name}: el punto de interés no se aparta del eje más de ${deviationLimit} u`,
+    `${name}: el punto de interés no se aparta del eje más de ${deviationLimit.toFixed(1)} u`,
     run.maxDeviation <= deviationLimit,
     `máx ${run.maxDeviation.toFixed(2)}`,
   );
@@ -271,7 +334,13 @@ for (const [name, run, deviationLimit] of runs) {
 section('Las piedras');
 
 const stones = stoneLayout();
-check('unas 310 piedras en todo el recorrido', stones.length >= 290 && stones.length <= 330, `${stones.length}`);
+// Una piedra cada ~1,45 u, de 30 u antes de la Home a 20 u después de Gastronomía.
+const expectedStones = (PATH_LENGTH + 50) / 1.45;
+check(
+  'una piedra cada ~1,45 u en todo el recorrido',
+  Math.abs(stones.length - expectedStones) <= expectedStones * 0.03,
+  `${stones.length}`,
+);
 check(
   'cubren de antes de la Home a después de Gastronomía',
   Math.max(...stones.map((s) => s.z)) >= 25 && Math.min(...stones.map((s) => s.z)) <= -(PATH_LENGTH + 15),
@@ -326,6 +395,105 @@ check(
   }) === STATION_DEPTHS[stationIndex('eventos')],
 );
 
+section('El tramo');
+
+check('sin tarjetas el tramo mide 440vh', tramoHeightVh(0) === 440);
+check('cada tarjeta suma 80vh', tramoHeightVh(3) === 680);
+check(
+  'sin tarjetas el avance es la curva del tramo (power2.inOut)',
+  range(0, 1, 0.01).every((p) => Math.abs(tramoFraction(p, 0) - walkEase(p)) < 1e-12),
+);
+
+for (const cards of [1, 2, 3]) {
+  const height = tramoHeightVh(cards);
+  const steps = range(0, 1, 0.0005);
+  const fractions = steps.map((p) => tramoFraction(p, cards));
+  check(
+    `${cards} tarjeta(s): empieza en la estación, termina en la siguiente y nunca retrocede`,
+    fractions[0] === 0 &&
+      Math.abs(fractions[fractions.length - 1]! - 1) < 1e-12 &&
+      fractions.every((f, i) => i === 0 || f >= fractions[i - 1]! - 1e-12),
+  );
+
+  // Dónde está cada parada, en vh: el caminar se reparte en cards + 1 trechos.
+  const walk = 440 / (cards + 1);
+  let worstDrift = 0;
+  let worstVisible = 0;
+  let worstOverlap = 0;
+  for (let k = 0; k < cards; k += 1) {
+    const stopStart = (k + 1) * walk + k * 80;
+    const fromP = stopStart / height;
+    const toP = (stopStart + 80) / height;
+    worstDrift = Math.max(worstDrift, tramoFraction(toP, cards) - tramoFraction(fromP, cards));
+    worstVisible = Math.max(worstVisible, 1 - tramoCardOpacity((stopStart + 40) / height, cards, k));
+  }
+  for (const p of steps) {
+    let total = 0;
+    for (let k = 0; k < cards; k += 1) total += tramoCardOpacity(p, cards, k);
+    worstOverlap = Math.max(worstOverlap, total);
+  }
+  check(`${cards} tarjeta(s): en cada parada la cámara casi se detiene (≤ 1 %)`, worstDrift <= 0.01, `${(worstDrift * 100).toFixed(2)} %`);
+  check(`${cards} tarjeta(s): en el centro de su parada cada tarjeta se ve entera`, worstVisible < 1e-9);
+  check(`${cards} tarjeta(s): nunca se ven dos tarjetas a la vez`, worstOverlap <= 1 + 1e-9, `máx ${worstOverlap.toFixed(2)}`);
+
+  const middleOfWalk = (walk / 2) / height;
+  check(
+    `${cards} tarjeta(s): a mitad de un trecho no hay ninguna tarjeta`,
+    Array.from({ length: cards }, (_, k) => tramoCardOpacity(middleOfWalk, cards, k)).every((o) => o === 0),
+  );
+
+  // Caminando, la cámara va a la misma velocidad que sin tarjetas.
+  const walked = tramoFraction(walk / height, cards);
+  const speedRatio = walked / walk / (1 / 440);
+  check(`${cards} tarjeta(s): caminando, la misma velocidad que sin tarjetas (±5 %)`, Math.abs(speedRatio - 1) <= 0.05, `×${speedRatio.toFixed(3)}`);
+
+  const lastStopEnd = cards * walk + cards * 80;
+  check(
+    `${cards} tarjeta(s): el cartel de la siguiente estación sale después de la última tarjeta`,
+    tramoSignOpacity(lastStopEnd / height, cards) === 0 && tramoSignOpacity(1, cards) === 1,
+  );
+}
+
+// El caminar de cada tramo sale de su distancia: la cámara avanza igual de
+// rápido en todos, y el de la Home, que es la mitad de largo, dura la mitad.
+const walkSpeeds = JOURNEY.slice(0, -1).map((s, i) => gaps[i]! / tramoWalkVh(s.slug));
+check(
+  'la cámara camina igual de rápido en todos los tramos (±2 %)',
+  Math.max(...walkSpeeds) / Math.min(...walkSpeeds) <= 1.02,
+  walkSpeeds.map((v) => v.toFixed(3)).join(' · '),
+);
+check(
+  'el tramo de la Home mide la mitad que el siguiente (±10 %)',
+  Math.abs(tramoWalkVh('inicio') / tramoWalkVh('ubicacion') - 0.5) <= 0.05,
+  `${tramoWalkVh('inicio')}vh / ${tramoWalkVh('ubicacion')}vh`,
+);
+check(
+  'el alto de un tramo es su caminar más sus paradas',
+  tramoHeightVh(3, tramoWalkVh('ubicacion')) === tramoWalkVh('ubicacion') + 3 * 80,
+);
+
+const ubicacion = JOURNEY[stationIndex('ubicacion')]!;
+check('el tramo de Ubicación lleva sus tres tarjetas provisionales', ubicacion.tramo.cards.length === 3);
+
+// Las claves de las tarjetas se arman con la estación y el id de `journey.ts`,
+// y el tipo de next-intl no puede seguirlas: lo que no comprueba el compilador
+// se comprueba aquí, en los dos idiomas.
+type Messages = { tramos?: Record<string, Record<string, { title?: string; body?: string }>> };
+const missingTexts: string[] = [];
+for (const [lang, messages] of [['es', messagesEs], ['en', messagesEn]] as [string, Messages][]) {
+  for (const station of JOURNEY) {
+    for (const card of station.tramo.cards) {
+      const text = messages.tramos?.[station.slug]?.[card.id];
+      if (!text?.title || !text.body) missingTexts.push(`${lang}:${station.slug}.${card.id}`);
+    }
+  }
+}
+check(
+  'cada tarjeta de tramo tiene título y texto en español y en inglés',
+  missingTexts.length === 0,
+  missingTexts.join(', '),
+);
+
 section('La llegada');
 
 /** Recorre el tramo con una lista de (progreso, dirección) y cuenta llegadas. */
@@ -369,12 +537,20 @@ check(
 
 section('El viaje');
 
+const oneStation = PATH_LENGTH / (JOURNEY.length - 1);
 check(
   'una estación de viaje dura ~1,8 s',
-  Math.abs(travelDuration(66.7) - 1.8) < 0.05,
-  `${travelDuration(66.7).toFixed(2)} s`,
+  Math.abs(travelDuration(oneStation) - 1.8) < 0.05,
+  `${travelDuration(oneStation).toFixed(2)} s`,
 );
-check('el camino entero dura 4 s', travelDuration(PATH_LENGTH) === 4, `${travelDuration(PATH_LENGTH)} s`);
+check(
+  'ningún viaje pasa de 160 u/s de media (el camino entero va justo al tope)',
+  [0.5, 1, 2, 3, 4, 6].every((stations) => {
+    const distance = stations * oneStation;
+    return distance / travelDuration(distance) <= 160 + 1e-9;
+  }) && Math.abs(travelDuration(PATH_LENGTH) - PATH_LENGTH / 160) < 1e-9,
+  `${travelDuration(PATH_LENGTH).toFixed(2)} s`,
+);
 check(
   'un salto corto no se hace eterno',
   travelDuration(5) >= 0.6 && travelDuration(5) < 1,
