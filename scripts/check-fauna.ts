@@ -11,7 +11,17 @@
  * Uso: bun run check:path (corre después de check-path.ts)
  */
 
-import { Frustum, Matrix4, PerspectiveCamera, Sphere, Vector3 } from 'three';
+import {
+  Euler,
+  Frustum,
+  Matrix4,
+  Mesh,
+  PerspectiveCamera,
+  Quaternion,
+  Raycaster,
+  Sphere,
+  Vector3,
+} from 'three';
 
 import { cubicBezierEase } from '../src/animation/presets';
 import { travelDuration } from '../src/animation/travel';
@@ -26,6 +36,9 @@ import {
   STATION_DEPTHS,
   stationIndex,
 } from '../src/scene/path/journeyPath';
+import { stoneGeometry } from '../src/scene/objects/stoneGeometry';
+import { stoneTopY } from '../src/scene/path/stoneSurface';
+import { STONE_VARIANTS, stoneLayout, stoneSeed } from '../src/scene/path/stones';
 import { groundY } from '../src/scene/systems/elevation';
 import {
   CAMERA_Z,
@@ -459,11 +472,13 @@ check(
   bodies.every(({ act }) => scaleAt(act, act.duration + OVERTIME_LIMIT + OVERTIME_FADE + 0.1) === 0),
 );
 
-// Lo que pisa, pisa el terreno del mundo: en cada muestra en que está en el
-// suelo, su centro está a `ride · size` del terreno. «En el suelo» es lo mismo
+// Lo que pisa, pisa el suelo del mundo —el terreno o, en el camino, lo alto de
+// las piedras—: en cada muestra en que está en el suelo, su centro está a
+// `ride · size` de él. «En el suelo» es lo mismo
 // que para la propia conducta: `airborne` 0, que es estar a menos de 5 cm (los
 // gorriones que se posan lo deducen de su altura).
 const GROUND_CONTACT = 0.05;
+const faunaFloor = (x: number, z: number) => Math.max(groundY(x, z), stoneTopY(x, z));
 let floating = 0;
 let groundSamples = 0;
 let firstFloat = '';
@@ -476,7 +491,7 @@ for (const { act } of bodies) {
       poseFor(act, m, seconds, pose);
       if (pose.airborne > 0) continue;
       localToWorld(act.anchor, pose.x, pose.y, pose.z, WORLD);
-      const expected = groundY(WORLD.x, WORLD.z) + act.spec.ride * act.spec.size;
+      const expected = faunaFloor(WORLD.x, WORLD.z) + act.spec.ride * act.spec.size;
       groundSamples += 1;
       if (Math.abs(WORLD.y - expected) > GROUND_CONTACT) {
         floating += 1;
@@ -486,9 +501,97 @@ for (const { act } of bodies) {
   }
 }
 check(
-  'lo que pisa, pisa el terreno, también en las cuestas',
+  'lo que pisa, pisa el suelo (terreno o piedra), también en las cuestas',
   floating === 0,
   `${floating} de ${groundSamples} muestras${firstFloat ? `; ${firstFloat}` : ''}`,
+);
+
+// …y pasa **por encima** de las piedras, nunca a través. Sonda independiente:
+// un rayo vertical contra la geometría real de cada piedra (la misma malla que
+// dibuja `StonePath`), en el centro del animal y en un anillo de pisada.
+const stoneMeshes = Array.from(
+  { length: STONE_VARIANTS },
+  (_, variant) => new Mesh(stoneGeometry(stoneSeed(variant), 1)),
+);
+const stonesByZ = [...stoneLayout()].sort((a, b) => a.z - b.z);
+const ray = new Raycaster();
+const DOWN = new Vector3(0, -1, 0);
+const stoneMatrix = new Matrix4();
+const stoneEuler = new Euler();
+const stoneQuat = new Quaternion();
+const stoneScale = new Vector3();
+const stonePos = new Vector3();
+const STONE_REACH = 1.7;
+/** Lo más alto de las piedras reales en (x, z), o −∞ si no hay ninguna debajo. */
+function stoneTopProbe(x: number, z: number): number {
+  let top = Number.NEGATIVE_INFINITY;
+  let low = 0;
+  let high = stonesByZ.length;
+  while (low < high) {
+    const mid = (low + high) >> 1;
+    if (stonesByZ[mid]!.z < z - STONE_REACH) low = mid + 1;
+    else high = mid;
+  }
+  for (let i = low; i < stonesByZ.length && stonesByZ[i]!.z <= z + STONE_REACH; i += 1) {
+    const stone = stonesByZ[i]!;
+    if (Math.abs(stone.x - x) > STONE_REACH) continue;
+    const mesh = stoneMeshes[stone.variant]!;
+    stoneMatrix.compose(
+      stonePos.set(stone.x, stone.y, stone.z),
+      stoneQuat.setFromEuler(stoneEuler.set(0, stone.rotation, 0)),
+      stoneScale.setScalar(stone.scale),
+    );
+    mesh.matrixWorld.copy(stoneMatrix);
+    mesh.matrixWorldAutoUpdate = false;
+    ray.set(new Vector3(x, stone.y + 5, z), DOWN);
+    const hit = ray.intersectObject(mesh, false)[0];
+    if (hit) top = Math.max(top, hit.point.y);
+  }
+  return top;
+}
+
+/** Cuánto se meten las patas en una piedra (positivo = dentro). */
+const STONE_FOOT = 0.1;
+const STONE_TOLERANCE = 0.02;
+let buried = 0;
+let stoneSamples = 0;
+let worstBury = 0;
+let firstBury = '';
+/** Lo más que la rampa levanta a un animal sobre la piedra o el terreno reales. */
+let maxLift = 0;
+for (const { act } of bodies) {
+  if (isAerial(act.behavior)) continue;
+  for (const m of members(act)) {
+    const pose = createPose();
+    for (const seconds of range(0, act.duration + 3, 0.25)) {
+      pose.heading = 0;
+      poseFor(act, m, seconds, pose);
+      if (pose.airborne > 0) continue;
+      localToWorld(act.anchor, pose.x, pose.y, pose.z, WORLD);
+      const feet = WORLD.y - act.spec.ride * act.spec.size;
+      let worst = Number.NEGATIVE_INFINITY;
+      for (const [ox, oz] of [[0, 0], [STONE_FOOT, 0], [-STONE_FOOT, 0], [0, STONE_FOOT], [0, -STONE_FOOT]] as const) {
+        worst = Math.max(worst, stoneTopProbe(WORLD.x + ox, WORLD.z + oz) - feet);
+      }
+      if (worst === Number.NEGATIVE_INFINITY) continue;
+      stoneSamples += 1;
+      const realFloor = Math.max(groundY(WORLD.x, WORLD.z), stoneTopProbe(WORLD.x, WORLD.z));
+      maxLift = Math.max(maxLift, feet - realFloor);
+      if (worst > STONE_TOLERANCE) {
+        buried += 1;
+        if (worst > worstBury) {
+          worstBury = worst;
+          firstBury = `${label(act)} a los ${seconds} s: ${worst.toFixed(3)} u dentro`;
+        }
+      }
+    }
+  }
+}
+check(
+  'lo que pisa pasa por encima de las piedras, nunca a través',
+  buried === 0,
+  `${buried} de ${stoneSamples} muestras sobre piedra${firstBury ? `; la peor, ${firstBury}` : ''}; ` +
+    `la rampa levanta como mucho ${maxLift.toFixed(2)} u`,
 );
 
 /* ── 6. El seguimiento y la retirada ───────────────────────────────────── */
@@ -775,7 +878,7 @@ function simulateJourney(aspect: number, seed: number): JourneyStats {
         }
         // «En el suelo» como para la propia conducta: airborne 0, a menos de 5 cm.
         if (!isAerial(act.behavior) && pose.airborne === 0) {
-          const expected = groundY(world.x, world.z) + act.spec.ride * act.spec.size;
+          const expected = faunaFloor(world.x, world.z) + act.spec.ride * act.spec.size;
           if (Math.abs(world.y - expected) > GROUND_CONTACT) stats.floating.add(name);
         }
       }

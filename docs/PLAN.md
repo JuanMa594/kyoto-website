@@ -363,7 +363,17 @@ un director de casting, no como un reproductor:
 - **ningún animal se retira a la vista**: sólo fuera de cuadro, comprobado cada
   frame con la cámara real. Si se le acaba el tiempo a la vista, sigue su
   camino hasta salir; el milano entra y sale planeando, y las luciérnagas se
-  encienden y se apagan.
+  encienden y se apagan;
+- **lo que cruza el camino pasa por encima de las piedras**: el suelo de la
+  fauna es lo más alto entre el terreno y las piedras
+  (`scene/path/stoneSurface.ts`), ensanchado por la pisada y suavizado en una
+  rampa para que subir a una piedra no sea un salto.
+
+> **Para las fases 4–8:** todo objeto sólido que se plante donde anda la fauna
+> (troncos, pies de torii, faroles, linternas de piedra) tiene que entrar en ese
+> suelo o quedar fuera de las trayectorias; si no, un animal lo atravesará como
+> atravesaba las piedras. `check:path` tiene ya la sonda (rayo vertical contra
+> la geometría real) que habría que extender a cada objeto nuevo.
 
 ---
 

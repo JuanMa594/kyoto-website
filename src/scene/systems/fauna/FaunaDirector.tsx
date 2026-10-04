@@ -15,6 +15,7 @@ import { FireflyRig } from '@/scene/objects/fauna/FireflyRig';
 import { ModelCreature } from '@/scene/objects/fauna/ModelCreature';
 import { SkinnedCreature } from '@/scene/objects/fauna/SkinnedCreature';
 import { PATH } from '@/scene/path/journeyPath';
+import { prepareStoneSurface } from '@/scene/path/stoneSurface';
 import type { QualityProfile } from '@/scene/quality/tiers';
 import { WIND } from '@/scene/systems/WindField';
 import { selectMotionAllowed, useKyotoStore } from '@/store/useKyotoStore';
@@ -97,6 +98,17 @@ export function FaunaDirector({ station, palette, profile }: FaunaDirectorProps)
       if (spec?.flightModel) useGLTF.preload(modelUrl(spec.flightModel), false, true);
     }
   }, [cast]);
+
+  // El suelo de lo que pisa incluye las piedras, y medirlas cuesta un frame
+  // largo: mejor en un momento ocioso que cuando nace el primer animal.
+  useEffect(() => {
+    if (typeof requestIdleCallback === 'function') {
+      const handle = requestIdleCallback(prepareStoneSurface);
+      return () => cancelIdleCallback(handle);
+    }
+    const handle = setTimeout(prepareStoneSurface, 500);
+    return () => clearTimeout(handle);
+  }, []);
 
   // Al apagar o encender el movimiento se empieza de cero. Al cambiar de zona
   // no: los actos vivos terminan su acto y la zona nueva sólo cuenta para el

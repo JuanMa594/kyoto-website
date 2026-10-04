@@ -105,6 +105,7 @@ src/
 │   ├─ FoundationScene.tsx     ← el mundo del camino (terreno, piedras, aire, vida)
 │   ├─ path/journeyPath.ts     ← ★ el sendero: eje, altura, pesos de zona y `PATH`
 │   ├─ path/stones.ts          ← dónde va cada piedra (puro)
+│   ├─ path/stoneSurface.ts    ← lo alto de las piedras, para lo que las pisa
 │   ├─ objects/stoneGeometry.ts← piedra procedural (12 formas instanciadas)
 │   ├─ objects/PetalGeometry.ts← pétalo, arce y hoja de bambú por contorno
 │   ├─ objects/fauna/          ← cuerpos: modelo + deformación, animado, luz
@@ -394,6 +395,15 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   que visto de lejos mide decenas de unidades) hasta salir. Una conducta nueva tiene que **empezar y terminar fuera
   de cuadro** —o, si es una luz, encenderse y apagarse—; `check:path` lo
   comprueba con cuatro aspectos de pantalla y simula el recorrido entero.
+- **El suelo de la fauna no es sólo el terreno.** Las piedras sobresalen hasta
+  ~0,3 u y la ardilla mide 0,3: apoyada sólo en el terreno, cruzaba el camino
+  **por dentro** de las piedras. `groundAt` toma lo más alto entre el terreno y
+  `stoneTopY` (`scene/path/stoneSurface.ts`), un mapa de alturas medido sobre
+  la geometría real de cada forma, **ensanchado** por la pisada (si no, la pata
+  de delante entra en la piedra antes que el centro) y **suavizado** después
+  (si no, subir un canto es un salto de 0,2 u en un frame). Se ensancha más de
+  lo que se suaviza, para que nunca quede por debajo de la piedra. Todo objeto
+  sólido que se plante donde anda la fauna tendrá que entrar en ese suelo.
 
 ---
 

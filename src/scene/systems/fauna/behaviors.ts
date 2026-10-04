@@ -22,6 +22,7 @@ import type { FaunaKind } from '@/config/journey';
 import { clamp, lerp, mulberry32, smoothstep } from '@/lib/procedural';
 import { bandCenterY, halfWidthAt, screenBandY } from '@/scene/camera/framing';
 import { frameToWorld, type PathFrame, type Point3 } from '@/scene/path/journeyPath';
+import { stoneTopY } from '@/scene/path/stoneSurface';
 import { groundY } from '@/scene/systems/elevation';
 
 import { catPlan, isAerial, type BehaviorName, type SpeciesSpec } from './bestiary';
@@ -127,12 +128,14 @@ const WORLD = { x: 0, z: 0 };
  *
  * Desde la Fase 3B el acto vive en el mundo, en su ancla (`act.anchor`): el
  * suelo se lee en su posición real, del mismo terreno que se dibuja, así que
- * nada flota ni se hunde en las cuestas, tampoco después de deslizarse.
+ * nada flota ni se hunde en las cuestas, tampoco después de deslizarse. Y el
+ * suelo de lo que pisa incluye las piedras del camino (`stoneTopY`): quien
+ * cruza el camino pasa por encima de ellas, no a través.
  */
 export function groundAt(act: FaunaAct, x: number, z: number): number {
   const frame = act.anchor;
   frameToWorld(frame, x, z, WORLD);
-  return groundY(WORLD.x, WORLD.z) - frame.y;
+  return Math.max(groundY(WORLD.x, WORLD.z), stoneTopY(WORLD.x, WORLD.z)) - frame.y;
 }
 
 /**

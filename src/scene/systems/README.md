@@ -7,7 +7,8 @@
 - `Terrain.tsx` — una sola malla para todo el camino, calculada al montar, con
   el tinte de suelo de cada zona por vértice.
 - `StonePath.tsx` — las ~310 piedras del recorrido en doce `InstancedMesh`;
-  dónde va cada una lo decide `scene/path/stones.ts`.
+  dónde va cada una lo decide `scene/path/stones.ts`, y lo alto de cada una
+  para lo que las pisa, `scene/path/stoneSurface.ts`.
 - `Atmosphere.tsx` — **Fase 3A**. Niebla, fondo y sol, mezclados por la zona en
   la que está la cámara; el sol y su caja de sombras siguen al encuadre.
 - `WindField.ts` — **Fase 2A**. Un solo viento para todo el sitio, con máquina
