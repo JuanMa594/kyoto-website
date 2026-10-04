@@ -171,6 +171,11 @@ export const PATH: {
   advance: number;
   /** Desfase de viaje en curso; 0 en reposo. */
   offset: number;
+  /**
+   * Avance de la cámara con signo, suavizado, en u/s; 0 tras un salto seco.
+   * La fauna decide con él si nace por delante o no nace (Fase 3B).
+   */
+  velocity: number;
   frame: PathFrame;
   /** Punto al que mira la cámara, en mundo. */
   focus: Point3;
@@ -179,6 +184,7 @@ export const PATH: {
   progress: 0,
   advance: 0,
   offset: 0,
+  velocity: 0,
   frame: { x: 0, y: 0, z: 0, yaw: 0 },
   focus: { x: 0, y: 0, z: 0 },
 };

@@ -28,6 +28,8 @@ Desde la **Fase 3A** la cámara viaja por el camino:
 - `CameraRig.tsx` — el **único escritor de `PATH`**. La cámara está en
   *objetivo del scroll + desfase de viaje* (`animation/travel.ts`); la primera
   estación de la visita es un aterrizaje y con modo 静 no hay viaje. El
-  parallax se suma encima, en los ejes locales.
+  parallax se suma encima, en los ejes locales. También escribe
+  `PATH.velocity` (avance con signo, suavizado): con él decide la fauna si nace
+  por delante o no nace (Fase 3B).
 
 La cámara es siempre **observadora**: nunca entra en la escena.

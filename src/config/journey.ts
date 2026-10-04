@@ -163,6 +163,13 @@ export interface StationAmbient {
   /** Intensidad base del viento, 0–1. Las ráfagas se suman encima (Fase 2). */
   readonly wind: number;
   readonly fauna: readonly FaunaKind[];
+  /**
+   * A qué distancia de la cámara nace la fauna de esta zona, como factor de la
+   * de cada especie: 1 = la de siempre, 0,8 = un 20 % más cerca. Se mezcla por
+   * zonas a lo largo del tramo y nunca acerca nada por debajo del suelo de
+   * distancia de `scene/systems/fauna/anchoring.ts` (Fase 3B).
+   */
+  readonly faunaDistance: number;
   readonly sounds: readonly SoundLayer[];
   /** Niebla de la zona, en unidades de mundo. Más corta = encuadre más íntimo. */
   readonly fog: { readonly near: number; readonly far: number };
@@ -206,16 +213,16 @@ export const PATH_LENGTH = 786;
 const NO_CARDS: StationTramo = { cards: [] };
 
 /**
- * De Ubicación a la sakura: dónde está Kyoto y cómo es, antes de llegar a los
- * cerezos. Provisional: las dos tarjetas de mapa dejan el hueco del mapa
- * antiguo desplegable, que se hace en la Fase 5.
- */
-/**
  * De la sakura a Fushimi Inari: 50 unidades llanas entre los cerezos antes de
  * que empiece la subida. Sin ellas, al llegar a Eventos ya se veía la cuesta.
  */
 const TRAMO_EVENTOS: StationTramo = { cards: [], flat: 50 };
 
+/**
+ * De Ubicación a la sakura: dónde está Kyoto y cómo es, antes de llegar a los
+ * cerezos. Provisional: las dos tarjetas de mapa dejan el hueco del mapa
+ * antiguo desplegable, que se hace en la Fase 5.
+ */
 const TRAMO_UBICACION: StationTramo = {
   cards: [
     { id: 'japon', side: 'izquierda', kind: 'mapa' },
@@ -247,6 +254,7 @@ export const JOURNEY: readonly Station[] = [
       petalKind: 'bambu',
       wind: 0.35,
       fauna: ['garza', 'gorrion'],
+      faunaDistance: 1,
       sounds: ['viento', 'bambu'],
       fog: { near: 18, far: 90 },
     },
@@ -270,6 +278,7 @@ export const JOURNEY: readonly Station[] = [
       wind: 0.2,
       // Valle abierto: libélulas sobre la hierba y alguna garza de paso.
       fauna: ['libelula', 'garza'],
+      faunaDistance: 1.2,
       sounds: ['viento'],
       fog: { near: 30, far: 140 },
     },
@@ -298,6 +307,7 @@ export const JOURNEY: readonly Station[] = [
       petalKind: 'sakura',
       wind: 0.5,
       fauna: ['mariposa', 'gorrion'],
+      faunaDistance: 0.9,
       sounds: ['viento', 'furin', 'pajaros'],
       fog: { near: 16, far: 80 },
     },
@@ -326,6 +336,7 @@ export const JOURNEY: readonly Station[] = [
       petalKind: 'momiji',
       wind: 0.3,
       fauna: ['milano', 'ardilla', 'gorrion'],
+      faunaDistance: 1,
       sounds: ['viento', 'grillos', 'pajaros'],
       // Antes era 8/45 ("túnel"), pero a esa distancia la niebla se tragaba la
       // montaña por completo. La sensación de subida la da ahora la pendiente
@@ -355,6 +366,7 @@ export const JOURNEY: readonly Station[] = [
       petalKind: 'momiji',
       wind: 0.35,
       fauna: ['ardilla', 'garza', 'milano'],
+      faunaDistance: 1.1,
       sounds: ['arroyo', 'viento', 'pajaros'],
       fog: { near: 24, far: 160 },
     },
@@ -383,6 +395,7 @@ export const JOURNEY: readonly Station[] = [
       petalKind: 'sakura',
       wind: 0.15,
       fauna: ['gato', 'luciernaga', 'tanuki'],
+      faunaDistance: 0.8,
       sounds: ['ciudad', 'arroyo', 'fuego'],
       // Callejón al anochecer: el encuadre se cierra.
       fog: { near: 10, far: 55 },
@@ -414,6 +427,7 @@ export const JOURNEY: readonly Station[] = [
       // Gorriones picoteando en el patio de la machiya. La carpa queda
       // declarada para cuando haya agua en escena (ver bestiary.ts).
       fauna: ['gorrion', 'carpa'],
+      faunaDistance: 0.9,
       sounds: ['arroyo', 'furin'],
       fog: { near: 30, far: 120 },
     },

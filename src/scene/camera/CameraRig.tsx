@@ -107,6 +107,10 @@ export function CameraRig() {
       // Un salto seco no es avance: los pétalos no deben fluir cuatrocientas
       // unidades de golpe.
       if (wasReady && !snap) PATH.advance += rig.d - before;
+      // Con la misma amortiguación que la velocidad del rig. Un salto seco no
+      // es caminar: la velocidad vuelve a 0.
+      PATH.velocity =
+        wasReady && !snap && dt > 0 ? damp(PATH.velocity, (rig.d - before) / dt, 8, dt) : 0;
       PATH.d = rig.d;
       PATH.progress = clamp(rig.d / PATH_LENGTH, 0, 1);
       PATH.offset = TRAVEL.offset;

@@ -50,12 +50,19 @@ export function FireflyRig({ act, member, palette }: FireflyRigProps) {
   );
 
   useFaunaFrame(act, member, group, (pose) => {
-    // El pulso viene de la conducta: cada individuo lleva su propio ritmo.
+    // El pulso viene de la conducta: cada individuo lleva su propio ritmo. La
+    // presencia (`fade`) las enciende al llegar y las apaga al irse.
     const glow = pose.glow;
+    const fade = pose.fade;
     spark.current?.scale.setScalar(lerp(0.5, 1.15, glow));
     halo.current?.scale.setScalar(lerp(1.4, 3.4, glow));
-    materials.spark.opacity = 0.35 + glow * 0.65;
-    materials.halo.opacity = 0.05 + glow * 0.22;
+    materials.spark.opacity = (0.35 + glow * 0.65) * fade;
+    materials.halo.opacity = (0.05 + glow * 0.22) * fade;
+    // Apagada del todo no se dibuja: un material transparente a opacidad 0
+    // seguiría escribiendo profundidad y taparía los pétalos de detrás.
+    const lit = fade > 0.001;
+    if (spark.current) spark.current.visible = lit;
+    if (halo.current) halo.current.visible = lit;
   });
 
   return (

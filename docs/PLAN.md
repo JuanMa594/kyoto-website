@@ -3,8 +3,8 @@
 > Documento de referencia del proyecto. Consolida las decisiones tomadas en la fase de
 > definición. Si algo cambia, se actualiza aquí y no en la memoria de nadie.
 >
-> Estado: **Fase 3 en curso** — 3A (el mundo) implementada, pendiente de revisión; 3B y 3C se
-> diseñan al llegar a ellas. La Fase 2 está completa (2A motor, 2B ambiente, 2C vida).
+> Estado: **Fase 3 en curso** — 3A (el mundo) y 3B (la fauna en el camino) implementadas,
+> pendientes de revisión; 3C se diseña al llegar a ella. La Fase 2 está completa (2A motor, 2B ambiente, 2C vida).
 > El estado vivo de las fases y las convenciones del repo están en `CLAUDE.md`.
 
 ---
@@ -345,6 +345,26 @@ un director de casting, no como un reproductor:
   su capa de sonido (el graznido de la garza al cruzar);
 - con modo 静 o `prefers-reduced-motion`: **cero actos**.
 
+**En el camino (Fase 3B).** La fauna vive en el mundo, como las piedras
+(`scene/systems/fauna/anchoring.ts`; diseño en
+`docs/superpowers/specs/2026-10-01-fase-3b-la-fauna-en-el-camino-design.md`):
+
+- cada acto nace con un **ancla**, una copia del encuadre de la cámara: al
+  avanzar, uno se acerca a los animales, los ve crecer y los deja atrás (lo que
+  anda sale por abajo a ~10 u);
+- **lo que vuela se adelanta**: su ancla se deja alcanzar hasta un mínimo
+  (mariposas 8 u, bandadas 10, milano 22) y después avanza con la cámara; los
+  gorriones que bajan a posarse, sólo mientras están en el aire;
+- al caminar, los actos **nacen por delante**, con una ventaja según la
+  velocidad; caminando rápido o retrocediendo no nace nada, y dejar atrás un
+  acto adelanta el siguiente;
+- cada estación declara su **cercanía** (`ambient.faunaDistance`): Gion íntimo,
+  Ubicación lejano;
+- **ningún animal se retira a la vista**: sólo fuera de cuadro, comprobado cada
+  frame con la cámara real. Si se le acaba el tiempo a la vista, sigue su
+  camino hasta salir; el milano entra y sale planeando, y las luciérnagas se
+  encienden y se apagan.
+
 ---
 
 ## 6. Sistema de diseño
@@ -575,7 +595,7 @@ fase** para revisión antes de seguir.
 | **2C** | · Vida | Los tres rigs de fauna · repertorio de conductas · `FaunaDirector` · motor de audio sintetizado · controles de sonido y modo 静 | ✅ |
 | **3** | **El Camino** | Se parte en tres bloques con parada propia, ver abajo | ⏳ |
 | **3A** | · El mundo | Sendero desde `journey.ts` · terreno continuo · piedras en todo el recorrido · cámara sobre el camino con scroll · tramo y llegada automática · viaje entre estaciones | ✅ pendiente de revisión |
-| **3B** | · La fauna en el camino | Actos anclados al mundo · cercanía por estación · márgenes con la cámara real | ⏸ |
+| **3B** | · La fauna en el camino | Actos anclados al mundo · lo que vuela se adelanta (ancla que se desliza) · nace por delante al caminar · cercanía por estación · márgenes con la cámara real · nunca desaparece a la vista | ✅ pendiente de revisión |
 | **3C** | · La navegación | Sidebar radial (`13.png`) con íconos generados por código · progreso del camino · nav móvil · teclado · transiciones | ⏸ |
 | **4** | Home 京都 | Torii 3D, bambú, título tipográfico, composición del hero | ⏸ |
 | **5** | Ubicación 位置 | Mapa de Japón extruido e interactivo, zoom a Kyoto · **tramo hacia Eventos**: los dos mapas antiguos, desplegables, **no como tarjetas sino como carteles de madera insertados en el camino** (en 3A son tarjetas provisionales, con el hueco del mapa), junto a la reseña breve de Kyoto | ⏸ |

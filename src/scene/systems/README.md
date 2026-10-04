@@ -29,8 +29,8 @@
   pétalos, reservado al cargar, que sólo dibuja cuando su zona pesa algo donde
   está la cámara. Las cajas viajan con el encuadre y fluyen hacia la cámara con
   el avance (`uAdvance`), desvaneciéndose en los bordes de profundidad.
-- `fauna/` — **Fase 2C**. Cuatro piezas, tres de ellas puras y comprobables sin
-  navegador:
+- `fauna/` — **Fase 2C**, anclada al mundo en la **3B**. Cinco piezas, cuatro de
+  ellas puras y comprobables sin navegador:
   - `bestiary.ts` — qué es cada especie: modelo, tamaño, **regiones que se
     doblan** (cola, patas, cuello, alas), marcha (paso, trote, galope o
     brinco), repertorio.
@@ -38,6 +38,10 @@
     posición. Rumbo, alabeo, esfuerzo y si está en el aire **se deducen** de la
     propia trayectoria.
   - `casting.ts` — las reglas del director: cadencia, aforo, variedad.
+  - `anchoring.ts` — dónde vive cada acto en el mundo: dónde y cuándo nace
+    (ventaja al caminar, cercanía por estación), el ancla que se desliza de lo
+    que vuela, la prueba de cuadro con la cámara real y la regla de retirada:
+    nunca a la vista.
   - `FaunaDirector.tsx` — la parte que React necesita: reloj, estado, precarga
     de modelos y el reparto a los cuerpos de `objects/fauna/` (modelo con
     deformación, modelo animado o punto de luz).

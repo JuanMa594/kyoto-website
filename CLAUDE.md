@@ -37,7 +37,7 @@ bun run typecheck    # tsc --noEmit
 bun run fonts        # regenera los .woff2 subseteados
 bun run models       # assets/models/source → public/models (fauna optimizada)
 bun run palette      # muestrea los colores de docs/referencias/*.png
-bun run check:path   # comprobaciones puras del camino, el terreno, la cámara y el scroll
+bun run check:path   # comprobaciones puras del camino, el terreno, la cámara, el scroll y la fauna
 ```
 
 En desarrollo, **`?fauna=<especie>`** en cualquier página (`/es/ubicacion?fauna=libelula`)
@@ -117,7 +117,7 @@ src/
 │   ├─ systems/WindDriver.tsx  ← lo hace avanzar dentro del <Canvas>
 │   ├─ systems/PetalSystem.tsx ← ★ pétalos: posición calculada en el shader
 │   ├─ systems/petals.ts       ← capas, densidad y colores (puro, sin React)
-│   ├─ systems/fauna/          ← ★ bestiario, conductas, casting y director
+│   ├─ systems/fauna/          ← ★ bestiario, conductas, anclaje, casting y director
 │   ├─ quality/tiers.ts        ← detección de tier + perfiles
 │   ├─ camera/framing.ts       ← ★ encuadre local y regla de tercios en unidades
 │   ├─ camera/pathRig.ts       ← ★ el encuadre sobre el camino, topes anti-mareo (puro)
@@ -361,7 +361,8 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   a ella.** Terreno y piedras, al mundo. Pétalos: sus cajas viajan con el
   encuadre, pero fluyen hacia la cámara con el avance integrado (`uAdvance`),
   y como ese borde en profundidad está en cuadro, se desvanecen en él. Fauna:
-  en 3A viaja con el encuadre (y patina con el scroll); 3B la ancla al mundo.
+  anclada al mundo, un ancla por acto (3B); lo que vuela, con un ancla que se
+  desliza (ver la trampa siguiente a la del viaje).
   Sol y caja de sombras: siguen al encuadre, o las sombras desaparecen al
   avanzar.
 - **Un viaje no puede ir más deprisa de lo que el encuadre puede seguir.** Al
@@ -373,6 +374,26 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   amortiguado, porque girar es lo que marea; el desplazamiento lateral más
   ágil, porque deslizarse de lado se lee como la ventanilla de un tren—. Si el
   camino vuelve a crecer, `check:path` lo dirá antes que la revisión.
+- **Lo que vuela no se puede anclar al mundo sin más.** Lo que anda sale por el
+  borde inferior a ~10 u de la cámara: anclarlo es gratis. La franja alta, en
+  cambio, vista de cerca baja hasta la altura de la cámara: el gorrión más bajo
+  de una bandada nacida a 18–27 u no sale de cuadro hasta estar a 0–5 u, y el
+  milano en lo más bajo de su térmica, a 5 u. Anclados, la cámara acabaría entre
+  ellos. Por eso lo que vuela tiene un **ancla que se desliza** (`SLIDE` en
+  `fauna/anchoring.ts`): se deja alcanzar hasta un mínimo y después avanza con
+  la cámara. Lo que anda **nunca** se desliza: deslizarlo es hacerlo patinar.
+- **Ningún animal se retira a la vista.** Un acto sólo sale de escena cuando
+  ninguno de sus individuos está en cuadro, comprobado cada frame con la
+  cámara real (`retirement`). «En cuadro» es en el frustum **y antes de que
+  termine la niebla** (`seen`): el frustum llega a 400 u, y sin la niebla lo que
+  quedaba lejos al retroceder seguía «a la vista» para siempre y acababa
+  encogiéndose en la red de seguridad. Por eso nada se encoge al terminar: si
+  se le acaba el tiempo a la vista, sigue su camino (`placeAt` extrapola,
+  conservando su altura sobre el suelo —con la altitud fija, un ave se metía en
+  una colina lateral— y animándose poco a poco, para salir también de un cuadro
+  que visto de lejos mide decenas de unidades) hasta salir. Una conducta nueva tiene que **empezar y terminar fuera
+  de cuadro** —o, si es una luz, encenderse y apagarse—; `check:path` lo
+  comprueba con cuatro aspectos de pantalla y simula el recorrido entero.
 
 ---
 
@@ -429,7 +450,7 @@ llega en las fases 4–8 y se cuelga de ese mismo objeto.
 | 2C | Vida: rigs de fauna + `FaunaDirector` + audio sintetizado + controles | ✅ pendiente de revisión |
 | 3 | El Camino, en tres bloques: | ⏳ |
 | 3A | · El mundo: sendero, terreno continuo, cámara con scroll, tramo y llegada | ✅ pendiente de revisión |
-| 3B | · La fauna en el camino (anclada al mundo, cercanía por estación) | ⏸ |
+| 3B | · La fauna en el camino (anclada al mundo, cercanía por estación) | ✅ pendiente de revisión |
 | 3C | · La navegación (sidebar radial, íconos por código, móvil, teclado) | ⏸ |
 | 4 | Home 京都 | ⏸ |
 | 5 | Ubicación 位置 | ⏸ |

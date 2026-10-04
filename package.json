@@ -12,7 +12,7 @@
     "fonts": "bun run scripts/subset-fonts.ts",
     "models": "bun run scripts/optimize-models.ts",
     "palette": "bun run scripts/sample-palette.ts",
-    "check:path": "bun run scripts/check-path.ts"
+    "check:path": "bun run scripts/check-path.ts && bun run scripts/check-fauna.ts"
   },
   "dependencies": {
     "@react-three/drei": "10.7.8",

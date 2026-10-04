@@ -21,10 +21,10 @@
 import type { FaunaKind } from '@/config/journey';
 import { clamp, lerp, mulberry32, smoothstep } from '@/lib/procedural';
 import { bandCenterY, halfWidthAt, screenBandY } from '@/scene/camera/framing';
-import { frameToWorld, PATH } from '@/scene/path/journeyPath';
+import { frameToWorld, type PathFrame, type Point3 } from '@/scene/path/journeyPath';
 import { groundY } from '@/scene/systems/elevation';
 
-import { catPlan, type BehaviorName, type SpeciesSpec } from './bestiary';
+import { catPlan, isAerial, type BehaviorName, type SpeciesSpec } from './bestiary';
 
 export interface FaunaAct {
   readonly id: number;
@@ -41,6 +41,21 @@ export interface FaunaAct {
   /** Profundidad base del acto. */
   readonly depth: number;
   readonly seed: number;
+  /**
+   * El encuadre de la cámara al nacer (`PATH.frame`): el sitio del mundo donde
+   * vive el acto. Sus conductas están escritas en coordenadas locales de él.
+   */
+  readonly origin: Readonly<PathFrame>;
+  /**
+   * Dónde está ahora: `origin`, salvo que lo que vuela se haya deslizado
+   * (`anchoring.ts`). Es lo único que cambia de un acto y tiene un solo
+   * escritor, `trackAct`. Lo leen el suelo (`groundAt`) y el grupo que lo dibuja.
+   */
+  readonly anchor: PathFrame;
+  /** Profundidad de la cámara (`PATH.d`) cuando nació. */
+  readonly spawnD: number;
+  /** Aspecto de sus márgenes: el mayor entre el de la pantalla al nacer y 16:9. */
+  readonly aspect: number;
 }
 
 export interface FaunaPose {
@@ -73,6 +88,11 @@ export interface FaunaPose {
   sleeping: number;
   /** Progreso del desperezo, 0–1 (0 fuera de él): primero las manos, luego las patas. */
   stretching: number;
+  /**
+   * Presencia de una luz, 0–1: las luciérnagas se encienden y se apagan en vez
+   * de crecer y encogerse. 1 en todo lo demás.
+   */
+  fade: number;
 }
 
 export function createPose(): FaunaPose {
@@ -94,28 +114,23 @@ export function createPose(): FaunaPose {
     lying: 0,
     sleeping: 0,
     stretching: 0,
+    fade: 1,
   };
 }
 
-interface Point {
-  x: number;
-  y: number;
-  z: number;
-}
+type Point = Point3;
 
 const WORLD = { x: 0, z: 0 };
 
 /**
- * Dónde está el suelo, en las coordenadas del encuadre local en que están
- * escritas todas las conductas.
+ * Dónde está el suelo, en las coordenadas locales del acto.
  *
- * En la Fase 3A la fauna **viaja con el encuadre de la cámara** (`PATH.frame`):
- * respecto de ella se ve igual que antes. El suelo, en cambio, se lee en la
- * posición real del mundo, del mismo terreno que se dibuja, así que nada flota
- * ni se hunde en las cuestas. (La Fase 3B anclará los actos al mundo.)
+ * Desde la Fase 3B el acto vive en el mundo, en su ancla (`act.anchor`): el
+ * suelo se lee en su posición real, del mismo terreno que se dibuja, así que
+ * nada flota ni se hunde en las cuestas, tampoco después de deslizarse.
  */
-export function groundAt(x: number, z: number): number {
-  const frame = PATH.frame;
+export function groundAt(act: FaunaAct, x: number, z: number): number {
+  const frame = act.anchor;
   frameToWorld(frame, x, z, WORLD);
   return groundY(WORLD.x, WORLD.z) - frame.y;
 }
@@ -127,7 +142,7 @@ export function groundAt(x: number, z: number): number {
  * hasta el pecho.
  */
 export function standingY(act: FaunaAct, x: number, z: number): number {
-  return groundAt(x, z) + act.spec.ride * act.spec.size;
+  return groundAt(act, x, z) + act.spec.ride * act.spec.size;
 }
 
 /**
@@ -153,9 +168,13 @@ export function track(t: number, keys: readonly (readonly [number, number])[]): 
   return keys[keys.length - 1]![1];
 }
 
-/** Margen por el que un animal entra y sale de cuadro sin que se le vea aparecer. */
-function offscreenX(z: number, size: number): number {
-  return halfWidthAt(z) + 2 + size * 2;
+/**
+ * Margen por el que un animal entra y sale de cuadro sin que se le vea
+ * aparecer. Se mide con el aspecto del acto: en una pantalla más ancha que
+ * 16:9 el cuadro es más ancho y el margen también.
+ */
+function offscreenX(act: FaunaAct, z: number, size: number): number {
+  return halfWidthAt(z, act.aspect) + 2 + size * 2;
 }
 
 /** Ruido barato y estable por individuo, para que ninguno vaya clavado a otro. */
@@ -173,12 +192,20 @@ interface Behavior {
 
 /* ── Las conductas ──────────────────────────────────────────────────────── */
 
+/** Cuándo tocan suelo los gorriones que bajan a posarse, y cuándo alzan el vuelo (fracción del acto). */
+const VISIT_LANDED = 0.3;
+const VISIT_TAKEOFF = 0.84;
+
+/** El radio más grande de los círculos del milano, y cuánto se aplastan en profundidad. */
+const KITE_RADIUS_MAX = 8.5;
+const KITE_DEPTH_SQUASH = 0.55;
+
 /** Cruza el encuadre de lado a lado, con aleteos y planeos alternos. */
 const cruzarVolando: Behavior = {
   place: (act, member, s, out) => {
     const t = s / act.duration;
     const z = act.depth - member * 0.9;
-    const w = offscreenX(z, act.spec.size);
+    const w = offscreenX(act, z, act.spec.size);
 
     out.z = z;
     out.x = act.direction * lerp(-w, w, t);
@@ -197,11 +224,25 @@ const cruzarVolando: Behavior = {
 /** Espirales lentas del milano, muy arriba y muy al fondo. Nunca aterriza. */
 const planearEnCirculos: Behavior = {
   place: (act, member, s, out) => {
-    const radius = 5 + jitter(act.seed, member, 1) * 3.5;
+    const t = s / act.duration;
+    const radius = 5 + jitter(act.seed, member, 1) * (KITE_RADIUS_MAX - 5);
     const angle = act.direction * (s * 0.2 + member * 2.1) + act.seed;
 
-    out.x = Math.cos(angle) * radius;
-    out.z = act.depth + Math.sin(angle) * radius * 0.55;
+    // Entra y sale planeando: el centro de sus círculos llega desde un costado
+    // en el primer 20 % del acto y se va por el otro en el último 20 %. El
+    // margen suma el radio más grande y se mide en el punto más hondo de los
+    // círculos, donde el cuadro es más ancho.
+    const w =
+      offscreenX(act, act.depth - KITE_RADIUS_MAX * KITE_DEPTH_SQUASH, act.spec.size) + KITE_RADIUS_MAX;
+    const center = track(t, [
+      [0, -act.direction * w],
+      [0.2, 0],
+      [0.8, 0],
+      [1, act.direction * w],
+    ]);
+
+    out.x = center + Math.cos(angle) * radius;
+    out.z = act.depth + Math.sin(angle) * radius * KITE_DEPTH_SQUASH;
     // El aire no es parejo: sube en una térmica, cae en un bajón. Dos oleajes
     // de 7 y 15 s sobre la deriva lenta, para que en un solo acto se le vea
     // ganar y perder altura. El cabeceo sale solo de la trayectoria: sube con
@@ -231,7 +272,7 @@ const visitaAlSuelo: Behavior = {
   place: (act, member, s, out) => {
     const t = s / act.duration;
     const z = act.depth + (jitter(act.seed, member, 2) - 0.5) * 1.6;
-    const w = offscreenX(z, act.spec.size);
+    const w = offscreenX(act, z, act.spec.size);
     const dir = act.direction;
 
     // Dónde toca suelo, y hasta dónde camina después.
@@ -257,8 +298,8 @@ const visitaAlSuelo: Behavior = {
       [0, cruise],
       [0.16, cruise * 0.35],
       [0.24, 0.12],
-      [0.3, 0],
-      [0.84, 0],
+      [VISIT_LANDED, 0],
+      [VISIT_TAKEOFF, 0],
       [0.9, cruise * 0.4],
       [1, cruise],
     ]);
@@ -279,7 +320,7 @@ const visitaAlSuelo: Behavior = {
     // en el aire, el aleteo. Picoteando no hay ni lo uno ni lo otro.
     if (pose.airborne > 0.5) {
       // El despegue cuesta: aletazos fuertes.
-      pose.effort = t > 0.84 ? 1 : 0.65 + 0.35 * Math.sin(s * 5);
+      pose.effort = t > VISIT_TAKEOFF ? 1 : 0.65 + 0.35 * Math.sin(s * 5);
     } else {
       pose.effort = clamp(pose.speed / 0.7, 0, 1);
     }
@@ -300,7 +341,7 @@ const vadear: Behavior = {
   place: (act, member, s, out) => {
     const t = s / act.duration;
     const z = act.depth + (jitter(act.seed, member, 20) - 0.5) * 1.2;
-    const w = offscreenX(z, act.spec.size);
+    const w = offscreenX(act, z, act.spec.size);
     const dir = act.direction;
 
     // Primera parada, un poco antes del centro; la segunda, un par de pasos
@@ -341,7 +382,7 @@ const bandada: Behavior = {
   place: (act, member, s, out) => {
     const t = s / act.duration;
     const z = act.depth + (jitter(act.seed, member, 6) - 0.5) * 3;
-    const w = offscreenX(z, 1.5);
+    const w = offscreenX(act, z, 1.5);
 
     // El viraje es común a todos: lo que convierte N pájaros en una bandada.
     const swerve = Math.sin(s * 0.85 + act.seed) * 1.1;
@@ -374,7 +415,7 @@ const bandada: Behavior = {
 const correrYParar: Behavior = {
   place: (act, member, s, out) => {
     // El margen de salida cubre también el vaivén lateral de abajo.
-    const w = offscreenX(act.depth, act.spec.size) + 0.6;
+    const w = offscreenX(act, act.depth, act.spec.size) + 0.6;
     const omega = 2 * Math.PI * 0.5;
     const pace = (2 * w) / act.duration;
 
@@ -409,7 +450,7 @@ const perseguir: Behavior = {
     // …y por encima, la entrada y la salida por los costados. El margen suma la
     // amplitud del juego: si no, en el primer frame el vaivén puede dejar a una
     // de las dos ya dentro de cuadro, apareciendo de la nada.
-    const w = offscreenX(depth, act.spec.size) + 3.4;
+    const w = offscreenX(act, depth, act.spec.size) + 3.4;
     const enter = track(t, [
       [0, -act.direction * w],
       [0.2, 0],
@@ -431,7 +472,7 @@ const perseguir: Behavior = {
 const deambular: Behavior = {
   place: (act, member, s, out) => {
     const t = s / act.duration;
-    const w = offscreenX(act.depth, act.spec.size) + 0.7;
+    const w = offscreenX(act, act.depth, act.spec.size) + 0.7;
 
     const progress = track(t, [
       [0, 0],
@@ -530,7 +571,7 @@ function playPath(act: FaunaAct): PlayPath {
   if (cached) return cached;
 
   // Se integra de izquierda a derecha; la dirección del acto lo refleja luego.
-  const w = offscreenX(act.depth, act.spec.size) + 1;
+  const w = offscreenX(act, act.depth, act.spec.size) + 1;
   const firstLoopAt = -3.2 + jitter(act.seed, 0, 42) * 1.4;
   const between = 1.2 + jitter(act.seed, 0, 43) * 1.6;
 
@@ -623,7 +664,7 @@ const callejear: Behavior = {
     const timeline = CAT_PLANS[plan];
     const t = s / act.duration;
     const dir = act.direction;
-    const w = offscreenX(act.depth, act.spec.size) + 0.7;
+    const w = offscreenX(act, act.depth, act.spec.size) + 0.7;
     // Se para antes del centro, del lado por el que entra: en un tercio, no en
     // mitad del cuadro.
     const stop = -dir * (1 + jitter(act.seed, member, 41) * 2.5);
@@ -657,7 +698,7 @@ const revolotear: Behavior = {
   place: (act, member, s, out) => {
     const t = s / act.duration;
     const z = act.depth + Math.sin(s * 0.7 + member * 2) * 0.8;
-    const w = offscreenX(z, 1);
+    const w = offscreenX(act, z, 1);
 
     out.z = z;
     out.x =
@@ -687,7 +728,7 @@ const titilar: Behavior = {
     out.z = act.depth + spreadZ + Math.sin(s * 0.21 + phase) * 0.5;
     out.x = spreadX + Math.sin(s * 0.27 + phase) * 1.1;
     out.y =
-      groundAt(out.x, out.z) +
+      groundAt(act, out.x, out.z) +
       0.35 +
       jitter(act.seed, member, 13) * 0.9 +
       Math.sin(s * 0.5 + phase) * 0.25;
@@ -699,6 +740,10 @@ const titilar: Behavior = {
     pose.glow = 0.12 + 0.88 * Math.max(0, Math.sin(s * 1.6 + phase)) ** 2;
     pose.effort = 1;
     pose.airborne = 1;
+    // Son luces: se encienden y se apagan en dos segundos, no crecen ni se
+    // encogen (§5.3 del spec de 3B).
+    pose.fade = smoothstep(0, 2, s) * (1 - smoothstep(act.duration - 2, act.duration, s));
+    pose.scale = 1;
   },
 };
 
@@ -715,6 +760,84 @@ const BEHAVIORS: Record<BehaviorName, Behavior> = {
   revolotear,
   titilar,
 };
+
+/* ── Dónde está cada individuo ──────────────────────────────────────────── */
+
+/** Re-aceleración al seguir más allá del final (s), y tramo final cuya velocidad se mantiene. */
+const EXIT_RAMP = 0.6;
+const EXIT_SPAN = 0.15;
+/**
+ * Y además se va animando: gana velocidad con esta aceleración (u/s²) durante
+ * este tiempo (s), hasta 4 u/s más. Visto de cerca, un acto que termina a la
+ * vista sale en un par de segundos; visto de lejos tras retroceder mucho —el
+ * cuadro mide allí decenas de unidades—, sin esto tardaría un minuto en salir.
+ */
+const EXIT_ACCEL = 0.4;
+const EXIT_BOOST_TIME = 10;
+
+/** Si un acto siguiera a la vista tanto tiempo (s) después de su fin, se funde en este otro. */
+export const OVERTIME_LIMIT = 30;
+export const OVERTIME_FADE = 1;
+
+const exitFrom: Point = { x: 0, y: 0, z: 0 };
+const exitTo: Point = { x: 0, y: 0, z: 0 };
+
+/** ¿Sigue su camino al terminar su tiempo? Todo menos las luces, que se apagan. */
+export function extrapolates(behavior: BehaviorName): boolean {
+  return behavior !== 'titilar';
+}
+
+/**
+ * ¿Está el acto en el aire? Lo que sólo vuela, siempre; los gorriones que bajan
+ * a posarse, sólo al llegar y al irse. Lo usa el ancla que se desliza.
+ */
+export function inFlight(act: FaunaAct, seconds: number): boolean {
+  if (act.behavior === 'visitaAlSuelo') {
+    const t = seconds / act.duration;
+    return t < VISIT_LANDED || t > VISIT_TAKEOFF;
+  }
+  return isAerial(act.behavior);
+}
+
+/**
+ * Dónde está un individuo, en las coordenadas locales de su acto.
+ *
+ * Dentro de su tiempo es su conducta, tal cual. **Más allá**, si alguien lo
+ * sigue viendo —la cámara retrocedió y el cuadro se ensanchó—, no se encoge ni
+ * desaparece: **sigue su camino** con la velocidad media del último 15 % del
+ * acto, re-acelerando suave desde donde terminó (derivada nula en el empalme)
+ * hasta salir de cuadro. Quien camina sigue pegado al suelo; quien vuela, a la
+ * misma altura sobre él.
+ */
+export function placeAt(act: FaunaAct, member: number, seconds: number, out: Point): void {
+  const behavior = BEHAVIORS[act.behavior];
+  const s = Math.max(0, seconds);
+  if (s <= act.duration || !extrapolates(act.behavior)) {
+    behavior.place(act, member, Math.min(s, act.duration), out);
+    return;
+  }
+
+  const span = act.duration * EXIT_SPAN;
+  behavior.place(act, member, act.duration - span, exitFrom);
+  behavior.place(act, member, act.duration, exitTo);
+
+  const tau = s - act.duration;
+  const along = tau - EXIT_RAMP * (1 - Math.exp(-tau / EXIT_RAMP));
+  const vx = (exitTo.x - exitFrom.x) / span;
+  const vz = (exitTo.z - exitFrom.z) / span;
+  // Lo que gana al animarse, en la misma dirección: ½·a·τ² y después a ritmo
+  // constante. Derivada nula en el empalme: no hay tirón.
+  const boostTime = Math.min(tau, EXIT_BOOST_TIME);
+  const boost =
+    0.5 * EXIT_ACCEL * boostTime * boostTime + EXIT_ACCEL * EXIT_BOOST_TIME * (tau - boostTime);
+  const speed = Math.hypot(vx, vz) || 1;
+  out.x = exitTo.x + vx * along + (vx / speed) * boost;
+  out.z = exitTo.z + vz * along + (vz / speed) * boost;
+  // Conserva su altura **sobre el suelo**, no su altitud: quien camina sigue
+  // pisando, y quien vuela no se mete en una colina que suba por el costado.
+  const height = exitTo.y - standingY(act, exitTo.x, exitTo.z);
+  out.y = standingY(act, out.x, out.z) + height;
+}
 
 /* ── De la trayectoria a la pose ────────────────────────────────────────── */
 
@@ -737,10 +860,9 @@ const ahead: Point = { x: 0, y: 0, z: 0 };
  * se persiguen— apuntaría a otro sitio y giraría igual.
  */
 function aheadHeading(act: FaunaAct, member: number, s: number): number {
-  const place = BEHAVIORS[act.behavior].place;
   const step = act.spec.size * 0.05;
   for (let lookAhead = 0.1; lookAhead <= 1.5; lookAhead += 0.1) {
-    place(act, member, Math.min(act.duration, s + lookAhead), ahead);
+    placeAt(act, member, s + lookAhead, ahead);
     const dx = ahead.x - here.x;
     const dz = ahead.z - here.z;
     if (Math.hypot(dx, dz) > step) return Math.atan2(-dz, dx);
@@ -766,11 +888,13 @@ function angleDelta(a: number, b: number): number {
  */
 export function poseFor(act: FaunaAct, member: number, seconds: number, out: FaunaPose): void {
   const behavior = BEHAVIORS[act.behavior];
-  const s = clamp(seconds, 0, act.duration);
+  // Sin tope por arriba: más allá de su tiempo el individuo sigue su camino.
+  const s = Math.max(0, seconds);
+  const early = Math.max(0, s - DT);
 
-  behavior.place(act, member, Math.max(0, s - DT), before);
-  behavior.place(act, member, s, here);
-  behavior.place(act, member, Math.min(act.duration, s + DT), after);
+  placeAt(act, member, early, before);
+  placeAt(act, member, s, here);
+  placeAt(act, member, s + DT, after);
 
   out.x = here.x;
   out.y = here.y;
@@ -780,7 +904,7 @@ export function poseFor(act: FaunaAct, member: number, seconds: number, out: Fau
   const dy = after.y - before.y;
   const dz = after.z - before.z;
   const flat = Math.hypot(dx, dz);
-  const span = Math.max(1e-4, Math.min(act.duration, s + DT) - Math.max(0, s - DT));
+  const span = Math.max(1e-4, s + DT - early);
 
   out.speed = Math.hypot(dx, dy, dz) / span;
 
@@ -808,9 +932,17 @@ export function poseFor(act: FaunaAct, member: number, seconds: number, out: Fau
   out.lying = 0;
   out.sleeping = 0;
   out.stretching = 0;
+  out.fade = 1;
 
-  const t = s / act.duration;
-  out.scale = smoothstep(0, 0.03, t) * (1 - smoothstep(0.97, 1, t));
+  // El reloj de la conducta no pasa de su duración: más allá, sólo se sigue el
+  // camino (`placeAt`).
+  const clock = Math.min(s, act.duration);
+  const t = clock / act.duration;
+  // Entra desde fuera de cuadro: crecer al empezar es sólo una red de
+  // seguridad. Ya no se encoge al terminar —sale de cuadro—, salvo la red de
+  // seguridad de la Fase 3B: si siguiera a la vista mucho después de su fin.
+  const overtime = act.duration + OVERTIME_LIMIT;
+  out.scale = smoothstep(0, 0.03, t) * (1 - smoothstep(overtime, overtime + OVERTIME_FADE, s));
 
-  behavior.decorate?.(act, member, s, out);
+  behavior.decorate?.(act, member, clock, out);
 }

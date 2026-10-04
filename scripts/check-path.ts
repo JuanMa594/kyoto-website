@@ -1,5 +1,5 @@
 /**
- * Comprobaciones puras del camino (Fase 3A).
+ * Comprobaciones puras del camino (Fase 3A). La fauna tiene las suyas en check-fauna.ts.
  *
  * Todo lo que se puede comprobar sin navegador —la forma del sendero, el
  * terreno, el encuadre de la cámara, las piedras, el scroll y el viaje— se
@@ -50,25 +50,9 @@ import {
   hillAmplitude,
   terrainHeight,
 } from '../src/scene/systems/elevation';
+import { check, finish, range, section } from './check-kit';
 
-const failures: string[] = [];
 const DEG = Math.PI / 180;
-
-function section(title: string): void {
-  console.log(`\n— ${title}`);
-}
-
-function check(name: string, ok: boolean, detail = ''): void {
-  const suffix = detail ? ` (${detail})` : '';
-  console.log(`${ok ? '✓' : '✗'} ${name}${suffix}`);
-  if (!ok) failures.push(name);
-}
-
-function range(from: number, to: number, step: number): number[] {
-  const values: number[] = [];
-  for (let value = from; value <= to + 1e-9; value += step) values.push(value);
-  return values;
-}
 
 /** Pendiente del eje en `d`, por diferencia centrada. */
 function slopeAt(d: number): number {
@@ -596,9 +580,4 @@ check('la lluvia se funde entre zonas, sin saltos', petalJump <= 6, `máx ${peta
 
 /* ── Resumen ───────────────────────────────────────────────────────────── */
 
-if (failures.length > 0) {
-  console.error(`\n✗ ${failures.length} comprobación(es) fallaron.`);
-  process.exit(1);
-}
-
-console.log('\n✓ Todo el camino en orden.');
+finish('Todo el camino en orden.');
