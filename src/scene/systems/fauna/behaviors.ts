@@ -202,6 +202,13 @@ const VISIT_TAKEOFF = 0.84;
 /** El radio más grande de los círculos del milano, y cuánto se aplastan en profundidad. */
 const KITE_RADIUS_MAX = 8.5;
 const KITE_DEPTH_SQUASH = 0.55;
+/** Cuánto lo sube o lo baja la térmica (u/s), y en cuánto tiempo coge ese ritmo (s). */
+const KITE_CLIMB = 1.4;
+const KITE_CLIMB_EASE = 2;
+/** Lo más que bajan sus oleajes respecto de su altura de crucero (suma de sus amplitudes). */
+const KITE_SWELL = 1.2 + 0.8 + 0.25;
+/** Lo que lo deriva el viento de lado mientras da vueltas (u/s). */
+const KITE_DRIFT = 0.3;
 
 /** Cruza el encuadre de lado a lado, con aleteos y planeos alternos. */
 const cruzarVolando: Behavior = {
@@ -224,25 +231,59 @@ const cruzarVolando: Behavior = {
   },
 };
 
+/**
+ * Lo que sube (o baja) la térmica al milano a los `tau` segundos de empezar a
+ * subir: arranca desde parado (derivada nula) y sigue a `KITE_CLIMB` u/s.
+ */
+function kiteRamp(tau: number): number {
+  if (tau <= 0) return 0;
+  return KITE_CLIMB * (tau - KITE_CLIMB_EASE * (1 - Math.exp(-tau / KITE_CLIMB_EASE)));
+}
+
+/** Su ritmo de subida en ese momento: la derivada de `kiteRamp`. */
+function kiteRampRate(tau: number): number {
+  return tau <= 0 ? 0 : KITE_CLIMB * (1 - Math.exp(-tau / KITE_CLIMB_EASE));
+}
+
+/**
+ * Cuánto tiene que estar por encima de su altura de crucero para quedar fuera
+ * de cuadro por arriba: del centro de la franja alta al borde superior, más lo
+ * que bajan sus oleajes, su envergadura y un margen. Medido en el punto más
+ * hondo de los círculos, donde el cuadro es más alto.
+ */
+function kiteHide(act: FaunaAct): number {
+  const far = act.depth - KITE_RADIUS_MAX * KITE_DEPTH_SQUASH;
+  return screenBandY(far, 0) - bandCenterY(far, 'alto') + 1 + KITE_SWELL + act.spec.size + 1.5;
+}
+
+/**
+ * El tiempo que tarda la térmica en subirlo (o bajarlo) `kiteHide`: lo que dura
+ * su entrada y su salida.
+ */
+function kiteLeg(act: FaunaAct): number {
+  return kiteHide(act) / KITE_CLIMB + KITE_CLIMB_EASE;
+}
+
+/** Lo que le suma la térmica a su altura en `s`: bajando al entrar, subiendo al salir. */
+function kiteThermal(act: FaunaAct, s: number): number {
+  const leg = kiteLeg(act);
+  return kiteRamp(leg - s) + kiteRamp(s - (act.duration - leg));
+}
+
 /** Espirales lentas del milano, muy arriba y muy al fondo. Nunca aterriza. */
 const planearEnCirculos: Behavior = {
   place: (act, member, s, out) => {
-    const t = s / act.duration;
     const radius = 5 + jitter(act.seed, member, 1) * (KITE_RADIUS_MAX - 5);
     const angle = act.direction * (s * 0.2 + member * 2.1) + act.seed;
 
-    // Entra y sale planeando: el centro de sus círculos llega desde un costado
-    // en el primer 20 % del acto y se va por el otro en el último 20 %. El
-    // margen suma el radio más grande y se mide en el punto más hondo de los
-    // círculos, donde el cuadro es más ancho.
-    const w =
-      offscreenX(act, act.depth - KITE_RADIUS_MAX * KITE_DEPTH_SQUASH, act.spec.size) + KITE_RADIUS_MAX;
-    const center = track(t, [
-      [0, -act.direction * w],
-      [0.2, 0],
-      [0.8, 0],
-      [1, act.direction * w],
-    ]);
+    // Entra y sale **por arriba**, en la térmica: llega bajando en espiral desde
+    // fuera de cuadro y se va subiendo en espiral hasta perderse, que es lo que
+    // hace un milano de verdad. Antes entraba y salía por un costado, y para
+    // cruzar las ~40 u que mide el cuadro a esa distancia en un quinto del acto
+    // iba a 11 u/s: se le veía salir disparado. Subiendo no hay prisa ni fin —la
+    // subida sigue después de su tiempo (`continuesOnItsOwn`)—, y mientras tanto
+    // el viento lo deriva despacio hacia un lado.
+    const center = act.direction * KITE_DRIFT * (s - act.duration / 2);
 
     out.x = center + Math.cos(angle) * radius;
     out.z = act.depth + Math.sin(angle) * radius * KITE_DEPTH_SQUASH;
@@ -258,12 +299,20 @@ const planearEnCirculos: Behavior = {
       1 +
       Math.sin(s * 0.09 + member) * 1.2 +
       Math.sin(s * 0.42 + act.seed) * 0.8 +
-      Math.sin(s * 0.87 + member * 2.1 + act.seed) * 0.25;
+      Math.sin(s * 0.87 + member * 2.1 + act.seed) * 0.25 +
+      kiteThermal(act, s);
   },
-  decorate: (_act, _member, _s, pose) => {
+  decorate: (act, _member, s, pose) => {
     // Casi sin esfuerzo: el tobi planea; los aletazos los pone el cuerpo.
     pose.effort = 0.05;
     pose.airborne = 1;
+
+    // La térmica sube el aire, no el pico: lo que sube por ella no cuenta para
+    // el cabeceo. Si contara, subiría encabritado a 45°.
+    const leg = kiteLeg(act);
+    const thermal = kiteRampRate(s - (act.duration - leg)) - kiteRampRate(leg - s);
+    const rise = pose.speed * Math.sin(pose.pitch) - thermal;
+    pose.pitch = clamp(Math.atan2(rise, pose.speed * Math.cos(pose.pitch)), -0.9, 0.9);
   },
 };
 
@@ -791,6 +840,15 @@ export function extrapolates(behavior: BehaviorName): boolean {
 }
 
 /**
+ * ¿Su conducta ya está escrita más allá de su tiempo? El milano sigue subiendo
+ * en la térmica sin fin: extrapolarlo en línea recta —y encima animándose— lo
+ * sacaba disparado de lado, a 20 u/s.
+ */
+export function continuesOnItsOwn(behavior: BehaviorName): boolean {
+  return behavior === 'planearEnCirculos';
+}
+
+/**
  * ¿Está el acto en el aire? Lo que sólo vuela, siempre; los gorriones que bajan
  * a posarse, sólo al llegar y al irse. Lo usa el ancla que se desliza.
  */
@@ -815,6 +873,10 @@ export function inFlight(act: FaunaAct, seconds: number): boolean {
 export function placeAt(act: FaunaAct, member: number, seconds: number, out: Point): void {
   const behavior = BEHAVIORS[act.behavior];
   const s = Math.max(0, seconds);
+  if (continuesOnItsOwn(act.behavior)) {
+    behavior.place(act, member, s, out);
+    return;
+  }
   if (s <= act.duration || !extrapolates(act.behavior)) {
     behavior.place(act, member, Math.min(s, act.duration), out);
     return;

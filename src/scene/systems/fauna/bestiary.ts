@@ -441,7 +441,7 @@ export function membersFor(
 export function durationFor(behavior: BehaviorName, random: () => number): number {
   const range: Record<BehaviorName, readonly [number, number]> = {
     cruzarVolando: [7, 12],
-    planearEnCirculos: [22, 34],
+    planearEnCirculos: [30, 42],
     visitaAlSuelo: [15, 23],
     // Una garza camina despacio y se para a pescar: es el acto más largo.
     vadear: [50, 58],

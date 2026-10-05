@@ -230,11 +230,14 @@ animal que aún está entrando por un costado no se retira antes de entrar.
    que tiene cuerpo. El crecimiento inicial se queda como red de seguridad:
    la entrada ya ocurre fuera de cuadro.
 3. **Las dos conductas que nunca salían de cuadro**:
-   - **Milano** (`planearEnCirculos`): **entra y sale planeando**. El centro de
-     sus círculos llega desde un costado en el primer 20 % del acto y se va por
-     el otro en el último 20 %, con el radio de los círculos sumado al margen
-     para que empiece y acabe fuera de cuadro. Los círculos, la térmica y la
-     altura no cambian.
+   - **Milano** (`planearEnCirculos`): **entra y sale por arriba, en la
+     térmica**. Llega bajando en espiral desde fuera de cuadro y se va subiendo
+     en espiral hasta perderse, a 1,4 u/s, con una deriva lateral lenta del
+     viento. *(Revisión tras la implementación: la primera versión lo hacía
+     entrar y salir por un costado, y cruzar las ~40 u del cuadro en un quinto
+     del acto le daba 11 u/s —20 u/s con la extrapolación—: se le veía salir
+     disparado.)* La subida sigue después de su tiempo, así que no se
+     extrapola; el cabeceo no cuenta lo que lo sube la térmica. Dura 30–42 s.
    - **Luciérnagas** (`titilar`): son luces. Su presencia sube de 0 a 1 en los
      primeros 2 s y vuelve a 0 en los últimos 2 s: se encienden y se apagan, no
      se encogen. No se extrapolan.

@@ -9,6 +9,7 @@ import { getLenis, ScrollTrigger } from './gsap';
 import {
   createArrivalGate,
   passTramo,
+  readingProgress,
   resetScrollPath,
   SCROLL_PATH,
   tramoCardOpacity,
@@ -112,7 +113,11 @@ export function useJourneyScroll({
       // vacío cuando el contenido cabe en la pantalla.
       end: section ? () => Math.max(1, section.offsetTop - window.innerHeight) : 'max',
       onUpdate: (self) => {
-        SCROLL_PATH.content = unit(self.progress);
+        // Lo leído se mide dentro del rango del contenido: un salto que lo pasa
+        // de largo lo deja en su final, no más allá.
+        const range = self.end - self.start;
+        const scrolled = clamp(self.scroll() - self.start, 0, range);
+        SCROLL_PATH.content = readingProgress(scrolled, range, window.innerHeight);
       },
     });
 

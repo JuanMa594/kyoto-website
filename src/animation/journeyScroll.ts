@@ -3,8 +3,9 @@
  *
  * Cada página de estación tiene dos partes:
  *
- *   · **contenido**: mientras se lee, la cámara avanza sólo `READING_DRIFT`
- *     unidades. Se sigue «en» la estación;
+ *   · **contenido**: mientras se lee, la cámara avanza como mucho
+ *     `READING_DRIFT` unidades, menos si el contenido es corto
+ *     (`readingProgress`). Se sigue «en» la estación;
  *   · **tramo**: la sección del final (`PathTramo`), cuyo scroll lleva la
  *     cámara de la estación a la siguiente con la curva del tramo.
  *
@@ -23,7 +24,7 @@ export const READING_DRIFT = 4;
 
 export interface ScrollPath {
   station: StationSlug | null;
-  /** Progreso del contenido, 0–1. */
+  /** Lo hecho del desvío de lectura, 0–1 (`readingProgress`). */
   content: number;
   /** Progreso del tramo, 0–1, **ya pasado por la curva del tramo**. */
   tramo: number;
@@ -36,6 +37,28 @@ export function resetScrollPath(station: StationSlug): void {
   SCROLL_PATH.station = station;
   SCROLL_PATH.content = 0;
   SCROLL_PATH.tramo = 0;
+}
+
+/**
+ * Cuánto del desvío de lectura lleva hecho la cámara (0–1).
+ *
+ * Antes era el progreso del contenido, tal cual. Con un contenido corto —hoy,
+ * 96 px antes de que asome el tramo— las 4 u cabían en el primer golpe de rueda
+ * y, como el tramo arranca desde velocidad cero, la cámara daba un tirón y casi
+ * se paraba. Dos cambios:
+ *
+ *   · **Con la curva del caminar** (`walkEase`) sobre el contenido: arranca
+ *     parada y llega parada al tramo, que arranca también desde cero. Sin
+ *     escalón de velocidad en ninguno de los dos empalmes.
+ *   · **Tanto desvío como contenido haya**: nada con una pantalla o menos, todo
+ *     desde dos. Así su velocidad nunca pasa de la del caminar: en un contenido
+ *     corto, comprimir las 4 u es el tirón de antes.
+ */
+export function readingProgress(scrolledPx: number, contentPx: number, viewportPx: number): number {
+  const content = Math.max(1, contentPx);
+  const viewport = Math.max(1, viewportPx);
+  const share = clamp((content - viewport) / viewport, 0, 1);
+  return walkEase(unit(scrolledPx / content)) * share;
 }
 
 /** Un NaN o un infinito en la cámara es un cuadro en blanco: se sanea aquí. */

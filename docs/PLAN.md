@@ -362,8 +362,9 @@ un director de casting, no como un reproductor:
   Ubicación lejano;
 - **ningún animal se retira a la vista**: sólo fuera de cuadro, comprobado cada
   frame con la cámara real. Si se le acaba el tiempo a la vista, sigue su
-  camino hasta salir; el milano entra y sale planeando, y las luciérnagas se
-  encienden y se apagan;
+  camino hasta salir; el milano llega bajando en espiral desde arriba y se va
+  subiendo en la térmica hasta perderse (nunca pasa de ~3 u/s), y las
+  luciérnagas se encienden y se apagan;
 - **lo que cruza el camino pasa por encima de las piedras**: el suelo de la
   fauna es lo más alto entre el terreno y las piedras
   (`scene/path/stoneSurface.ts`), ensanchado por la pisada y suavizado en una
@@ -634,5 +635,6 @@ buena medida rellenar contenido sobre una plantilla que ya funciona.
 | Bloom | ⏳ Aplazado de 2B a **2C**. Sobre un fondo washi (`#FFFACD`, luminancia ~0,97) un bloom por umbral ilumina el fondo entero. Entra con las luciérnagas y los faroles, que son lo que de verdad tiene que brillar |
 | Giroscopio en iOS | ⚠️ `DeviceOrientationEvent.requestPermission()` exige un gesto y abre un diálogo del sistema. No se pide al vuelo: el parallax por giro queda listo pero apagado en iOS hasta que haya un interruptor explícito (Fase 2C / 9) |
 | Profundidad del contenido | ⏳ ¿Tarjetas cortas o artículos largos? Define si se usa MDX o datos en TS |
+| Fauna en vertical | ⏳ Fase 3C (móvil). En 9:16 el cuadro es estrecho y los círculos del milano (hasta 8,5 u de radio, más su deriva) se salen por los lados: se le ve el ~36 % de su acto, frente al ~75 % en horizontal (`check:path` lo mide). Habrá que escalar sus círculos —y revisar los márgenes laterales del resto— con el aspecto real |
 | Dominio y hosting | ⏳ Fase 9 |
 | Assets de Canva | ⚠️ Con marca de agua. Sólo referencia, nunca producción |

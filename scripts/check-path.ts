@@ -13,6 +13,7 @@ import {
   createArrivalGate,
   passTramo,
   READING_DRIFT,
+  readingProgress,
   scrollTargetDepth,
   tramoCardOpacity,
   tramoFraction,
@@ -378,6 +379,37 @@ check(
     tramo: Number.POSITIVE_INFINITY,
   }) === STATION_DEPTHS[stationIndex('eventos')],
 );
+
+// Al empezar a bajar, la cámara arranca suave: ningún golpe de rueda avanza
+// mucho más que el siguiente. Con el contenido corto de hoy (96 px antes de que
+// asome el tramo en una pantalla de 739) el desvío de lectura entero cabía en
+// el primer golpe: 4 u de golpe y luego casi parada, porque el tramo arranca
+// desde cero.
+{
+  const VIEWPORT = 739;
+  const WHEEL = 100;
+  let worst = '';
+  for (const contentPx of [0, 96, 300, 739, 3000]) {
+    for (const station of withNext) {
+      const walkVh = tramoWalkVh(station.slug);
+      const cards = station.tramo?.cards.length ?? 0;
+      const tramoPx = (tramoHeightVh(cards, walkVh) / 100) * VIEWPORT;
+      const depthAt = (y: number) =>
+        scrollTargetDepth(station.slug, {
+          station: station.slug,
+          content: readingProgress(Math.min(y, contentPx), contentPx, VIEWPORT),
+          tramo: tramoFraction(Math.max(0, y - contentPx) / tramoPx, cards, walkVh),
+        });
+      const ticks = Array.from({ length: 6 }, (_, k) => depthAt((k + 1) * WHEEL) - depthAt(k * WHEEL));
+      for (let k = 0; k + 1 < ticks.length; k += 1) {
+        if (ticks[k]! > 2 * ticks[k + 1]! + 0.1 && !worst) {
+          worst = `${station.slug} con ${contentPx} px de contenido: golpe ${k + 1} avanza ${ticks[k]!.toFixed(2)} u y el siguiente ${ticks[k + 1]!.toFixed(2)} u`;
+        }
+      }
+    }
+  }
+  check('al empezar a bajar no hay tirón: ningún golpe de rueda avanza mucho más que el siguiente', !worst, worst);
+}
 
 section('El tramo');
 

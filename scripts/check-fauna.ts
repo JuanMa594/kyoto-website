@@ -506,6 +506,52 @@ check(
   `${floating} de ${groundSamples} muestras${firstFloat ? `; ${firstFloat}` : ''}`,
 );
 
+// El milano planea: entra y sale a su ritmo de crucero, nunca a un acelerón.
+// Entraba y salía por un costado recorriendo ~40 u en un quinto del acto, a
+// ~11 u/s frente a ~1,4 u/s en sus círculos: se le veía «salir disparado».
+{
+  const KITE_TOP_SPEED = 3;
+  let fastest = 0;
+  let where = '';
+  for (const { act } of bodies) {
+    if (act.behavior !== 'planearEnCirculos') continue;
+    const pose = createPose();
+    for (const m of members(act)) {
+      for (const seconds of range(0, act.duration + 10, 0.1)) {
+        poseFor(act, m, seconds, pose);
+        if (pose.speed > fastest) {
+          fastest = pose.speed;
+          where = `${label(act)} a los ${seconds.toFixed(1)} s de ${act.duration.toFixed(1)}`;
+        }
+      }
+    }
+  }
+  check(
+    `el milano nunca pasa de ${KITE_TOP_SPEED} u/s, tampoco al entrar y al salir`,
+    fastest <= KITE_TOP_SPEED,
+    `${fastest.toFixed(1)} u/s${where ? `, ${where}` : ''}`,
+  );
+
+  // Entrar y salir por arriba no puede comerse el acto: se le ve dar vueltas.
+  const KITE_MIN_SEEN = 0.5;
+  const leastSeen = ASPECTS.map(() => 1);
+  sweep.forEach(({ act, viewer }, index) => {
+    if (act.behavior !== 'planearEnCirculos') return;
+    // Cada conducta ocupa en el barrido un bloque de aspecto × velocidad × elección.
+    const aspect = Math.floor((index % (ASPECTS.length * 9)) / 9);
+    const samples = range(0, act.duration, 0.25);
+    const seen = samples.filter((seconds) => memberSeen(act, 0, seconds, viewer)).length;
+    leastSeen[aspect] = Math.min(leastSeen[aspect]!, seen / samples.length);
+  });
+  // En vertical sus círculos (hasta 8,5 u de radio) son más anchos que el
+  // cuadro y se le ve menos: es del encuadre móvil, anotado para la Fase 3C.
+  check(
+    `el milano se ve al menos el ${KITE_MIN_SEEN * 100} % de su acto (en horizontal)`,
+    leastSeen.every((share, i) => ASPECTS[i]! < 1 || share >= KITE_MIN_SEEN),
+    ASPECTS.map((aspect, i) => `${aspect.toFixed(2)}: ${(leastSeen[i]! * 100).toFixed(0)} %`).join(' · '),
+  );
+}
+
 // …y pasa **por encima** de las piedras, nunca a través. Sonda independiente:
 // un rayo vertical contra la geometría real de cada piedra (la misma malla que
 // dibuja `StonePath`), en el centro del animal y en un anillo de pisada.
