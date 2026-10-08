@@ -181,10 +181,11 @@ export function track(t: number, keys: readonly (readonly [number, number])[]): 
 /**
  * Margen por el que un animal entra y sale de cuadro sin que se le vea
  * aparecer. Se mide con el aspecto del acto: en una pantalla más ancha que
- * 16:9 el cuadro es más ancho y el margen también.
+ * 16:9 el cuadro es más ancho y el margen también. Quien quiera ajustarse a un
+ * cuadro vertical pasa el aspecto real (`viewAspect`).
  */
-function offscreenX(act: FaunaAct, z: number, size: number): number {
-  return halfWidthAt(z, act.aspect) + 2 + size * 2;
+function offscreenX(act: FaunaAct, z: number, size: number, aspect = act.aspect): number {
+  return halfWidthAt(z, aspect) + 2 + size * 2;
 }
 
 /** Ruido barato y estable por individuo, para que ninguno vaya clavado a otro. */
@@ -487,8 +488,12 @@ const bandada: Behavior = {
  */
 const correrYParar: Behavior = {
   place: (act, member, s, out) => {
-    // El margen de salida cubre también el vaivén lateral de abajo.
-    const w = offscreenX(act, act.depth, act.spec.size) + 0.6;
+    // El margen de salida cubre también el vaivén lateral de abajo. Se mide con
+    // el cuadro real: con el de 16:9, en vertical la ardilla pasaba dos tercios
+    // del acto corriendo fuera de cuadro (Fase 3C). La duración no cambia, así
+    // que en vertical corre más despacio en unidades del mundo —pero cruza la
+    // pantalla, que es lo que se ve, a un ritmo parecido—.
+    const w = offscreenX(act, act.depth, act.spec.size, act.viewAspect) + 0.6;
     const omega = 2 * Math.PI * 0.5;
     const pace = (2 * w) / act.duration;
 

@@ -394,7 +394,8 @@ export const JOURNEY: readonly Station[] = [
       petals: 'baja',
       petalKind: 'sakura',
       wind: 0.15,
-      fauna: ['gato', 'luciernaga', 'tanuki'],
+      // La luciérnaga vuelve con la noche: ámbar sobre washi no se ve (PLAN §11).
+      fauna: ['gato', 'tanuki'],
       faunaDistance: 0.8,
       sounds: ['ciudad', 'arroyo', 'fuego'],
       // Callejón al anochecer: el encuadre se cierra.

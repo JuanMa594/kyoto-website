@@ -77,6 +77,7 @@ import {
 } from '../src/scene/systems/fauna/behaviors';
 import {
   availableSpecies,
+  BESTIARY,
   durationFor,
   isAerial,
   membersFor,
@@ -373,10 +374,18 @@ const SAMPLE_DEPTHS = STATION_DEPTHS.flatMap((d, i) => {
   return next === undefined ? [d] : [d, (d + next) / 2];
 });
 
+// Las especies que ninguna estación reparte hoy (la luciérnaga espera a la
+// noche) se recorren igual, con el ambiente de cada tramo: cuando vuelvan al
+// reparto, sus conductas tienen que seguir cumpliendo todo lo de aquí.
+const castAnywhere = new Set(JOURNEY.flatMap((station) => availableSpecies(station.ambient.fauna)));
+const benched = (Object.keys(BESTIARY) as FaunaKind[]).filter(
+  (kind) => BESTIARY[kind] !== null && !castAnywhere.has(kind),
+);
+
 const sweep: { act: FaunaAct; viewer: Viewer }[] = [];
 for (const d of SAMPLE_DEPTHS) {
   const station = JOURNEY[dominantZone(d)]!;
-  for (const kind of availableSpecies(station.ambient.fauna)) {
+  for (const kind of [...availableSpecies(station.ambient.fauna), ...benched]) {
     const spec = speciesSpec(kind)!;
     for (const behavior of spec.behaviors) {
       for (const aspect of ASPECTS) {
@@ -592,6 +601,14 @@ check(
     shares.set(act.behavior, entry);
   }
   const mean = (values: number[]) => values.reduce((a, b) => a + b, 0) / Math.max(1, values.length);
+  // La ardilla que corre y se para mide sus márgenes con el cuadro real: en
+  // vertical recorría el ancho de un 16:9 y se veía menos de un tercio del acto.
+  const squirrelPortrait = mean(shares.get('correrYParar')?.portrait ?? []);
+  check(
+    'correrYParar se ve al menos el 40 % de su acto en 9:16',
+    squirrelPortrait >= 0.4,
+    `${(squirrelPortrait * 100).toFixed(0)} %`,
+  );
   console.log('\n— Fauna en vertical (informe: fracción del acto a la vista)');
   const weak: string[] = [];
   for (const [behavior, { portrait, landscape }] of shares) {

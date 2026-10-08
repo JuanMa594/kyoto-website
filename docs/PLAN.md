@@ -3,8 +3,8 @@
 > Documento de referencia del proyecto. Consolida las decisiones tomadas en la fase de
 > definición. Si algo cambia, se actualiza aquí y no en la memoria de nadie.
 >
-> Estado: **Fase 3 en curso** — 3A (el mundo), 3B (la fauna en el camino) y 3C (la
-> navegación) implementadas, pendientes de revisión. La Fase 2 está completa (2A motor, 2B ambiente, 2C vida).
+> Estado: **Fase 3 completa** — 3A (el mundo), 3B (la fauna en el camino) y 3C (la
+> navegación) implementadas y revisadas. Siguiente: Fase 4 (Home 京都). La Fase 2 está completa (2A motor, 2B ambiente, 2C vida).
 > El estado vivo de las fases y las convenciones del repo están en `CLAUDE.md`.
 
 ---
@@ -150,7 +150,7 @@ Debe ser **sutil**. Es lo que separa "elegante" de "efecto barato":
 - **Damping ≈ 0.06** — la cámara persigue al cursor con inercia, nunca 1:1
 - Rotación máxima **≈ 2°**, con `lookAt` fijo al centro de interés → se siente como un
   reencuadre suave, no como girar la cabeza
-- En móvil: giroscopio, con la misma amortiguación
+- En móvil: giroscopio, con la misma amortiguación (sólo Android: en iOS pide un permiso del sistema y se descartó, ver §11)
 - Se desactiva con `prefers-reduced-motion`
 
 ### 5.3 El camino
@@ -619,10 +619,10 @@ fase** para revisión antes de seguir.
 | **2A** | · Motor | Lenis + GSAP en un solo RAF · easings leídos de `tokens.css` · `WindField` con ráfagas · parallax de cursor · lectura en `/diagnostico` | ✅ |
 | **2B** | · Ambiente | `PetalSystem` en `InstancedMesh` con la posición calculada en el shader, en tres capas de profundidad · profundidad de campo en tier alto | ✅ |
 | **2C** | · Vida | Los tres rigs de fauna · repertorio de conductas · `FaunaDirector` · motor de audio sintetizado · controles de sonido y modo 静 | ✅ |
-| **3** | **El Camino** | Se parte en tres bloques con parada propia, ver abajo | ⏳ |
-| **3A** | · El mundo | Sendero desde `journey.ts` · terreno continuo · piedras en todo el recorrido · cámara sobre el camino con scroll · tramo y llegada automática · viaje entre estaciones | ✅ pendiente de revisión |
-| **3B** | · La fauna en el camino | Actos anclados al mundo · lo que vuela se adelanta (ancla que se desliza) · nace por delante al caminar · cercanía por estación · márgenes con la cámara real · nunca desaparece a la vista | ✅ pendiente de revisión |
-| **3C** | · La navegación | Sidebar radial (`13.png`) con íconos generados por código · progreso del camino · nav móvil · teclado · transiciones | ✅ pendiente de revisión |
+| **3** | **El Camino** | Se parte en tres bloques con parada propia, ver abajo | ✅ |
+| **3A** | · El mundo | Sendero desde `journey.ts` · terreno continuo · piedras en todo el recorrido · cámara sobre el camino con scroll · tramo y llegada automática · viaje entre estaciones | ✅ |
+| **3B** | · La fauna en el camino | Actos anclados al mundo · lo que vuela se adelanta (ancla que se desliza) · nace por delante al caminar · cercanía por estación · márgenes con la cámara real · nunca desaparece a la vista | ✅ |
+| **3C** | · La navegación | Sidebar radial (`13.png`) con íconos generados por código · progreso del camino · nav móvil · teclado · transiciones | ✅ |
 | **4** | Home 京都 | Torii 3D, bambú, título tipográfico, composición del hero | ⏸ |
 | **5** | Ubicación 位置 | Mapa de Japón extruido e interactivo, zoom a Kyoto · **tramo hacia Eventos**: los dos mapas antiguos, desplegables, **no como tarjetas sino como carteles de madera insertados en el camino** (en 3A son tarjetas provisionales, con el hueco del mapa), junto a la reseña breve de Kyoto | ⏸ |
 | **6** | Lugares | Plantilla + Fushimi Inari, Kiyomizu-dera, Gion · **tramos**: de Eventos a Fushimi, paso por los costados del santuario y subida escalonada —gradas en la malla del terreno— con toriis (`5.png`); de Fushimi a Kiyomizu-dera, un bosque denso de bambú y un puente de madera sobre una pequeña vaguada antes de la plataforma del templo; de Kiyomizu-dera a Gion, la bajada termina en calzadas tradicionales y faroles | ⏸ |
@@ -647,9 +647,10 @@ buena medida rellenar contenido sobre una plantilla que ya funciona.
 | Carpa koi | ⏳ Aplazada hasta que haya agua: un estanque en alguno de los templos o en la home. El koi que había es un asset de Animal Crossing y **no se puede publicar**; se hará uno propio (los peces son el caso de libro de la deformación en el shader) |
 | **Créditos de los modelos** | ⚠️ Garza y gorrión son CC BY: **antes de publicar tiene que existir una sección de créditos visible**. Detalle en `assets/models/LICENSES.md` (Fase 9) |
 | Peso de la fauna | ⏳ ~0,96 MB en total; cada estación sólo carga su elenco. La mariposa se lleva 620 KB (esqueleto de 192 huesos que el simplificador no consigue bajar de 16.000 triángulos), y las posiciones de los modelos estáticos van sin cuantizar para que el shader vea coordenadas reales. Las dos cosas son candidatas a recorte en la Fase 9 |
-| Bloom | ⏳ Aplazado de 2B a **2C**. Sobre un fondo washi (`#FFFACD`, luminancia ~0,97) un bloom por umbral ilumina el fondo entero. Entra con las luciérnagas y los faroles, que son lo que de verdad tiene que brillar |
-| Giroscopio en iOS | ⚠️ `DeviceOrientationEvent.requestPermission()` exige un gesto y abre un diálogo del sistema. No se pide al vuelo: el parallax por giro queda listo pero apagado en iOS hasta que haya un interruptor explícito (Fase 2C / 9) |
+| Bloom y luciérnagas | ⏳ **A la fase de la noche.** Sobre un fondo washi (`#FFFACD`, luminancia ~0,97) un bloom no tiene nada más brillante que el fondo que hacer brillar: o ilumina el fondo entero o no hace nada. Por lo mismo, las luciérnagas (`kohaku`, `#FFD699`) no se veían en Gion, cuyo cielo además se tiñe de ese mismo ámbar, y ocupaban un tercio de sus actos. Se sacaron del reparto de Gion (la especie, su rig y su conducta siguen, y `check:path` las sigue recorriendo); vuelven con la noche, junto con el bloom y los faroles encendidos |
+| La noche | ⏳ Fase posterior, sin número aún. Anochecer según la hora: la de Japón (GMT+9: «ahora mismo en Kyoto es de noche») o la de quien visita. Trae de vuelta las luciérnagas y el bloom |
+| Giroscopio en iOS | ❌ Descartado. Sólo daría el parallax al inclinar un iPhone (en Android ya funciona), y a cambio pediría un botón más en la barra móvil para el diálogo de permiso del sistema. No compensa |
 | Profundidad del contenido | ⏳ ¿Tarjetas cortas o artículos largos? Define si se usa MDX o datos en TS |
-| Fauna en vertical | ⏳ En parte resuelto en la Fase 3C. **El milano**: sus círculos se estrechan con el aspecto real (`kiteFit`, nunca por debajo de la mitad) y en 9:16 se le ve el **75 %** de su acto (antes, 36 %), como en horizontal. **El resto**, medido en `check:path` (9:16 frente a 16:9): vadear 50/89 %, visitaAlSuelo 76/90 %, perseguir 72/86 %, callejear 58/86 %, deambular 50/81 %, y **por debajo del 40 % en vertical: bandada 30/75 %, revolotear 26/67 %, correrYParar 28/83 %**. Cruzan con los márgenes de 16:9 y en un cuadro estrecho se les ve poco. Pendiente de decidir con el usuario (propuesta: márgenes desde el aspecto real y duración del cruce ajustada para conservar la velocidad de la especie) |
+| Fauna en vertical | ✅ Cerrado. **El milano**: sus círculos se estrechan con el aspecto real (`kiteFit`, nunca por debajo de la mitad) y en 9:16 se le ve el **75 %** de su acto (antes, 36 %). **La ardilla que corre y se para** (`correrYParar`) mide sus márgenes con el cuadro real: **65 %** en 9:16 (antes, 28 %); la duración no cambia, así que en vertical corre más despacio en unidades del mundo pero cruza la pantalla a un ritmo parecido. **El resto se queda así**, decidido con el usuario: en móvil ya hay mucho en pantalla y faltan las decoraciones y el contenido (9:16 frente a 16:9: bandada 30/75 %, revolotear 26/67 %, vadear 50/89 %, visitaAlSuelo 76/90 %, perseguir 72/86 %, callejear 58/86 %, deambular 50/81 %) |
 | Dominio y hosting | ⏳ Fase 9 |
 | Assets de Canva | ⚠️ Con marca de agua. Sólo referencia, nunca producción |

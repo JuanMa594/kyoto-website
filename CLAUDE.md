@@ -493,11 +493,11 @@ llega en las fases 4–8 y se cuelga de ese mismo objeto.
 | 1 | Fundación: scaffold, tokens, fuentes, `journey.ts`, store, i18n, `<SceneRoot>` | ✅ |
 | 2A | Motor: Lenis + GSAP, `WindField` con ráfagas, parallax de cursor | ✅ |
 | 2B | Ambiente: pétalos por capas en el shader, profundidad de campo | ✅ |
-| 2C | Vida: rigs de fauna + `FaunaDirector` + audio sintetizado + controles | ✅ pendiente de revisión |
-| 3 | El Camino, en tres bloques: | ⏳ |
-| 3A | · El mundo: sendero, terreno continuo, cámara con scroll, tramo y llegada | ✅ pendiente de revisión |
-| 3B | · La fauna en el camino (anclada al mundo, cercanía por estación) | ✅ pendiente de revisión |
-| 3C | · La navegación (sidebar radial, íconos por código, móvil, teclado) | ✅ pendiente de revisión |
+| 2C | Vida: rigs de fauna + `FaunaDirector` + audio sintetizado + controles | ✅ |
+| 3 | El Camino, en tres bloques: | ✅ |
+| 3A | · El mundo: sendero, terreno continuo, cámara con scroll, tramo y llegada | ✅ |
+| 3B | · La fauna en el camino (anclada al mundo, cercanía por estación) | ✅ |
+| 3C | · La navegación (sidebar radial, íconos por código, móvil, teclado) | ✅ |
 | 4 | Home 京都 | ⏸ |
 | 5 | Ubicación 位置 | ⏸ |
 | 6 | Lugares | ⏸ |

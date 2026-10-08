@@ -64,8 +64,8 @@ export function EnvironmentProbe() {
     //
     //     En iOS haría falta `DeviceOrientationEvent.requestPermission()`, que
     //     exige un gesto y abre un diálogo del sistema. Pedirlo en el primer
-    //     toque sería una ventana emergente sin contexto, así que allí el giro
-    //     queda apagado hasta que haya un interruptor explícito (PLAN §11).
+    //     toque sería una ventana emergente sin contexto, y un botón sólo para
+    //     eso no compensa: en iOS el giro queda apagado, descartado (PLAN §11).
     const orientation = window.DeviceOrientationEvent as unknown as
       | DeviceOrientationConstructor
       | undefined;
