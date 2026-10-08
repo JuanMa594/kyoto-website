@@ -289,5 +289,6 @@ export function createAct(
     anchor: { ...camera.frame },
     spawnD: camera.d,
     aspect: Math.max(camera.aspect, 16 / 9),
+    viewAspect: camera.aspect,
   };
 }

@@ -469,6 +469,29 @@ export function stationHref(station: Station, locale: Locale): string {
   return station.route ? `/${locale}/${station.route}/` : `/${locale}/`;
 }
 
+/**
+ * La misma ruta en otro idioma, absoluta y con la barra final del export
+ * («/lugares/gion» → «/en/lugares/gion/»). Los slugs no se traducen (decidido
+ * en la Fase 3). La usa el cambio de idioma, que es una navegación completa
+ * (ver `LanguageToggle`).
+ */
+export function localeHref(pathname: string, locale: Locale): string {
+  const route = pathname.replace(/^\/+|\/+$/g, '');
+  return route ? `/${locale}/${route}/` : `/${locale}/`;
+}
+
+/**
+ * La estación de una ruta **sin idioma**, como la da el `usePathname` de
+ * `@/i18n/navigation` («/lugares/gion/» → gion). Acepta la barra final del
+ * export. `null` fuera del camino (`/diagnostico`, `/tipografia`). La usa la
+ * navegación para marcar la estación actual ya en el HTML estático, sin
+ * esperar al store (Fase 3C).
+ */
+export function stationFromPathname(pathname: string): Station | null {
+  const route = pathname.replace(/^\/+|\/+$/g, '');
+  return JOURNEY.find((station) => station.route === route) ?? null;
+}
+
 /** Estación anterior y siguiente sobre el camino (flechas y navegación por teclado). */
 export function neighbours(slug: StationSlug): {
   prev: Station | null;

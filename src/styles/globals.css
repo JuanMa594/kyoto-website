@@ -60,6 +60,13 @@
     border-radius: 2px;
   }
 
+  /* El contenido recibe el foco por programa —el «saltar al contenido», el
+     Escape del riel—, pero no es un control: sin anillo alrededor de toda la
+     página. */
+  main[tabindex='-1']:focus {
+    outline: none;
+  }
+
   h1,
   h2,
   h3 {
@@ -81,6 +88,15 @@
 
   .brush {
     font-family: var(--font-brush);
+  }
+
+  /* Texto latino corto de la navegación (ES/EN): en la letra de titulares,
+     no en la de pincel, que por debajo de 1,2rem no se lee. */
+  .nav-latin {
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+    line-height: 1;
+    letter-spacing: 0.06em;
   }
 
   /* Superficie de papel washi para tarjetas y paneles de UI. */
@@ -165,8 +181,10 @@
     left: 6vw;
   }
 
+  /* Nunca debajo del riel plegado de la navegación (Fase 3C): 6vw son 61 px a
+     1024 px de ancho. */
   .tramo-card[data-side='derecha'] {
-    right: 6vw;
+    right: max(6vw, 4.5rem);
   }
 
   /* El hueco del mapa antiguo desplegable, que llega en la Fase 5. */
@@ -226,6 +244,421 @@
   .content-arrival[data-arrival='pending'] {
     opacity: 0;
     translate: 0 0.75rem;
+  }
+
+  /* ── La navegación (Fase 3C) ───────────────────────────────────────────
+     El riel de escritorio: siete paradas sobre un arco pegado al borde
+     derecho. Aquí vive la geometría en reposo —plegado—; el despliegue
+     (`--bulge`, la escala de los círculos) lo anima `RadialSidebar`. Las
+     paradas están en `top: t · 100 %` y se separan del borde `bulge · bend`. */
+  .rail {
+    --bulge: 8px;
+    --circle: clamp(44px, 7vh, 56px);
+    position: fixed;
+    top: 50%;
+    right: 2.25rem;
+    z-index: 40;
+    width: 0;
+    height: min(64vh, 560px);
+    translate: 0 -50%;
+  }
+
+  .rail__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .rail__stop {
+    --glow: 0;
+    position: absolute;
+    top: calc(var(--t) * 100%);
+    right: 0;
+    translate: calc(var(--bulge) * var(--bend) * -1) 0;
+  }
+
+  .rail__link {
+    position: absolute;
+    top: calc(var(--circle) / -2);
+    left: calc(var(--circle) / -2);
+    display: grid;
+    width: var(--circle);
+    height: var(--circle);
+    place-items: center;
+    border-radius: 9999px;
+  }
+
+  .rail__link:focus-visible {
+    outline-offset: 3px;
+    border-radius: 9999px;
+  }
+
+  .rail__circle {
+    position: absolute;
+    inset: 0;
+    transform: scale(0.2);
+  }
+
+  .rail__stone {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    filter: drop-shadow(0 0 calc(var(--glow) * 30px) var(--accent));
+  }
+
+  .rail__stone path {
+    fill: transparent;
+    stroke: var(--color-sumi-faint);
+    stroke-width: 0.22;
+  }
+
+  .rail__stop[data-walked] .rail__stone path {
+    fill: var(--accent);
+    stroke: var(--accent);
+  }
+
+  .rail__face {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    border: 1px solid color-mix(in srgb, var(--color-sumi) 22%, transparent);
+    border-radius: 9999px;
+    background: var(--halo);
+    box-shadow: var(--shadow-paper);
+    opacity: 0;
+  }
+
+  .rail__link[aria-current='page'] .rail__face {
+    box-shadow:
+      0 0 0 2px var(--accent),
+      var(--shadow-paper);
+  }
+
+  .rail__icon {
+    width: 76%;
+    height: 76%;
+    overflow: visible;
+  }
+
+  .rail__home {
+    font-family: var(--font-kanji);
+    font-size: 1rem;
+    line-height: 1;
+    letter-spacing: 0.1em;
+    color: var(--color-shu);
+    writing-mode: vertical-rl;
+    filter: drop-shadow(0 0 calc(var(--glow) * 8px) var(--accent));
+  }
+
+  .rail__label {
+    position: absolute;
+    top: 50%;
+    right: calc(100% + 0.75rem);
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.35rem 0.8rem;
+    white-space: nowrap;
+    border: 1px solid var(--border-hairline);
+    border-radius: 0.6rem;
+    background: color-mix(in srgb, var(--surface-paper) 78%, transparent);
+    backdrop-filter: blur(6px);
+    box-shadow: var(--shadow-paper);
+    opacity: 0;
+    pointer-events: none;
+    translate: 0.5rem -50%;
+    transition:
+      opacity var(--dur-rapido) var(--ease-washi),
+      translate var(--dur-rapido) var(--ease-washi);
+  }
+
+  .rail[data-open] .rail__link:hover .rail__label,
+  .rail[data-open] .rail__link:focus-visible .rail__label {
+    opacity: 1;
+    translate: 0 -50%;
+  }
+
+  .rail__label-kanji {
+    font-family: var(--font-kanji);
+    font-size: 1.1rem;
+    color: var(--accent);
+  }
+
+  .rail__label-name {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+  }
+
+  .rail__line {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 0;
+    height: 0;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .rail__line path {
+    fill: none;
+    stroke: var(--color-sumi-faint);
+    stroke-width: 1;
+    stroke-dasharray: 2 5;
+    opacity: 0.7;
+  }
+
+  .rail__marker {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    width: 10px;
+    height: 10px;
+    border: 2px solid var(--color-shu);
+    border-radius: 9999px;
+    background: var(--color-washi);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-shu) 18%, transparent);
+    pointer-events: none;
+    will-change: transform;
+  }
+
+  /* Antes de que el ticker arranque, la marca está en la estación del HTML. */
+  .rail__marker:not([data-live]) {
+    top: calc(var(--s0) / 6 * 100% - 5px);
+  }
+
+  /* La navegación móvil: una píldora flotante con el riel en horizontal y los
+     mandos; al tocarla, el abanico. Fuera del corte de móvil no se ve. */
+  .mnav {
+    display: none;
+  }
+
+  .mnav__bar {
+    position: fixed;
+    right: 0.75rem;
+    bottom: calc(0.75rem + env(safe-area-inset-bottom));
+    left: 0.75rem;
+    z-index: 40;
+    display: flex;
+    height: 52px;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 0.25rem 0 0.75rem;
+    border: 1px solid var(--border-hairline);
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--surface-paper) 78%, transparent);
+    backdrop-filter: blur(6px);
+    box-shadow: var(--shadow-paper);
+  }
+
+  .mnav__toggle {
+    display: flex;
+    height: 44px;
+    min-width: 0;
+    flex: 1;
+    align-items: center;
+    padding: 0 0.6rem;
+    border-radius: 9999px;
+  }
+
+  .mnav__track {
+    position: relative;
+    height: 100%;
+    flex: 1;
+  }
+
+  .mnav__track::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: 0;
+    left: 0;
+    border-top: 1px dashed var(--color-sumi-faint);
+    opacity: 0.7;
+  }
+
+  .mnav__stone {
+    position: absolute;
+    top: 50%;
+    left: calc(var(--t) * 100%);
+    width: 12px;
+    height: 12px;
+    translate: -50% -50%;
+  }
+
+  .mnav__stone svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .mnav__stone path {
+    fill: var(--color-washi);
+    stroke: var(--color-sumi-faint);
+    stroke-width: 0.22;
+  }
+
+  .mnav__stone[data-walked] path {
+    fill: var(--accent);
+    stroke: var(--accent);
+  }
+
+  .mnav__stone--home {
+    width: auto;
+    height: auto;
+    padding: 0 0.15rem;
+    font-family: var(--font-kanji);
+    font-size: 1rem;
+    line-height: 1;
+    color: var(--color-shu);
+    background: color-mix(in srgb, var(--surface-paper) 78%, transparent);
+  }
+
+  .mnav__marker {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 10px;
+    height: 10px;
+    margin: -5px 0 0 -5px;
+    border: 2px solid var(--color-shu);
+    border-radius: 9999px;
+    background: var(--color-washi);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-shu) 18%, transparent);
+    pointer-events: none;
+    will-change: transform;
+  }
+
+  .mnav__marker:not([data-live]) {
+    left: calc(var(--s0) / 6 * 100%);
+  }
+
+  .mnav__fan {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+  }
+
+  .mnav__fan[hidden] {
+    display: none;
+  }
+
+  .mnav__veil {
+    position: absolute;
+    inset: 0;
+    background: color-mix(in srgb, var(--color-washi) 60%, transparent);
+    backdrop-filter: blur(3px);
+  }
+
+  .mnav__arc {
+    position: absolute;
+    bottom: calc(6rem + env(safe-area-inset-bottom));
+    left: 50%;
+    width: 0;
+    height: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .mnav__item {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+
+  .mnav__link {
+    position: absolute;
+    top: -26px;
+    left: -26px;
+    display: flex;
+    width: 52px;
+    flex-direction: column;
+    align-items: center;
+    border-radius: 1rem;
+  }
+
+  .mnav__face,
+  .mnav__hub {
+    position: relative;
+    display: grid;
+    width: 52px;
+    height: 52px;
+    place-items: center;
+    border-radius: 9999px;
+  }
+
+  .mnav__face {
+    border: 1px solid color-mix(in srgb, var(--color-sumi) 22%, transparent);
+    background: var(--halo);
+    box-shadow: var(--shadow-paper);
+  }
+
+  .mnav__hub {
+    font-family: var(--font-kanji);
+    font-size: 1.3rem;
+    color: var(--color-shu);
+  }
+
+  .mnav__link[aria-current='page'] .mnav__face {
+    box-shadow:
+      0 0 0 2px var(--accent),
+      var(--shadow-paper);
+  }
+
+  .mnav__icon {
+    width: 76%;
+    height: 76%;
+    overflow: visible;
+  }
+
+  .mnav__name {
+    max-width: 5.5rem;
+    margin-top: 0.3rem;
+    font-family: var(--font-display);
+    font-size: 0.8rem;
+    line-height: 1.1;
+    text-align: center;
+  }
+
+  .mnav__kanji {
+    position: absolute;
+    bottom: calc(100% + 0.3rem);
+    font-family: var(--font-kanji);
+    font-size: 1.1rem;
+    white-space: nowrap;
+    color: var(--accent);
+    opacity: 0;
+    transition: opacity var(--dur-rapido) var(--ease-washi);
+  }
+
+  .mnav__kanji[data-shown] {
+    opacity: 1;
+  }
+
+  /* Con el abanico abierto la página no se mueve debajo. */
+  .nav-locked {
+    overflow: hidden;
+  }
+}
+
+/* Navegación móvil: pantallas estrechas y táctiles sin hover. El mismo corte
+   vive en `components/nav/navQuery.ts`: si cambia aquí, cambia allí. */
+@media (max-width: 767px), (hover: none) and (pointer: coarse) {
+  .rail,
+  .ambient-corner {
+    display: none;
+  }
+
+  .mnav {
+    display: block;
+  }
+
+  /* Que lo último de la página nunca quede debajo de la barra flotante. */
+  body {
+    padding-bottom: calc(52px + 2.25rem + env(safe-area-inset-bottom));
   }
 }
 

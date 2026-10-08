@@ -23,3 +23,7 @@ Thumbs.db
 # más de 100. Se versionan las versiones optimizadas de public/models/, que es
 # lo que produce `bun run models`.
 /assets/models/source/
+
+# fuente de Natural Earth para el ícono de Ubicación (~3 MB): la descarga
+# `bun run geo`, y lo que se versiona es icons/japan.generated.ts.
+/assets/geo/source/

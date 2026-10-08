@@ -68,6 +68,7 @@ import {
 } from '../src/scene/systems/fauna/anchoring';
 import {
   createPose,
+  kiteFit,
   OVERTIME_FADE,
   OVERTIME_LIMIT,
   placeAt,
@@ -154,6 +155,7 @@ function buildAct(
     anchor: { ...rig.frame },
     spawnD: d,
     aspect: Math.max(aspect, 16 / 9),
+    viewAspect: aspect,
   };
   return { act, viewer };
 }
@@ -437,14 +439,31 @@ const gap = (act: FaunaAct, member: number, a: number, b: number) => {
   return Math.hypot(Q.x - P.x, Q.z - P.z);
 };
 
+// Salir de cuadro es en cualquier dirección, así que se mide en 3D: el milano
+// sale **por arriba**, subiendo en la térmica, y en vertical (Fase 3C), con
+// los círculos estrechados, apenas se desplaza en el plano.
+const exitGap = (act: FaunaAct, member: number, a: number, b: number) => {
+  placeAt(act, member, a, P);
+  placeAt(act, member, b, Q);
+  return Math.hypot(Q.x - P.x, Q.y - P.y, Q.z - P.z);
+};
 let slowestExit = Infinity;
+let slowestWho = '';
 for (const { act } of bodies) {
   for (const m of members(act)) {
     const span = act.duration * 0.15;
-    slowestExit = Math.min(slowestExit, gap(act, m, act.duration - span, act.duration) / span);
+    const speed = exitGap(act, m, act.duration - span, act.duration) / span;
+    if (speed < slowestExit) {
+      slowestExit = speed;
+      slowestWho = `${label(act)}, aspecto ${act.viewAspect.toFixed(2)}`;
+    }
   }
 }
-check('todo lo que sale de cuadro sale a más de 0,3 u/s', slowestExit > 0.3, `mín ${slowestExit.toFixed(2)} u/s`);
+check(
+  'todo lo que sale de cuadro sale a más de 0,3 u/s',
+  slowestExit > 0.3,
+  `mín ${slowestExit.toFixed(2)} u/s: ${slowestWho}`,
+);
 check(
   'más allá de su tiempo sigue su camino: sin salto en el empalme y sin pararse',
   bodies.every(({ act }) =>
@@ -533,22 +552,57 @@ check(
   );
 
   // Entrar y salir por arriba no puede comerse el acto: se le ve dar vueltas.
+  // También en vertical: sus círculos se ajustan al cuadro real (Fase 3C).
   const KITE_MIN_SEEN = 0.5;
   const leastSeen = ASPECTS.map(() => 1);
-  sweep.forEach(({ act, viewer }, index) => {
-    if (act.behavior !== 'planearEnCirculos') return;
-    // Cada conducta ocupa en el barrido un bloque de aspecto × velocidad × elección.
-    const aspect = Math.floor((index % (ASPECTS.length * 9)) / 9);
+  for (const { act, viewer } of sweep) {
+    if (act.behavior !== 'planearEnCirculos') continue;
+    const aspect = ASPECTS.indexOf(act.viewAspect);
     const samples = range(0, act.duration, 0.25);
     const seen = samples.filter((seconds) => memberSeen(act, 0, seconds, viewer)).length;
     leastSeen[aspect] = Math.min(leastSeen[aspect]!, seen / samples.length);
-  });
-  // En vertical sus círculos (hasta 8,5 u de radio) son más anchos que el
-  // cuadro y se le ve menos: es del encuadre móvil, anotado para la Fase 3C.
+  }
   check(
-    `el milano se ve al menos el ${KITE_MIN_SEEN * 100} % de su acto (en horizontal)`,
-    leastSeen.every((share, i) => ASPECTS[i]! < 1 || share >= KITE_MIN_SEEN),
+    `el milano se ve al menos el ${KITE_MIN_SEEN * 100} % de su acto, también en vertical`,
+    leastSeen.every((share) => share >= KITE_MIN_SEEN),
     ASPECTS.map((aspect, i) => `${aspect.toFixed(2)}: ${(leastSeen[i]! * 100).toFixed(0)} %`).join(' · '),
+  );
+  check(
+    'sus círculos se estrechan con el cuadro, sin bajar de la mitad',
+    kiteFit(9 / 16) === 0.5 &&
+      kiteFit(16 / 9) === 1 &&
+      kiteFit(21 / 9) === 1 &&
+      Math.abs(kiteFit(4 / 3) - 0.75) < 1e-12,
+  );
+}
+
+// Fauna en vertical: qué fracción de su acto se ve cada conducta en 9:16 y en
+// 16:9. No falla: es la línea base de la Fase 3C. Si alguna queda por debajo
+// del 40 % en vertical, se le enseña al usuario antes de tocarla (spec §8.2).
+{
+  const PORTRAIT_FLOOR = 0.4;
+  const shares = new Map<string, { portrait: number[]; landscape: number[] }>();
+  for (const { act, viewer } of bodies) {
+    const key = act.viewAspect === 9 / 16 ? 'portrait' : act.viewAspect === 16 / 9 ? 'landscape' : null;
+    if (!key) continue;
+    const samples = range(0, act.duration, 0.5);
+    const seen = samples.filter((s) => members(act).some((m) => memberSeen(act, m, s, viewer))).length;
+    const entry = shares.get(act.behavior) ?? { portrait: [], landscape: [] };
+    entry[key].push(seen / samples.length);
+    shares.set(act.behavior, entry);
+  }
+  const mean = (values: number[]) => values.reduce((a, b) => a + b, 0) / Math.max(1, values.length);
+  console.log('\n— Fauna en vertical (informe: fracción del acto a la vista)');
+  const weak: string[] = [];
+  for (const [behavior, { portrait, landscape }] of shares) {
+    const p = mean(portrait);
+    console.log(`  ${behavior}: 9:16 ${(p * 100).toFixed(0)} % · 16:9 ${(mean(landscape) * 100).toFixed(0)} %`);
+    if (p < PORTRAIT_FLOOR) weak.push(behavior);
+  }
+  console.log(
+    weak.length > 0
+      ? `  ⚠ por debajo del ${PORTRAIT_FLOOR * 100} % en 9:16: ${weak.join(', ')} — revisar con el usuario antes de tocarlas`
+      : `  ✓ ninguna conducta por debajo del ${PORTRAIT_FLOOR * 100} % en 9:16`,
   );
 }
 

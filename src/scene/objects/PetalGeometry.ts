@@ -10,17 +10,15 @@
  * escala —entre 0,17 y 0,3 unidades— el color y el contorno es todo lo que se
  * ve: el pétalo de cerezo con su muesca en la punta, el arce de cinco lóbulos y
  * la hoja lanceolada del bambú.
+ *
+ * Los contornos viven en `lib/petalOutlines.ts`: el ícono de Eventos del
+ * sidebar los comparte sin cargar three (Fase 3C).
  */
 
 import { BufferGeometry, Float32BufferAttribute } from 'three';
 
 import type { PetalKind } from '@/config/journey';
-import { smoothstep } from '@/lib/procedural';
-
-interface Point {
-  x: number;
-  y: number;
-}
+import { bambuOutline, momijiOutline, sakuraOutline, type OutlinePoint } from '@/lib/petalOutlines';
 
 /**
  * Triangula un contorno cerrado en abanico desde su centro y le da una
@@ -32,7 +30,7 @@ interface Point {
  * La malla se normaliza para que su lado mayor mida 1, de modo que la escala de
  * cada capa (`PetalLayer.scale`) se lea directamente en unidades de mundo.
  */
-function fanFromOutline(outline: readonly Point[], cup: number, sizeFactor: number): BufferGeometry {
+function fanFromOutline(outline: readonly OutlinePoint[], cup: number, sizeFactor: number): BufferGeometry {
   const ys = outline.map((p) => p.y);
   const xs = outline.map((p) => p.x);
   const midY = (Math.min(...ys) + Math.max(...ys)) / 2;
@@ -65,78 +63,6 @@ function fanFromOutline(outline: readonly Point[], cup: number, sizeFactor: numb
   geometry.computeVertexNormals();
 
   return geometry;
-}
-
-/** Cierra un contorno simétrico a partir de su mitad derecha. */
-function mirrorHalf(half: readonly Point[]): Point[] {
-  const outline = [...half];
-  for (let i = half.length - 2; i >= 1; i -= 1) {
-    const point = half[i]!;
-    outline.push({ x: -point.x, y: point.y });
-  }
-  return outline;
-}
-
-const SEGMENTS = 14;
-
-/**
- * Pétalo de cerezo. La clave está en la muesca: el borde sube por los dos
- * lóbulos y **baja** al llegar al centro. Sin ese hundimiento la silueta es una
- * lágrima y podría ser cualquier cosa.
- */
-function sakuraOutline(): Point[] {
-  const width = 0.42;
-  const notch = 0.34;
-
-  const half: Point[] = [];
-  for (let i = 0; i <= SEGMENTS; i += 1) {
-    const u = i / SEGMENTS;
-    half.push({
-      x: width * Math.sin(Math.PI * u) ** 0.55,
-      y: u ** 0.9 - notch * smoothstep(0.72, 1, u),
-    });
-  }
-
-  return mirrorHalf(half);
-}
-
-/**
- * Hoja de arce. Cinco lóbulos en coordenadas polares: `|cos(2.5θ)|` tiene
- * exactamente cinco máximos en una vuelta, y el exponente los afila.
- */
-function momijiOutline(): Point[] {
-  const points: Point[] = [];
-  const steps = 60;
-
-  for (let i = 0; i < steps; i += 1) {
-    // El desfase deja un lóbulo apuntando hacia arriba.
-    const angle = (i / steps) * Math.PI * 2 + Math.PI / 2;
-    const lobes = Math.abs(Math.cos(2.5 * (angle - Math.PI / 2)));
-    const radius = 0.5 * (0.42 + 0.58 * lobes ** 0.4);
-    points.push({ x: Math.cos(angle) * radius, y: Math.sin(angle) * radius });
-  }
-
-  return points;
-}
-
-/** Hoja de bambú: lanceolada, larga y con una curva suave hacia un lado. */
-function bambuOutline(): Point[] {
-  const width = 0.16;
-  const bend = 0.14;
-
-  const half: Point[] = [];
-  for (let i = 0; i <= SEGMENTS; i += 1) {
-    const u = i / SEGMENTS;
-    half.push({ x: bend * u * u + width * Math.sin(Math.PI * u) ** 0.8, y: u });
-  }
-
-  const outline = [...half];
-  for (let i = SEGMENTS - 1; i >= 1; i -= 1) {
-    const u = i / SEGMENTS;
-    outline.push({ x: bend * u * u - width * Math.sin(Math.PI * u) ** 0.8, y: u });
-  }
-
-  return outline;
 }
 
 /**

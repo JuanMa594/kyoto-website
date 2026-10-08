@@ -1,7 +1,6 @@
 import { getTranslations } from 'next-intl/server';
 
 import { ActiveStation } from '@/components/ActiveStation';
-import { StationLinks } from '@/components/nav/StationLinks';
 import { ContentArrival } from '@/components/sections/ContentArrival';
 import { PathTramo } from '@/components/sections/PathTramo';
 import { getStation } from '@/config/journey';
@@ -27,7 +26,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       <ActiveStation slug="inicio" />
 
       <ContentArrival key="inicio">
-        <main id="contenido" className="mx-auto min-h-dvh max-w-6xl px-6 py-[14vh]">
+        <main id="contenido" tabIndex={-1} className="mx-auto min-h-dvh max-w-6xl px-6 py-[14vh]">
           <p className="brush tracking-[0.3em] uppercase opacity-60">{t('eyebrow')}</p>
 
           {/* El título y el kanji son el otro protagonista del cuadro, junto al
@@ -51,8 +50,6 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           <p className="paper mt-10 inline-block px-4 py-3 opacity-80">
             <strong>{scaffold('phase')}</strong> — {scaffold('sceneLabel')}
           </p>
-
-          <StationLinks locale={locale} current="inicio" />
         </main>
       </ContentArrival>
 

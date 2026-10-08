@@ -3,8 +3,8 @@
 > Documento de referencia del proyecto. Consolida las decisiones tomadas en la fase de
 > definición. Si algo cambia, se actualiza aquí y no en la memoria de nadie.
 >
-> Estado: **Fase 3 en curso** — 3A (el mundo) y 3B (la fauna en el camino) implementadas,
-> pendientes de revisión; 3C se diseña al llegar a ella. La Fase 2 está completa (2A motor, 2B ambiente, 2C vida).
+> Estado: **Fase 3 en curso** — 3A (el mundo), 3B (la fauna en el camino) y 3C (la
+> navegación) implementadas, pendientes de revisión. La Fase 2 está completa (2A motor, 2B ambiente, 2C vida).
 > El estado vivo de las fases y las convenciones del repo están en `CLAUDE.md`.
 
 ---
@@ -195,6 +195,21 @@ sigue siendo el orquestador de las transiciones del viaje y de ScrollTrigger.
 Panel lateral con los 6 íconos circulares, que se despliega al acercar el cursor al borde.
 Al hover, cada círculo hace un pulso *spring* y revela su kanji. En móvil se convierte en
 una barra inferior o un gesto.
+
+**Cómo está hecho (Fase 3C).** En escritorio, un **riel de piedras** en el borde
+derecho: siete paradas —京都 y las seis estaciones— equiespaciadas sobre un arco.
+Plegado es un camino de piedrecitas con la marca «tú», que sigue a la cámara
+(lee `PATH.d` desde `gsap.ticker`, fuera de React): en un salto se la ve
+recorrer el riel y cada estación por la que pasa destella. Al acercar el cursor
+al borde, o con el foco de teclado, se despliega en los seis círculos de
+`13.png`, con un pulso *spring*, el kanji y una microanimación por ícono. Los
+íconos son **geometría calculada** (`components/nav/icons/`): Japón sale de
+Natural Earth (`bun run geo`), la sakura del mismo pétalo que cae en la escena,
+y el torii, la pagoda, el farol y el naruto, de sus proporciones. En móvil, y
+en cualquier pantalla táctil sin hover, una **barra flotante** con el riel en
+horizontal y los mandos; al tocarla, un **abanico** modal que se cierra al
+elegir, con el velo, Escape o «atrás». Cada estación tiene su `<title>`
+(«Ubicación · Kyoto»). Detalle: `docs/superpowers/specs/2026-10-05-fase-3c-la-navegacion-design.md`.
 
 ### 5.5 Ambiente
 
@@ -607,7 +622,7 @@ fase** para revisión antes de seguir.
 | **3** | **El Camino** | Se parte en tres bloques con parada propia, ver abajo | ⏳ |
 | **3A** | · El mundo | Sendero desde `journey.ts` · terreno continuo · piedras en todo el recorrido · cámara sobre el camino con scroll · tramo y llegada automática · viaje entre estaciones | ✅ pendiente de revisión |
 | **3B** | · La fauna en el camino | Actos anclados al mundo · lo que vuela se adelanta (ancla que se desliza) · nace por delante al caminar · cercanía por estación · márgenes con la cámara real · nunca desaparece a la vista | ✅ pendiente de revisión |
-| **3C** | · La navegación | Sidebar radial (`13.png`) con íconos generados por código · progreso del camino · nav móvil · teclado · transiciones | ⏸ |
+| **3C** | · La navegación | Sidebar radial (`13.png`) con íconos generados por código · progreso del camino · nav móvil · teclado · transiciones | ✅ pendiente de revisión |
 | **4** | Home 京都 | Torii 3D, bambú, título tipográfico, composición del hero | ⏸ |
 | **5** | Ubicación 位置 | Mapa de Japón extruido e interactivo, zoom a Kyoto · **tramo hacia Eventos**: los dos mapas antiguos, desplegables, **no como tarjetas sino como carteles de madera insertados en el camino** (en 3A son tarjetas provisionales, con el hueco del mapa), junto a la reseña breve de Kyoto | ⏸ |
 | **6** | Lugares | Plantilla + Fushimi Inari, Kiyomizu-dera, Gion · **tramos**: de Eventos a Fushimi, paso por los costados del santuario y subida escalonada —gradas en la malla del terreno— con toriis (`5.png`); de Fushimi a Kiyomizu-dera, un bosque denso de bambú y un puente de madera sobre una pequeña vaguada antes de la plataforma del templo; de Kiyomizu-dera a Gion, la bajada termina en calzadas tradicionales y faroles | ⏸ |
@@ -635,6 +650,6 @@ buena medida rellenar contenido sobre una plantilla que ya funciona.
 | Bloom | ⏳ Aplazado de 2B a **2C**. Sobre un fondo washi (`#FFFACD`, luminancia ~0,97) un bloom por umbral ilumina el fondo entero. Entra con las luciérnagas y los faroles, que son lo que de verdad tiene que brillar |
 | Giroscopio en iOS | ⚠️ `DeviceOrientationEvent.requestPermission()` exige un gesto y abre un diálogo del sistema. No se pide al vuelo: el parallax por giro queda listo pero apagado en iOS hasta que haya un interruptor explícito (Fase 2C / 9) |
 | Profundidad del contenido | ⏳ ¿Tarjetas cortas o artículos largos? Define si se usa MDX o datos en TS |
-| Fauna en vertical | ⏳ Fase 3C (móvil). En 9:16 el cuadro es estrecho y los círculos del milano (hasta 8,5 u de radio, más su deriva) se salen por los lados: se le ve el ~36 % de su acto, frente al ~75 % en horizontal (`check:path` lo mide). Habrá que escalar sus círculos —y revisar los márgenes laterales del resto— con el aspecto real |
+| Fauna en vertical | ⏳ En parte resuelto en la Fase 3C. **El milano**: sus círculos se estrechan con el aspecto real (`kiteFit`, nunca por debajo de la mitad) y en 9:16 se le ve el **75 %** de su acto (antes, 36 %), como en horizontal. **El resto**, medido en `check:path` (9:16 frente a 16:9): vadear 50/89 %, visitaAlSuelo 76/90 %, perseguir 72/86 %, callejear 58/86 %, deambular 50/81 %, y **por debajo del 40 % en vertical: bandada 30/75 %, revolotear 26/67 %, correrYParar 28/83 %**. Cruzan con los márgenes de 16:9 y en un cuadro estrecho se les ve poco. Pendiente de decidir con el usuario (propuesta: márgenes desde el aspecto real y duración del cruce ajustada para conservar la velocidad de la especie) |
 | Dominio y hosting | ⏳ Fase 9 |
 | Assets de Canva | ⚠️ Con marca de agua. Sólo referencia, nunca producción |

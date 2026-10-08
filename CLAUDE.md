@@ -36,8 +36,9 @@ bun run preview      # sirve out/ como lo haría el hosting
 bun run typecheck    # tsc --noEmit
 bun run fonts        # regenera los .woff2 subseteados
 bun run models       # assets/models/source → public/models (fauna optimizada)
+bun run geo          # Natural Earth → icons/japan.generated.ts (Japón del ícono)
 bun run palette      # muestrea los colores de docs/referencias/*.png
-bun run check:path   # comprobaciones puras del camino, el terreno, la cámara, el scroll y la fauna
+bun run check:path   # comprobaciones puras del camino, el terreno, la cámara, el scroll, la fauna y la navegación
 ```
 
 En desarrollo, **`?fauna=<especie>`** en cualquier página (`/es/ubicacion?fauna=libelula`)
@@ -124,6 +125,13 @@ src/
 │   ├─ camera/pathRig.ts       ← ★ el encuadre sobre el camino, topes anti-mareo (puro)
 │   ├─ camera/CameraRig.tsx    ← único escritor de `PATH` + parallax de cursor
 ├─ store/useKyotoStore.ts      ← Zustand: estación, zona, calidad, a11y, audio, cursor
+├─ components/nav/             ← ★ la navegación (Fase 3C)
+│   ├─ JourneyNav.tsx          ← persistente en el layout; estación actual desde la URL
+│   ├─ RadialSidebar.tsx       ← el riel de piedras del escritorio
+│   ├─ MobileNav.tsx           ← la barra y el abanico
+│   ├─ railProgress.ts         ← profundidad → riel, barra y abanico (puro)
+│   ├─ useRailProgress.ts      ← la marca «tú», desde gsap.ticker (fuera de React)
+│   └─ icons/                  ← los seis íconos calculados + sus microanimaciones
 ├─ components/sections/        ← StationShell, PathTramo (el tramo), ContentArrival
 ├─ i18n/                       ← routing, request, navigation, params
 ├─ messages/{es,en}.json       ← textos
@@ -136,8 +144,8 @@ src/
 └─ lib/procedural.ts           ← PRNG, ruido direccional, damping
 ```
 
-Fuera de `src/`: `scripts/` (pipelines de fuentes, paleta y modelos) y
-`assets/` (originales). Los modelos originales de `assets/models/source/` **no
+Fuera de `src/`: `scripts/` (pipelines de fuentes, paleta, modelos y el Japón
+del ícono de Ubicación) y `assets/` (originales). Los modelos originales de `assets/models/source/` **no
 se versionan** —la garza pesa 127 MB y GitHub no acepta más de 100—; sí se
 versionan los optimizados de `public/models/`. Créditos y licencias en
 `assets/models/LICENSES.md`.
@@ -170,6 +178,11 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
 - Los enlaces internos usan el `<Link>` de `@/i18n/navigation` con rutas **sin
   idioma** (`stationPath(station)`). El de `next/link` saca a la persona del
   idioma activo.
+- **La navegación lee la cámara, no la ruta.** `JourneyNav` vive en el layout
+  y no se desmonta; la estación actual sale de la URL (`stationFromPathname`)
+  para que `aria-current` sea correcto en el HTML estático, y la marca del
+  riel la mueve un callback de `gsap.ticker` que lee `PATH.d` (con
+  `PATH.live` falso, sin WebGL, se queda en la estación de la URL).
 
 ---
 
@@ -404,6 +417,29 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   (si no, subir un canto es un salto de 0,2 u en un frame). Se ensancha más de
   lo que se suaviza, para que nunca quede por debajo de la piedra. Todo objeto
   sólido que se plante donde anda la fauna tendrá que entrar en ese suelo.
+- **Cambiar de idioma es una navegación completa, no un `<Link>`.** Cambiar
+  `[locale]` monta de nuevo su layout y con él el `<Canvas>`, y R3F tarda
+  500 ms en liberar el contexto WebGL del canvas desmontado: con una
+  navegación de cliente el viejo y el nuevo convivían medio segundo (regla
+  dura 3), aunque en el DOM sólo se viera un `<canvas>`. `LanguageToggle` usa
+  un `<a>` normal (`localeHref`), y la página entera se descarta.
+- **`clearProps: 'all'` vacía el `style` entero.** Se lleva también las
+  variables que pone React en línea (`--halo`, `--accent`), y React no las
+  vuelve a escribir porque para él no cambiaron: el abanico móvil perdía sus
+  colores en cada carga. Se limpian sólo las propiedades que animó GSAP
+  (`clearProps: 'opacity,transform'`).
+- **La consulta de móvil vive dos veces.** `(max-width: 767px), (hover: none)
+  and (pointer: coarse)` está en `globals.css` (qué se ve) y en
+  `components/nav/navQuery.ts` (qué se enciende). Si cambia en uno y no en el
+  otro, queda encendida la navegación que no se ve.
+- **Un acto de fauna fija su aspecto al nacer.** Si se gira el móvil a mitad de
+  un acto, el cuadro se ensancha y un animal puede verse en el margen por el
+  que iba a entrar. Recalcularlo al girar lo teletransportaría, que es peor.
+- **Salir de cuadro es en cualquier dirección.** El milano sale por arriba,
+  subiendo en la térmica; en vertical, con los círculos estrechados
+  (`kiteFit`), apenas se mueve en el plano. Por eso `check:path` mide la
+  velocidad de salida en 3D: medida sólo en XZ daba 0,25 u/s a un animal que
+  sube a 1,4.
 
 ---
 
@@ -461,7 +497,7 @@ llega en las fases 4–8 y se cuelga de ese mismo objeto.
 | 3 | El Camino, en tres bloques: | ⏳ |
 | 3A | · El mundo: sendero, terreno continuo, cámara con scroll, tramo y llegada | ✅ pendiente de revisión |
 | 3B | · La fauna en el camino (anclada al mundo, cercanía por estación) | ✅ pendiente de revisión |
-| 3C | · La navegación (sidebar radial, íconos por código, móvil, teclado) | ⏸ |
+| 3C | · La navegación (sidebar radial, íconos por código, móvil, teclado) | ✅ pendiente de revisión |
 | 4 | Home 京都 | ⏸ |
 | 5 | Ubicación 位置 | ⏸ |
 | 6 | Lugares | ⏸ |

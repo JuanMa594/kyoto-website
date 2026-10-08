@@ -112,6 +112,7 @@ export function CameraRig() {
       PATH.velocity =
         wasReady && !snap && dt > 0 ? damp(PATH.velocity, (rig.d - before) / dt, 8, dt) : 0;
       PATH.d = rig.d;
+      PATH.live = true;
       PATH.progress = clamp(rig.d / PATH_LENGTH, 0, 1);
       PATH.offset = TRAVEL.offset;
       Object.assign(PATH.frame, rig.frame);

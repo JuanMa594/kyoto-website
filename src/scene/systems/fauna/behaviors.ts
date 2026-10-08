@@ -57,6 +57,13 @@ export interface FaunaAct {
   readonly spawnD: number;
   /** Aspecto de sus márgenes: el mayor entre el de la pantalla al nacer y 16:9. */
   readonly aspect: number;
+  /**
+   * El aspecto real de la pantalla al nacer, sin acotar. Con él ajusta el
+   * milano sus círculos a un cuadro vertical (Fase 3C). Se fija al nacer: si se
+   * gira el móvil a mitad de un acto, el acto no se recalcula —lo
+   * teletransportaría—.
+   */
+  readonly viewAspect: number;
 }
 
 export interface FaunaPose {
@@ -209,6 +216,18 @@ const KITE_CLIMB_EASE = 2;
 const KITE_SWELL = 1.2 + 0.8 + 0.25;
 /** Lo que lo deriva el viento de lado mientras da vueltas (u/s). */
 const KITE_DRIFT = 0.3;
+/** Lo más que se estrechan los círculos del milano en un cuadro vertical. */
+const KITE_FIT_FLOOR = 0.5;
+
+/**
+ * Cuánto se estrechan los círculos del milano con el cuadro: el medio ancho
+ * visible es proporcional al aspecto, así que el cociente con el de 16:9 no
+ * depende de la profundidad. Con un suelo: por debajo de la mitad los círculos
+ * se cierran tanto que parece que gira sobre sí mismo (Fase 3C).
+ */
+export function kiteFit(viewAspect: number): number {
+  return clamp(viewAspect / (16 / 9), KITE_FIT_FLOOR, 1);
+}
 
 /** Cruza el encuadre de lado a lado, con aleteos y planeos alternos. */
 const cruzarVolando: Behavior = {
@@ -273,7 +292,9 @@ function kiteThermal(act: FaunaAct, s: number): number {
 /** Espirales lentas del milano, muy arriba y muy al fondo. Nunca aterriza. */
 const planearEnCirculos: Behavior = {
   place: (act, member, s, out) => {
-    const radius = 5 + jitter(act.seed, member, 1) * (KITE_RADIUS_MAX - 5);
+    // En un cuadro vertical los círculos se estrechan con él (Fase 3C).
+    const fit = kiteFit(act.viewAspect);
+    const radius = (5 + jitter(act.seed, member, 1) * (KITE_RADIUS_MAX - 5)) * fit;
     const angle = act.direction * (s * 0.2 + member * 2.1) + act.seed;
 
     // Entra y sale **por arriba**, en la térmica: llega bajando en espiral desde
@@ -283,7 +304,7 @@ const planearEnCirculos: Behavior = {
     // iba a 11 u/s: se le veía salir disparado. Subiendo no hay prisa ni fin —la
     // subida sigue después de su tiempo (`continuesOnItsOwn`)—, y mientras tanto
     // el viento lo deriva despacio hacia un lado.
-    const center = act.direction * KITE_DRIFT * (s - act.duration / 2);
+    const center = act.direction * KITE_DRIFT * fit * (s - act.duration / 2);
 
     out.x = center + Math.cos(angle) * radius;
     out.z = act.depth + Math.sin(angle) * radius * KITE_DEPTH_SQUASH;

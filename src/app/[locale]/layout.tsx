@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { MotionEngine } from '@/animation/MotionEngine';
 import { AmbientAudio } from '@/audio/AmbientAudio';
 import { EnvironmentProbe } from '@/components/EnvironmentProbe';
+import { JourneyNav } from '@/components/nav/JourneyNav';
 import { AmbientControls } from '@/components/ui/AmbientControls';
 import { staticLocale } from '@/i18n/params';
 import { routing } from '@/i18n/routing';
@@ -28,7 +29,10 @@ export async function generateMetadata({ params }: Omit<LocaleLayoutProps, 'chil
   const t = await getTranslations({ locale, namespace: 'meta' });
 
   return {
-    title: t('title'),
+    // Cada estación pone su nombre y la plantilla añade el sitio: «Ubicación ·
+    // Kyoto». La Home comparte segmento con este layout, así que la plantilla
+    // no le aplica y se queda con el título completo (Fase 3C).
+    title: { template: '%s · Kyoto', default: t('title') },
     description: t('description'),
   };
 }
@@ -60,10 +64,14 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
               desplazamiento por el camino y no un corte. */}
           <SceneRoot />
 
+          {/* La navegación: persistente como la escena, y antes del contenido
+              en el orden de tabulación (después del «saltar al contenido»). */}
+          <JourneyNav />
+
           {children}
 
-          {/* Los dos mandos del ambiente, siempre a la vista. */}
-          <AmbientControls />
+          {/* Los tres mandos —sonido, 静 e idioma— en la esquina del escritorio. */}
+          <AmbientControls variant="corner" />
         </NextIntlClientProvider>
       </body>
     </html>

@@ -179,6 +179,12 @@ export const PATH: {
   frame: PathFrame;
   /** Punto al que mira la cámara, en mundo. */
   focus: Point3;
+  /**
+   * Si `CameraRig` ya escribió algún frame. Sin canvas (sin WebGL) se queda en
+   * `false`, y la navegación pone la marca en la estación de la URL en vez de
+   * en la Home (Fase 3C).
+   */
+  live: boolean;
 } = {
   d: 0,
   progress: 0,
@@ -187,6 +193,7 @@ export const PATH: {
   velocity: 0,
   frame: { x: 0, y: 0, z: 0, yaw: 0 },
   focus: { x: 0, y: 0, z: 0 },
+  live: false,
 };
 
 /** Del encuadre local al mundo, en el plano XZ (la misma rotación que three). */
