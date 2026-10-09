@@ -142,6 +142,17 @@ export interface DecorShrub extends DecorObjectBase {
 }
 
 /**
+ * Un farol de piedra (tōrō). `kasuga`: el alto, sobre poste, de los caminos de
+ * los santuarios; `yukimi`: el bajo de patas y tejado ancho, de jardín. Le
+ * cierra el paso a la fauna. Las ventanas son de papel: el modo noche las
+ * encenderá.
+ */
+export interface DecorLantern extends DecorObjectBase {
+  readonly kind: 'farol';
+  readonly variant: 'kasuga' | 'yukimi';
+}
+
+/**
  * Un macizo: una franja que se llena de plantas con semilla fija. Hoy, bambú;
  * es también la puerta a los cerezos de Eventos y a las reglas de Fushimi.
  */
@@ -158,7 +169,7 @@ export interface DecorGrove {
   readonly seed: number;
 }
 
-export type DecorItem = DecorTorii | DecorShrub | DecorGrove;
+export type DecorItem = DecorTorii | DecorShrub | DecorLantern | DecorGrove;
 
 /**
  * El "preset de ambiente" de la estación: qué forma tiene el terreno, por qué
@@ -190,6 +201,11 @@ export interface StationEnvironment {
    * llevan al mundo `scene/decor/placement.ts` y `StationDecor`.
    */
   readonly decor: readonly DecorItem[];
+  /**
+   * Cuánto musgo crece al pie de su decoración y junto a las piedras, 0–1
+   * (`scene/decor/moss.ts`). Sin él, ninguno.
+   */
+  readonly moss?: number;
 }
 
 /**
@@ -363,6 +379,13 @@ const DECOR_INICIO: readonly DecorItem[] = [
   },
   { kind: 'arbusto', seed: 12, at: { d: 14, u: -5.5 } },
   { kind: 'arbusto', seed: 13, at: { d: 34, u: 6 } },
+  // Los faroles, ya fuera del cartel: un yukimi entre el musgo al empezar a
+  // caminar, a la derecha (la izquierda es del texto y de la tarjeta), y un
+  // par de kasuga flanqueando el camino donde el bambú se abre a Ubicación.
+  // En vertical, más cerca: así queda detrás del pilar del torii desde el cartel.
+  { kind: 'farol', variant: 'yukimi', at: { d: 22, u: 5.2 }, portrait: { d: 12, u: 4.8 } },
+  { kind: 'farol', variant: 'kasuga', at: { d: 54, u: -4.6 } },
+  { kind: 'farol', variant: 'kasuga', at: { d: 54, u: 4.6 } },
 ];
 
 /**
@@ -387,6 +410,7 @@ export const JOURNEY: readonly Station[] = [
       altitude: 0,
       lateral: 0,
       decor: DECOR_INICIO,
+      moss: 1,
     },
     tramo: TRAMO_INICIO,
     ambient: {

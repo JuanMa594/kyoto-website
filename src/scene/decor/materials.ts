@@ -20,7 +20,7 @@ export interface DecorMaterialOptions {
   readonly rim?: number;
   readonly doubleSide?: boolean;
   readonly vertexColors?: boolean;
-  /** Lo que se mece: 'tallo' se dobla; 'hoja' además aletea. */
+  /** Lo que se mece: 'tallo' se dobla; 'hoja' además planea (gira sobre su peciolo). */
   readonly sway?: 'tallo' | 'hoja';
 }
 
@@ -49,12 +49,12 @@ export function createDecorMaterial(options: DecorMaterialOptions): MeshStandard
  * La sombra de lo que se mece. Sin esto la sombra sería la de la planta
  * quieta: three dibuja las sombras con su propio material de profundidad.
  */
-export function createSwayDepthMaterial(flutter: boolean): MeshDepthMaterial {
+export function createSwayDepthMaterial(leaf: boolean): MeshDepthMaterial {
   const material = new MeshDepthMaterial({ depthPacking: RGBADepthPacking });
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, SWAY_UNIFORMS);
-    shader.vertexShader = withWindSway(shader.vertexShader, flutter);
+    shader.vertexShader = withWindSway(shader.vertexShader, leaf);
   };
-  material.customProgramCacheKey = () => `decor-sway-depth-${flutter ? 'hoja' : 'tallo'}`;
+  material.customProgramCacheKey = () => `decor-sway-depth-${leaf ? 'hoja' : 'tallo'}`;
   return material;
 }

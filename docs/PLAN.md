@@ -237,10 +237,29 @@ torii se va más al fondo y el texto sube (`portrait` en la decoración).
   el JS no llega.
 - **La tarjeta de bienvenida** del tramo explica cómo se recorre el sitio.
 - **El riel lleva una bruma de papel** detrás de las piedrecitas, para leerse
-  sobre las vigas del torii.
+  sobre las vigas del torii. El texto del cartel lleva la misma idea en sus
+  letras (`.paper-halo`): un halo washi, no una sombra oscura. **Los títulos de
+  las otras páginas la usarán en sus fases.**
+- **Faroles de piedra** (revisión de la Fase 4), ya fuera del cartel: un
+  *yukimi-dōrō* entre el musgo al empezar a caminar y un par de *kasuga-dōrō*
+  flanqueando el camino donde el bambú se abre a Ubicación. Por código (tornos
+  hexagonales), con musgo en el tejado y el pie húmedo; las ventanas son de
+  papel con un tibio kohaku. **Se usarán los dos tipos a lo largo de todo el
+  camino**, porque el modo noche los encenderá para alumbrar el sendero.
+- **Musgo** (`scene/decor/moss.ts`, `MossPatches`): corros planos al pie de lo
+  plantado y de las cañas (también las del fondo), en el borde de los macizos,
+  por el terreno abierto entre el camino y el bambú —en la revisión se veía
+  vacío— y a trechos junto a las piedras. Los parches se agrupan en corros y
+  tienen tres verdes, para leerse como musgo y no como manchas. Una draw
+  call; el contorno, los cojines y su relieve salen del shader, sin texturas.
+  Cuánto, `environment.moss`.
+- **Las hojas del bambú planean, no aletean**: giran enteras sobre su peciolo y
+  se tienden hacia sotavento; las que caen se mecen como un péndulo en vez de
+  dar vueltas. La primera versión «parecían mariposas».
 
 Rendimiento medido (tier alto, GPU integrada): +11 draw calls y ~100 k triángulos
-por frame con sombras, a 60 fps. Detalle:
+por frame con sombras, a 60 fps; con faroles y musgo, 61 draw calls en el cartel
+(antes 55), aún a 60 fps. Detalle:
 `docs/superpowers/specs/2026-10-08-fase-4-home-design.md`.
 
 ### 5.5 Ambiente
@@ -658,7 +677,7 @@ fase** para revisión antes de seguir.
 | **3A** | · El mundo | Sendero desde `journey.ts` · terreno continuo · piedras en todo el recorrido · cámara sobre el camino con scroll · tramo y llegada automática · viaje entre estaciones | ✅ |
 | **3B** | · La fauna en el camino | Actos anclados al mundo · lo que vuela se adelanta (ancla que se desliza) · nace por delante al caminar · cercanía por estación · márgenes con la cámara real · nunca desaparece a la vista | ✅ |
 | **3C** | · La navegación | Sidebar radial (`13.png`) con íconos generados por código · progreso del camino · nav móvil · teclado · transiciones | ✅ |
-| **4** | Home 京都 | Torii 3D, bambú, arbusto, título tipográfico, composición del hero · decoración declarada en `journey.ts` · entrada «el cartel se compone» · tramo hacia Ubicación con tarjeta de bienvenida | 🔍 |
+| **4** | Home 京都 | Torii 3D, bambú, arbusto, título tipográfico, composición del hero · decoración declarada en `journey.ts` · entrada «el cartel se compone» · tramo hacia Ubicación con tarjeta de bienvenida · faroles kasuga y yukimi, musgo y halo de papel en el texto (revisión) | 🔍 |
 | **5** | Ubicación 位置 | Mapa de Japón extruido e interactivo, zoom a Kyoto · el kanji 位置 dibujado con `<InkKanji>` · **tramo hacia Eventos**: los dos mapas antiguos, desplegables, **no como tarjetas sino como carteles de madera insertados en el camino** (en 3A son tarjetas provisionales, con el hueco del mapa), junto a la reseña breve de Kyoto | ⏸ |
 | **6** | Lugares | Plantilla + Fushimi Inari, Kiyomizu-dera, Gion · sus kanji dibujados con `<InkKanji>` · variante `inari` del torii · **tramos**: de Eventos a Fushimi, paso por los costados del santuario y subida escalonada —gradas en la malla del terreno— con toriis (`5.png`); de Fushimi a Kiyomizu-dera, un bosque denso de bambú y un puente de madera sobre una pequeña vaguada antes de la plataforma del templo; de Kiyomizu-dera a Gion, la bajada termina en calzadas tradicionales y faroles | ⏸ |
 | **7** | Eventos | Sakura + rueda de estaciones / calendario del año · 桜 dibujado con `<InkKanji>` · **tramo de llegada**: el bosque de cerezos al acercarse a la sakura (el aumento progresivo de pétalos ya lo hace 3A) | ⏸ |
@@ -682,7 +701,8 @@ buena medida rellenar contenido sobre una plantilla que ya funciona.
 | Carpa koi | ⏳ Aplazada hasta que haya agua: un estanque en alguno de los templos o en la home. El koi que había es un asset de Animal Crossing y **no se puede publicar**; se hará uno propio (los peces son el caso de libro de la deformación en el shader) |
 | **Créditos de los modelos** | ⚠️ Garza y gorrión son CC BY: **antes de publicar tiene que existir una sección de créditos visible**. Detalle en `assets/models/LICENSES.md` (Fase 9) |
 | **Créditos de KanjiVG** | ⚠️ Los trazos de los kanji son CC BY-SA 3.0 (© Ulrich Apel): entran en la misma sección de créditos. El «compartir igual» afecta sólo a `strokes.generated.ts`. Detalle en `assets/kanji/LICENSES.md` |
-| Faroles de piedra y más decoración | ⏳ Pendiente **dentro de la Fase 4**: al menos un par de *ishidōrō* en la Home o su tramo, y quizá otros elementos, según cómo se vean la Home y el tramo en la revisión. Irían como objetos sueltos de `environment.decor`, con su huella |
+| Faroles de piedra | ✅ En la revisión de la Fase 4: tres en el tramo de la Home (un yukimi y un par de kasuga), fuera del cartel. **Los dos tipos se reparten por el resto del camino en sus fases**, pensando en el modo noche |
+| Faroles encendidos | ⏳ **A la fase de la noche.** Las ventanas de papel ya son un material propio (`StoneLanterns`, `DAY_GLOW`); de noche subirá su brillo y se sumará la luz al sendero desde la cámara del fuego (`LANTERN_SIZE.fireY`), con presupuesto de luces: no una luz por farol |
 | Profundidad de campo en la Home | ⏳ El bambú de delante sale casi nítido con el rango actual (16 u). Estrecharlo lo desenfocaría, pero también las piedras cercanas en todas las estaciones: se decide en la revisión |
 | Precargas RSC en el export | ⏳ Fase 9: con `serve`, las precargas de segmento de Next 16 dan 404 (piden `__next.$d$locale.__PAGE__.txt`, el export escribe `__next.$d$locale/__PAGE__.txt`). No rompe la navegación; el hosting tendrá que servirlas |
 | Peso de la fauna | ⏳ ~0,96 MB en total; cada estación sólo carga su elenco. La mariposa se lleva 620 KB (esqueleto de 192 huesos que el simplificador no consigue bajar de 16.000 triángulos), y las posiciones de los modelos estáticos van sin cuantizar para que el shader vea coordenadas reales. Las dos cosas son candidatas a recorte en la Fase 9 |

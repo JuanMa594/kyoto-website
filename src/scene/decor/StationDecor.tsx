@@ -6,10 +6,12 @@ import { useMemo } from 'react';
 import { JOURNEY, type Station } from '@/config/journey';
 import type { ScenePalette } from '@/lib/css-vars';
 import { Shrub } from '@/scene/objects/Shrub';
+import { StoneLanterns } from '@/scene/objects/toro/StoneLanterns';
 import { Torii } from '@/scene/objects/torii/Torii';
 import { stationIndex } from '@/scene/path/journeyPath';
 import type { QualityProfile } from '@/scene/quality/tiers';
 import { BambooGrove } from '@/scene/systems/BambooGrove';
+import { MossPatches } from '@/scene/systems/MossPatches';
 
 import { stationDecorLayout } from './placement';
 
@@ -54,17 +56,18 @@ interface DecorSetProps {
 
 function DecorSet({ index, portrait, palette, profile }: DecorSetProps) {
   const layout = useMemo(() => stationDecorLayout(index, portrait), [index, portrait]);
+  const lanterns = useMemo(() => layout.objects.filter((o) => o.item.kind === 'farol'), [layout]);
 
   return (
     <>
-      {layout.objects.map((placed, k) =>
-        placed.item.kind === 'torii' ? (
-          <Torii key={k} placed={placed} palette={palette} profile={profile} />
-        ) : (
-          <Shrub key={k} placed={placed} palette={palette} profile={profile} />
-        ),
-      )}
+      {layout.objects.map((placed, k) => {
+        if (placed.item.kind === 'torii') return <Torii key={k} placed={placed} palette={palette} profile={profile} />;
+        if (placed.item.kind === 'arbusto') return <Shrub key={k} placed={placed} palette={palette} profile={profile} />;
+        return null;
+      })}
+      {lanterns.length > 0 && <StoneLanterns lanterns={lanterns} palette={palette} profile={profile} />}
       {layout.groves.length > 0 && <BambooGrove groves={layout.groves} palette={palette} profile={profile} />}
+      <MossPatches index={index} portrait={portrait} palette={palette} profile={profile} />
     </>
   );
 }

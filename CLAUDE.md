@@ -112,14 +112,16 @@ src/
 │   ├─ objects/PetalGeometry.ts← pétalo, arce y hoja de bambú por contorno
 │   ├─ objects/fauna/          ← cuerpos: modelo + deformación, animado, luz
 │   ├─ objects/torii/          ← el torii ryōbu: medidas (puro), geometría y componente
+│   ├─ objects/toro/           ← los faroles kasuga y yukimi: medidas (puro), tornos y componente
 │   ├─ objects/Shrub.tsx       ← el arbusto podado en nube (o-karikomi)
 │   ├─ decor/                  ← ★ la decoración de journey.ts (Fase 4)
 │   │   ├─ placement.ts        ← descriptor → mundo, por aspecto (puro)
 │   │   ├─ footprints.ts       ← huellas: piedras, cámara y fauna (puro)
+│   │   ├─ moss.ts             ← dónde crece el musgo (puro)
 │   │   ├─ bamboo.ts shrub.ts  ← cañas, hojas y masas (puro, three)
 │   │   ├─ materials.ts        ← MeshStandardMaterial + cartel + viento
 │   │   └─ StationDecor.tsx    ← monta la zona y sus dos vecinas
-│   ├─ shaders/                ← cartelLook (washi + tinta) y windSway (flexión y aleteo)
+│   ├─ shaders/                ← cartelLook (washi + tinta) y windSway (flexión y planeo de las hojas)
 │   ├─ PostProcessing.tsx      ← profundidad de campo (sólo tier alto)
 │   ├─ systems/elevation.ts    ← ★ altura del terreno, global (función pura)
 │   ├─ systems/Terrain.tsx     ← una malla para todo el camino, color por zona
@@ -129,6 +131,7 @@ src/
 │   ├─ systems/WindDriver.tsx  ← lo hace avanzar dentro del <Canvas>
 │   ├─ systems/sway.ts         ← ★ los muelles del bambú y los arbustos (CPU → uBend)
 │   ├─ systems/BambooGrove.tsx ← el bambú de una estación, instanciado
+│   ├─ systems/MossPatches.tsx ← el musgo: parches planos, el dibujo en el shader
 │   ├─ systems/intro.ts        ← `INTRO`: la bruma de la entrada de la Home
 │   ├─ systems/PetalSystem.tsx ← ★ pétalos: posición calculada en el shader
 │   ├─ systems/petals.ts       ← capas, densidad y colores (puro, sin React)
@@ -180,14 +183,17 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   Eventos camina 50 u entre los cerezos antes de que empiece la subida a
   Fushimi. Los tramos crecen cuando una página les pone tarjetas.
 - **Lo que hay a los lados del camino se declara en `journey.ts`**
-  (`environment.decor`, Fase 4): objetos sueltos (`torii`, `arbusto`) y
-  macizos (`bambu`), en coordenadas del camino —`d` desde la estación, `u` desde
+  (`environment.decor`, Fase 4): objetos sueltos (`torii`, `arbusto`, `farol`
+  kasuga o yukimi) y macizos (`bambu`), en coordenadas del camino —`d` desde la estación, `u` desde
   el eje—, con otra colocación opcional para pantallas verticales
   (`portrait`). **La decoración de una estación incluye su tramo de salida.**
   `scene/decor/placement.ts` la lleva al mundo y `footprints.ts` publica sus
   huellas: nada pisa las piedras, la cámara nunca pasa a menos de 1,5 u y la
-  fauna no atraviesa pilares ni cañas (el reparto prueba otro sitio). Todo lo
-  comprueba `check:path` (`scripts/check-decor.ts`).
+  fauna no atraviesa pilares, faroles ni cañas (el reparto prueba otro sitio).
+  El musgo no se declara parche a parche: crece al pie de esas mismas bases y
+  de cada caña, en el borde de los macizos, en corros por el terreno abierto y
+  junto a las piedras, en la cantidad que diga
+  `environment.moss`. Todo lo comprueba `check:path` (`scripts/check-decor.ts`).
 - **La posición de la cámara decide qué se ve y qué se oye**, no la ruta. Vive
   en `PATH` (`scene/path/journeyPath.ts`), con un único escritor, `CameraRig`;
   el store guarda sólo `zone`, que leen el ambiente, el audio y la fauna. La
@@ -481,6 +487,17 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   objeto que se mece **no se gira** (el `<Shrub>` va sin rotación) o la ráfaga
   lo doblaría en otra dirección. Y su sombra necesita el mismo viento en un
   `customDepthMaterial`, o sería la de la planta quieta.
+- **Una hoja que se deforma a lo largo de su normal aletea.** La primera hoja
+  de bambú se doblaba de frente a 1,4 Hz y con la fase de su caña: los
+  ramilletes batían a la vez y la revisión dijo «parecen mariposas». Una hoja
+  larga **gira entera sobre su peciolo**, despacio y con fase propia (sacada de
+  su matriz de instancia), y con viento se tiende hacia sotavento. Vale para
+  las hojas de cerezo y de arce de las fases siguientes.
+- **Un torno que empieza o acaba en el eje deja triángulos de área cero.** Sus
+  normales son nulas, y una normal nula es un punto negro (la trampa de los
+  NaN, más arriba). `toroGeometry.ts` los quita antes de calcular normales. Y
+  en un shader con `discard`, las derivadas (`dFdx`) se toman **antes** del
+  `discard`: después, en algunos GPU, no están definidas (el relieve del musgo).
 - **StrictMode monta, desmonta y vuelve a montar cada efecto en desarrollo.**
   La entrada de la Home se mataba en ese desmontaje simulado y en `bun run dev`
   no se veía nunca. Lo que dura más que un render y no debe repetirse vive a
@@ -548,7 +565,7 @@ llega en las fases 4–8 y se cuelga de ese mismo objeto.
 | 3A | · El mundo: sendero, terreno continuo, cámara con scroll, tramo y llegada | ✅ |
 | 3B | · La fauna en el camino (anclada al mundo, cercanía por estación) | ✅ |
 | 3C | · La navegación (sidebar radial, íconos por código, móvil, teclado) | ✅ |
-| 4 | Home 京都: torii, bambú, arbusto, cartel, entrada y tramo hacia Ubicación | 🔍 en revisión |
+| 4 | Home 京都: torii, bambú, arbusto, cartel, entrada, tramo hacia Ubicación, faroles y musgo | 🔍 en revisión |
 | 5 | Ubicación 位置 | ⏸ |
 | 6 | Lugares | ⏸ |
 | 7 | Eventos 桜 | ⏸ |

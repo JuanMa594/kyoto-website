@@ -30,7 +30,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
 
       <ContentArrival key="inicio">
         <main id="contenido" tabIndex={-1} className="home-cartel">
-          <div className="home-cartel__text">
+          <div className="home-cartel__text paper-halo">
             <h1 className="home-cartel__title">
               <span className="sr-only">
                 {title} <span lang="ja">{station.kanji}</span>

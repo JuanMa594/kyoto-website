@@ -148,8 +148,25 @@ const VERTEX = /* glsl */ `
     float hondo = smoothstep(0.0, 0.12, z01) * (1.0 - smoothstep(0.88, 1.0, z01));
     float fade = ciclo * presente * borde * hondo;
 
-    float angle = uTime * uSpin * (0.5 + seed) + seed * 6.283;
-    mat3 spin = axisRotation(vec3(0.4 + seed * 0.6, 1.0, 0.25 - seed * 0.5), angle);
+    #ifdef GLIDE
+      // Una hoja larga no voltea: planea. Va tendida, con el eje largo hacia
+      // donde la lleva el aire, y se mece de lado a lado como un péndulo —se
+      // inclina hacia el lado al que va, sube un poco en cada extremo y cabecea
+      // al cruzar el centro—. Su rumbo deriva despacio, cada hoja con el suyo.
+      float glidePhase = uTime * (0.8 + seed * 0.5) + seed * 23.0;
+      float swing = sin(glidePhase);
+      float heading = (seed - 0.5) * 1.8 + sin(uTime * 0.13 + seed * 9.0) * 0.5;
+      float bank = swing * (0.5 + 0.25 * uStrength);
+      float pitch = -1.5707963 + cos(glidePhase) * 0.22;
+      mat3 spin = axisRotation(vec3(0.0, 1.0, 0.0), heading)
+        * axisRotation(vec3(1.0, 0.0, 0.0), pitch)
+        * axisRotation(vec3(0.0, 1.0, 0.0), bank);
+      place += vec3(sin(heading), 0.0, cos(heading)) * swing * 0.3 * fade;
+      place.y += swing * swing * 0.12;
+    #else
+      float angle = uTime * uSpin * (0.5 + seed) + seed * 6.283;
+      mat3 spin = axisRotation(vec3(0.4 + seed * 0.6, 1.0, 0.25 - seed * 0.5), angle);
+    #endif
 
     vec3 local = spin * (position * uScale * aScale * fade);
 
@@ -341,6 +358,8 @@ function PetalLayerMesh({ layer, station, zone, palette, particleScale, allocati
       // escribir el color y las distancias de la niebla, y los pétalos del
       // fondo flotarían nítidos sobre una escena con bruma.
       fog: true,
+      // Las hojas de bambú planean en vez de voltear (ver GLIDE en el shader).
+      defines: kind === 'bambu' ? { GLIDE: '' } : {},
       // Opaco a propósito: con transparencia habría que ordenar cientos de
       // instancias por profundidad en cada frame para que no se recortaran
       // entre sí. La niebla ya disuelve las de atrás.

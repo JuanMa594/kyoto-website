@@ -304,6 +304,25 @@
     margin: 0;
   }
 
+  /* Bruma de papel alrededor de las letras: la misma idea que la del riel. Un
+     halo washi, no una sombra oscura —sobre el cartel crema, la sombra
+     ensuciaría el shu y se leería como efecto de web—: aclara lo que pasa por
+     detrás (una caña, el terreno) justo donde está el trazo, y sobre el crema
+     no se ve. Dos capas: una ceñida al glifo y otra difusa. En `em`, así que
+     escala con cada texto. Las páginas de las otras fases la usarán en sus
+     títulos. El kanji es SVG: ahí va como `drop-shadow`. */
+  .paper-halo {
+    --paper-halo-near: color-mix(in srgb, var(--color-washi) 85%, transparent);
+    --paper-halo-far: color-mix(in srgb, var(--color-washi) 60%, transparent);
+    text-shadow:
+      0 0 0.08em var(--paper-halo-near),
+      0 0 0.4em var(--paper-halo-far);
+  }
+
+  .paper-halo .ink-kanji__char {
+    filter: drop-shadow(0 0 0.03em var(--paper-halo-near)) drop-shadow(0 0 0.12em var(--paper-halo-far));
+  }
+
   /* --ink va de 0 a 1 en la entrada: la palabra se empapa de izquierda a
      derecha y el interletrado se cierra. En reposo vale 1. */
   .home-cartel__word {

@@ -2,8 +2,9 @@
  * Lo que ocupa la decoración en el suelo, con su altura. Módulo puro.
  *
  * Tres usuarios: las piedras (nada se planta encima), la cámara (nunca entra
- * en un objeto) y la fauna (un acto que atravesaría un pilar o una caña de
- * bambú no sale; ver `crossesDecor`). Es la sonda que el PLAN (§5.6, «Para las
+ * en un objeto) y la fauna (un acto que atravesaría un pilar, un farol o una
+ * caña de bambú no sale; ver `crossesDecor`). El musgo (`moss.ts`) crece al pie
+ * de las mismas bases (`objectBases`). Es la sonda que el PLAN (§5.6, «Para las
  * fases 4–8») pedía extender a cada objeto nuevo.
  *
  * Un macizo publica dos cosas: su **franja** entera, que es lo que miran la
@@ -14,13 +15,14 @@
  */
 
 import { JOURNEY } from '@/config/journey';
+import { LANTERN_SIZE } from '@/scene/objects/toro/toro';
 import { RYOBU_FOOTPRINTS } from '@/scene/objects/torii/ryobu';
 import { frameToWorld, pathX, type PathFrame, type Point3 } from '@/scene/path/journeyPath';
 import { groundY } from '@/scene/systems/elevation';
 import { placeAt, type FaunaAct } from '@/scene/systems/fauna/behaviors';
 
 import { groveCulms } from './bamboo';
-import { areaU, objectToWorld, SHRUB_SIZE, stationDecorLayout } from './placement';
+import { areaU, objectToWorld, SHRUB_SIZE, stationDecorLayout, type PlacedObject } from './placement';
 
 /**
  * Margen que pide cada huella a la fauna, en fracción del cuerpo del animal.
@@ -54,6 +56,57 @@ export interface BandFootprint {
 
 export type Footprint = CircleFootprint | BandFootprint;
 
+/** Una base de un objeto suelto: su huella y lo que de verdad toca el suelo. */
+export interface ObjectBase extends CircleFootprint {
+  /** Radio de lo que toca el suelo (sin el vuelo del tejado): ahí crece el musgo. */
+  readonly foot: number;
+}
+
+/** Lo que pisa un objeto colocado: un círculo por pilar, por arbusto, por farol. */
+export function objectBases(o: PlacedObject): ObjectBase[] {
+  const item = o.item;
+  if (item.kind === 'torii') {
+    const point = { x: 0, z: 0 };
+    return RYOBU_FOOTPRINTS.map((f) => {
+      objectToWorld(o, f.x, f.z, point);
+      return {
+        kind: 'circulo',
+        x: point.x,
+        z: point.z,
+        r: f.r * o.scale,
+        foot: f.r * o.scale,
+        top: o.y + f.top * o.scale,
+        faunaMargin: SOLID_MARGIN,
+      };
+    });
+  }
+  if (item.kind === 'farol') {
+    const size = LANTERN_SIZE[item.variant];
+    return [
+      {
+        kind: 'circulo',
+        x: o.x,
+        z: o.z,
+        r: size.radius * o.scale,
+        foot: size.foot * o.scale,
+        top: o.y + size.height * o.scale,
+        faunaMargin: SOLID_MARGIN,
+      },
+    ];
+  }
+  return [
+    {
+      kind: 'circulo',
+      x: o.x,
+      z: o.z,
+      r: SHRUB_SIZE.radius * o.scale,
+      foot: SHRUB_SIZE.radius * 0.85 * o.scale,
+      top: o.y + SHRUB_SIZE.height * o.scale,
+      faunaMargin: 0,
+    },
+  ];
+}
+
 const cache = new Map<boolean, readonly Footprint[]>();
 
 /** Todas las huellas del camino para un aspecto, calculadas una vez. */
@@ -62,35 +115,11 @@ export function decorFootprints(portrait: boolean): readonly Footprint[] {
   if (cached) return cached;
 
   const list: Footprint[] = [];
-  const point = { x: 0, z: 0 };
 
   JOURNEY.forEach((_, index) => {
     const layout = stationDecorLayout(index, portrait);
 
-    for (const o of layout.objects) {
-      if (o.item.kind === 'torii') {
-        for (const f of RYOBU_FOOTPRINTS) {
-          objectToWorld(o, f.x, f.z, point);
-          list.push({
-            kind: 'circulo',
-            x: point.x,
-            z: point.z,
-            r: f.r * o.scale,
-            top: o.y + f.top * o.scale,
-            faunaMargin: SOLID_MARGIN,
-          });
-        }
-      } else {
-        list.push({
-          kind: 'circulo',
-          x: o.x,
-          z: o.z,
-          r: SHRUB_SIZE.radius * o.scale,
-          top: o.y + SHRUB_SIZE.height * o.scale,
-          faunaMargin: 0,
-        });
-      }
-    }
+    for (const o of layout.objects) list.push(...objectBases(o));
 
     for (const g of layout.groves) {
       const [u0, u1] = areaU(g.area);

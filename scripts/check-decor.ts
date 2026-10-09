@@ -24,6 +24,7 @@ import {
   decorFootprints,
   footprintDistance,
   insideFootprint,
+  objectBases,
   type Footprint,
 } from '../src/scene/decor/footprints';
 import {
@@ -33,7 +34,10 @@ import {
   type DecorLayout,
   type PlacedObject,
 } from '../src/scene/decor/placement';
+import { stationMoss } from '../src/scene/decor/moss';
 import { MASS_TRIANGLES_MAX, SHRUB_LEAF_TRIANGLES, SHRUB_LEAVES, shrubBlobs, shrubLeaves } from '../src/scene/decor/shrub';
+import { LANTERN_SIZE } from '../src/scene/objects/toro/toro';
+import { lanternGeometry } from '../src/scene/objects/toro/toroGeometry';
 import { kasagiProfile, RYOBU } from '../src/scene/objects/torii/ryobu';
 import { ryobuToriiGeometry } from '../src/scene/objects/torii/toriiGeometry';
 import { STATION_DEPTHS, stationIndex } from '../src/scene/path/journeyPath';
@@ -310,7 +314,87 @@ check(
 check('las hojas se reparten por la superficie', shrubLeaves(11, SHRUB_LEAVES.high).length >= SHRUB_LEAVES.high * 0.8);
 
 const shrubTriangles = shrubSeeds.length * (MASS_TRIANGLES_MAX + SHRUB_LEAVES.high * SHRUB_LEAF_TRIANGLES);
-const totalTriangles = toriiTriangles + bambooTriangles + shrubTriangles;
+
+/* ── 8b. Los faroles ───────────────────────────────────────────────────── */
+
+section('Los faroles');
+
+const lanternsOf = (layout: DecorLayout) => layout.objects.filter((o) => o.item.kind === 'farol');
+const homeLanterns = lanternsOf(homeLand);
+const variants = new Set(homeLanterns.map((o) => (o.item.kind === 'farol' ? o.item.variant : '')));
+check('el tramo de la Home tiene tres faroles, kasuga y yukimi', homeLanterns.length === 3 && variants.size === 2);
+
+let lanternTriangles = 0;
+for (const variant of ['kasuga', 'yukimi'] as const) {
+  const parts = lanternGeometry(variant);
+  const size = LANTERN_SIZE[variant];
+  let top = Number.NEGATIVE_INFINITY;
+  let reach = 0;
+  let bad = 0;
+  let triangles = 0;
+  for (const part of [parts.stone, parts.paper]) {
+    const position = part.getAttribute('position');
+    const normal = part.getAttribute('normal');
+    triangles += position.count / 3;
+    for (let i = 0; i < position.count; i += 1) {
+      top = Math.max(top, position.getY(i));
+      reach = Math.max(reach, Math.hypot(position.getX(i), position.getZ(i)));
+      const length = Math.hypot(normal.getX(i), normal.getY(i), normal.getZ(i));
+      if (!Number.isFinite(length) || length < 0.5) bad += 1;
+    }
+  }
+  lanternTriangles += triangles * homeLanterns.filter((o) => o.item.kind === 'farol' && o.item.variant === variant).length;
+  check(`${variant}: mide lo que dice LANTERN_SIZE`, Math.abs(top - size.height) < 0.02, top.toFixed(2));
+  check(`${variant}: cabe en su huella`, reach <= size.radius, `${reach.toFixed(2)} ≤ ${size.radius}`);
+  check(`${variant}: ninguna normal nula ni NaN`, bad === 0, `${bad}`);
+  check(`${variant}: menos de 3 000 triángulos`, triangles < 3000, `${triangles}`);
+}
+
+// Fuera del cartel: en la Home, ninguno cae en el bloque de texto (8–48 % del
+// ancho, tercio medio) a menos de 60 u, donde la niebla aún no lo borra.
+const poster = homeCamera(16 / 9);
+const underText = homeLanterns.filter((o) => {
+  const distance = Math.hypot(o.x - poster.position.x, o.z - poster.position.z);
+  const p = onScreen(poster, o.x, o.y + 1, o.z);
+  return distance < 60 && p.x > 0.06 && p.x < 0.5 && p.y > 0.25 && p.y < 0.7;
+});
+check('16:9 · ningún farol cercano bajo el texto del cartel', underText.length === 0, `${underText.length}`);
+
+let culmsInside = 0;
+for (const portrait of [false, true]) {
+  const layout = stationDecorLayout(HOME, portrait);
+  const bases = layout.objects.filter((o) => o.item.kind !== 'arbusto').flatMap(objectBases);
+  for (const grove of layout.groves) {
+    for (const culm of groveCulms(grove, 1)) {
+      if (bases.some((b) => Math.hypot(b.x - culm.x, b.z - culm.z) < b.r + culm.radius)) culmsInside += 1;
+    }
+  }
+}
+check('ninguna caña sale de un farol ni de un pilar', culmsInside === 0, `${culmsInside}`);
+
+const lantern = homeLanterns[0]!;
+check(
+  'el pie de un farol cierra el paso',
+  decorFootprints(false).some((f) => f.faunaMargin > 0 && insideFootprint(f, lantern.x, lantern.y + 0.5, lantern.z, 0)),
+);
+
+/* ── 8c. El musgo ──────────────────────────────────────────────────────── */
+
+section('El musgo');
+
+const moss = stationMoss(HOME, false, 1);
+check('la Home tiene entre 120 y 700 parches de musgo (tier alto)', moss.length >= 120 && moss.length <= 700, `${moss.length}`);
+check(
+  'cada parche se apoya en el terreno',
+  moss.every((p) => Math.abs(p.y - groundY(p.x, p.z)) < 0.05 && p.normal[1] > 0.8),
+);
+check(
+  'sin musgo, ni un parche',
+  JOURNEY.every((s, i) => (s.environment.moss ?? 0) > 0 || stationMoss(i, false, 1).length === 0),
+);
+const mossTriangles = moss.length * 2;
+
+const totalTriangles = toriiTriangles + bambooTriangles + shrubTriangles + lanternTriangles + mossTriangles;
 check('la Home entera cabe en 150 000 triángulos (tier alto)', totalTriangles <= 150000, `${totalTriangles}`);
 
 /* ── 9. La fauna ───────────────────────────────────────────────────────── */
