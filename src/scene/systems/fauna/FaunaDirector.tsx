@@ -17,6 +17,7 @@ import { SkinnedCreature } from '@/scene/objects/fauna/SkinnedCreature';
 import { PATH } from '@/scene/path/journeyPath';
 import { prepareStoneSurface } from '@/scene/path/stoneSurface';
 import type { QualityProfile } from '@/scene/quality/tiers';
+import { INTRO } from '@/scene/systems/intro';
 import { WIND } from '@/scene/systems/WindField';
 import { selectMotionAllowed, useKyotoStore } from '@/store/useKyotoStore';
 
@@ -141,6 +142,12 @@ export function FaunaDirector({ station, palette, profile }: FaunaDirectorProps)
         tracks.current.set(act.id, track);
       }
       trackAct(act, track, now, PATH.d, Math.min(delta, 0.1), viewer);
+    }
+
+    // Mientras se compone el cartel de la Home no sale nadie.
+    if (INTRO.playing) {
+      FAUNA_STAGE.live = acts.map((act) => describeAct(act, tracks.current.get(act.id)));
+      return;
     }
 
     const idleFor = (Date.now() - useKyotoStore.getState().lastScrollAt) / 1000;

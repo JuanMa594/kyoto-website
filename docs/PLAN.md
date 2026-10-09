@@ -3,8 +3,9 @@
 > Documento de referencia del proyecto. Consolida las decisiones tomadas en la fase de
 > definición. Si algo cambia, se actualiza aquí y no en la memoria de nadie.
 >
-> Estado: **Fase 3 completa** — 3A (el mundo), 3B (la fauna en el camino) y 3C (la
-> navegación) implementadas y revisadas. Siguiente: Fase 4 (Home 京都). La Fase 2 está completa (2A motor, 2B ambiente, 2C vida).
+> Estado: **Fase 4 implementada, en revisión** (Home 京都: el cartel de `1.png`, la
+> entrada y el tramo hacia Ubicación). La Fase 3 está completa — 3A (el mundo), 3B (la
+> fauna en el camino) y 3C (la navegación). La Fase 2 está completa (2A motor, 2B ambiente, 2C vida).
 > El estado vivo de las fases y las convenciones del repo están en `CLAUDE.md`.
 
 ---
@@ -211,6 +212,37 @@ horizontal y los mandos; al tocarla, un **abanico** modal que se cierra al
 elegir, con el velo, Escape o «atrás». Cada estación tiene su `<title>`
 («Ubicación · Kyoto»). Detalle: `docs/superpowers/specs/2026-10-05-fase-3c-la-navegacion-design.md`.
 
+### 5.4b La Home (Fase 4)
+
+El cartel de `1.png` con volumen: KYOTO / 京都 a la izquierda (DOM real) y, en la
+escena, un **torii ryōbu** a la derecha del camino, cortado por el borde, con su
+pilar de apoyo y su tejadillo; un **arbusto** podado en nube al pie; **bambú** en la
+esquina inferior izquierda, detrás del texto y detrás del torii. En vertical el
+torii se va más al fondo y el texto sube (`portrait` en la decoración).
+
+- **La decoración se declara en `journey.ts`** (`environment.decor`): objetos
+  sueltos y macizos, en coordenadas del camino, incluido el tramo de salida. Al
+  salir de la Home el bosquecillo se aclara hasta abrirse al valle de Ubicación.
+  Huellas para las piedras, la cámara (≥ 1,5 u, también en los viajes) y la fauna
+  (que cruza entre caña y caña): `scripts/check-decor.ts`.
+- **El bambú y los arbustos son muelles amortiguados** (`scene/systems/sway.ts`):
+  se arquean al arreciar, se pasan un poco, rebotan al amainar y se quedan
+  arqueados si el viento es parejo. Siete muelles —tres rigideces con dos
+  retardos, y el de los arbustos—, integrados en la CPU y aplicados en el shader.
+- **La entrada** (sólo la primera carga de la pestaña, con movimiento): la bruma se
+  abre, KYOTO se empapa de izquierda a derecha —un gesto, no un deletreo—, 京都 se
+  dibuja trazo a trazo con KanjiVG como máscara del glifo de Zen Old Mincho y, al
+  posarse el último trazo, una ráfaga real. Cualquier gesto la completa. Un script
+  en línea evita el parpadeo y una animación CSS de respaldo muestra el cartel si
+  el JS no llega.
+- **La tarjeta de bienvenida** del tramo explica cómo se recorre el sitio.
+- **El riel lleva una bruma de papel** detrás de las piedrecitas, para leerse
+  sobre las vigas del torii.
+
+Rendimiento medido (tier alto, GPU integrada): +11 draw calls y ~100 k triángulos
+por frame con sombras, a 60 fps. Detalle:
+`docs/superpowers/specs/2026-10-08-fase-4-home-design.md`.
+
 ### 5.5 Ambiente
 
 - **Pétalos y hojas** en varias capas de profundidad, con viento direccional variable.
@@ -412,6 +444,7 @@ valores ya no son estimaciones: son medidas.
 | Ámbar | `--color-kohaku` | `#FFD699` | Círculo del farol, `13.png` |
 | Matcha suave | `--color-matcha-soft` | `#B4CCAD` | Círculo de gastronomía, `13.png` |
 | Bambú | `--color-bambu` | `#A3B58E` | Hojas de bambú de `1.png` |
+| Musgo | `--color-koke` · `-mid` · `-deep` | `#78B848` · `#509030` · `#306828` | El arbusto de `1.png`, medido aparte (no llega al 0,1 % del cuadro) |
 | Piedra | `--color-ishi` | `#EDE6DD` | Círculo del torii, `13.png` |
 
 Las tres estimaciones del documento original estaban cerca pero ninguna era
@@ -478,8 +511,10 @@ instancia miles de veces y reacciona al input. Un dibujo estático no.
 | Elemento | Cómo se genera | Librería |
 |---|---|---|
 | **Piedras del camino** | Icosaedro deformado con ruido simplex + flat shading. Cada piedra con seed distinto = todas únicas | R3F + `maath` |
-| **Torii** | Cajas para los pilares + `ExtrudeGeometry` sobre `CatmullRomCurve3` para el *kasagi* curvado | three / R3F |
-| **Bambú** | `CylinderGeometry` instanciado + vertex shader de viento (seno + ruido) | R3F `<Instances>` + GLSL |
+| **Torii** | Generador paramétrico (`scene/objects/torii/`): pilares cónicos con *uchikorobi*, cajas de aristas redondeadas, *kasagi* y *shimaki* lofteados con las puntas levantadas, placa, *sode-bashira* con tejadillo. Tres geometrías, una por material. Hoy `ryobu`; la Fase 6 añade `inari` | three |
+| **Bambú** | Cañas con nudos y hojas (la misma hoja que cae) en dos `InstancedMesh` por estación; se doblan con un muelle amortiguado integrado en CPU (`sway.ts` → `windSway`), con sombra en el mismo viento | three + GLSL |
+| **Arbusto** | *O-karikomi*: esferas deformadas con ruido de masa + cientos de hojas instanciadas sobre su superficie, con su muelle | three + GLSL |
+| **Kanji dibujado** | Trazos de KanjiVG (CC BY-SA 3.0, `bun run kanji`) como máscara SVG del glifo real, animando `stroke-dashoffset` (`<InkKanji>`) | SVG + GSAP |
 | **Pétalos / hojas** | `InstancedMesh` con posición calculada **en el shader** → coste CPU ≈ 0, miles de partículas a 60 fps | R3F + shader |
 | **Faroles** | `LatheGeometry` para la acanaladura + material emisivo + bloom. Se balancean con física | R3F + postprocessing + rapier |
 | **Fauna** | Modelos `.glb` reales pasados por `bun run models`: el color de la textura se **hornea en los vértices** y la textura se tira (el 80 % del peso, y un realismo fotográfico que chocaba con el cartel), la malla se simplifica y se normaliza (morro a +X, pies en y = 0, largo 1). De 177 MB a ~1 MB. Se animan deformando regiones en el vertex shader, con un 20 % más de saturación (sin tocar el brillo), un 5 % de washi y un filo de tinta en la silueta (§5.6) | gltf-transform + meshoptimizer + sharp; R3F + GLSL |
@@ -623,11 +658,11 @@ fase** para revisión antes de seguir.
 | **3A** | · El mundo | Sendero desde `journey.ts` · terreno continuo · piedras en todo el recorrido · cámara sobre el camino con scroll · tramo y llegada automática · viaje entre estaciones | ✅ |
 | **3B** | · La fauna en el camino | Actos anclados al mundo · lo que vuela se adelanta (ancla que se desliza) · nace por delante al caminar · cercanía por estación · márgenes con la cámara real · nunca desaparece a la vista | ✅ |
 | **3C** | · La navegación | Sidebar radial (`13.png`) con íconos generados por código · progreso del camino · nav móvil · teclado · transiciones | ✅ |
-| **4** | Home 京都 | Torii 3D, bambú, título tipográfico, composición del hero | ⏸ |
-| **5** | Ubicación 位置 | Mapa de Japón extruido e interactivo, zoom a Kyoto · **tramo hacia Eventos**: los dos mapas antiguos, desplegables, **no como tarjetas sino como carteles de madera insertados en el camino** (en 3A son tarjetas provisionales, con el hueco del mapa), junto a la reseña breve de Kyoto | ⏸ |
-| **6** | Lugares | Plantilla + Fushimi Inari, Kiyomizu-dera, Gion · **tramos**: de Eventos a Fushimi, paso por los costados del santuario y subida escalonada —gradas en la malla del terreno— con toriis (`5.png`); de Fushimi a Kiyomizu-dera, un bosque denso de bambú y un puente de madera sobre una pequeña vaguada antes de la plataforma del templo; de Kiyomizu-dera a Gion, la bajada termina en calzadas tradicionales y faroles | ⏸ |
-| **7** | Eventos | Sakura + rueda de estaciones / calendario del año · **tramo de llegada**: el bosque de cerezos al acercarse a la sakura (el aumento progresivo de pétalos ya lo hace 3A) | ⏸ |
-| **8** | Gastronomía 京料理 | Platos interactivos · **tramo final**: llano, culmina en el espacio gastronómico | ⏸ |
+| **4** | Home 京都 | Torii 3D, bambú, arbusto, título tipográfico, composición del hero · decoración declarada en `journey.ts` · entrada «el cartel se compone» · tramo hacia Ubicación con tarjeta de bienvenida | 🔍 |
+| **5** | Ubicación 位置 | Mapa de Japón extruido e interactivo, zoom a Kyoto · el kanji 位置 dibujado con `<InkKanji>` · **tramo hacia Eventos**: los dos mapas antiguos, desplegables, **no como tarjetas sino como carteles de madera insertados en el camino** (en 3A son tarjetas provisionales, con el hueco del mapa), junto a la reseña breve de Kyoto | ⏸ |
+| **6** | Lugares | Plantilla + Fushimi Inari, Kiyomizu-dera, Gion · sus kanji dibujados con `<InkKanji>` · variante `inari` del torii · **tramos**: de Eventos a Fushimi, paso por los costados del santuario y subida escalonada —gradas en la malla del terreno— con toriis (`5.png`); de Fushimi a Kiyomizu-dera, un bosque denso de bambú y un puente de madera sobre una pequeña vaguada antes de la plataforma del templo; de Kiyomizu-dera a Gion, la bajada termina en calzadas tradicionales y faroles | ⏸ |
+| **7** | Eventos | Sakura + rueda de estaciones / calendario del año · 桜 dibujado con `<InkKanji>` · **tramo de llegada**: el bosque de cerezos al acercarse a la sakura (el aumento progresivo de pétalos ya lo hace 3A) | ⏸ |
+| **8** | Gastronomía 京料理 | Platos interactivos · 京料理 dibujado con `<InkKanji>` · **tramo final**: llano, culmina en el espacio gastronómico | ⏸ |
 | **9** | Pulido | Presupuesto de rendimiento · Lighthouse · auditoría a11y · móvil real · SEO/OG · deploy | ⏸ |
 
 **Las fases 1–3 son la inversión clave.** Si el camino queda bien, las páginas 4–8 son en
@@ -646,6 +681,10 @@ buena medida rellenar contenido sobre una plantilla que ya funciona.
 | Kitsune | ⏳ Aplazado a la Fase 6, entre los toriis. El modelo está en `assets/models/source/` |
 | Carpa koi | ⏳ Aplazada hasta que haya agua: un estanque en alguno de los templos o en la home. El koi que había es un asset de Animal Crossing y **no se puede publicar**; se hará uno propio (los peces son el caso de libro de la deformación en el shader) |
 | **Créditos de los modelos** | ⚠️ Garza y gorrión son CC BY: **antes de publicar tiene que existir una sección de créditos visible**. Detalle en `assets/models/LICENSES.md` (Fase 9) |
+| **Créditos de KanjiVG** | ⚠️ Los trazos de los kanji son CC BY-SA 3.0 (© Ulrich Apel): entran en la misma sección de créditos. El «compartir igual» afecta sólo a `strokes.generated.ts`. Detalle en `assets/kanji/LICENSES.md` |
+| Faroles de piedra y más decoración | ⏳ Pendiente **dentro de la Fase 4**: al menos un par de *ishidōrō* en la Home o su tramo, y quizá otros elementos, según cómo se vean la Home y el tramo en la revisión. Irían como objetos sueltos de `environment.decor`, con su huella |
+| Profundidad de campo en la Home | ⏳ El bambú de delante sale casi nítido con el rango actual (16 u). Estrecharlo lo desenfocaría, pero también las piedras cercanas en todas las estaciones: se decide en la revisión |
+| Precargas RSC en el export | ⏳ Fase 9: con `serve`, las precargas de segmento de Next 16 dan 404 (piden `__next.$d$locale.__PAGE__.txt`, el export escribe `__next.$d$locale/__PAGE__.txt`). No rompe la navegación; el hosting tendrá que servirlas |
 | Peso de la fauna | ⏳ ~0,96 MB en total; cada estación sólo carga su elenco. La mariposa se lleva 620 KB (esqueleto de 192 huesos que el simplificador no consigue bajar de 16.000 triángulos), y las posiciones de los modelos estáticos van sin cuantizar para que el shader vea coordenadas reales. Las dos cosas son candidatas a recorte en la Fase 9 |
 | Bloom y luciérnagas | ⏳ **A la fase de la noche.** Sobre un fondo washi (`#FFFACD`, luminancia ~0,97) un bloom no tiene nada más brillante que el fondo que hacer brillar: o ilumina el fondo entero o no hace nada. Por lo mismo, las luciérnagas (`kohaku`, `#FFD699`) no se veían en Gion, cuyo cielo además se tiñe de ese mismo ámbar, y ocupaban un tercio de sus actos. Se sacaron del reparto de Gion (la especie, su rig y su conducta siguen, y `check:path` las sigue recorriendo); vuelven con la noche, junto con el bloom y los faroles encendidos |
 | La noche | ⏳ Fase posterior, sin número aún. Anochecer según la hora: la de Japón (GMT+9: «ahora mismo en Kyoto es de noche») o la de quien visita. Trae de vuelta las luciérnagas y el bloom |

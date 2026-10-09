@@ -490,6 +490,8 @@ check(
 
 const ubicacion = JOURNEY[stationIndex('ubicacion')]!;
 check('el tramo de Ubicación lleva sus tres tarjetas provisionales', ubicacion.tramo.cards.length === 3);
+const inicio = JOURNEY[stationIndex('inicio')]!;
+check('el tramo de la Home lleva la tarjeta de bienvenida', inicio.tramo.cards.some((card) => card.id === 'bienvenida'));
 
 // Las claves de las tarjetas se arman con la estación y el id de `journey.ts`,
 // y el tipo de next-intl no puede seguirlas: lo que no comprueba el compilador

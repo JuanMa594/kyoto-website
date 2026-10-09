@@ -97,6 +97,70 @@ export interface SkyTint {
 }
 
 /**
+ * Dónde va un objeto de la decoración, en coordenadas del camino: `d` es la
+ * profundidad desde la estación (positiva = hacia la siguiente: la
+ * decoración de un tramo la declara la estación de la que sale) y `u`, la
+ * distancia al eje del camino (negativa = a la izquierda), la misma `u` de
+ * `scene/systems/elevation.ts`.
+ */
+export interface DecorAt {
+  readonly d: number;
+  readonly u: number;
+}
+
+/** Una franja a un costado del camino, entre dos profundidades y dos |u|. */
+export interface DecorArea {
+  readonly side: Side;
+  readonly from: number;
+  readonly to: number;
+  readonly inner: number;
+  readonly outer: number;
+}
+
+interface DecorObjectBase {
+  readonly at: DecorAt;
+  /**
+   * Otra colocación cuando la pantalla es más alta que ancha: en 9:16 el cuadro
+   * mide unas 4 u de ancho a la distancia del cartel. `null` = no aparece.
+   */
+  readonly portrait?: DecorAt | null;
+  /** Giro extra sobre el rumbo del camino, en radianes. */
+  readonly yaw?: number;
+  readonly scale?: number;
+}
+
+/** Un torii. La Fase 6 añadirá la variante `inari` para Fushimi. */
+export interface DecorTorii extends DecorObjectBase {
+  readonly kind: 'torii';
+  readonly variant: 'ryobu';
+}
+
+/** Un arbusto podado en nube (o-karikomi). No le cierra el paso a la fauna. */
+export interface DecorShrub extends DecorObjectBase {
+  readonly kind: 'arbusto';
+  readonly seed: number;
+}
+
+/**
+ * Un macizo: una franja que se llena de plantas con semilla fija. Hoy, bambú;
+ * es también la puerta a los cerezos de Eventos y a las reglas de Fushimi.
+ */
+export interface DecorGrove {
+  readonly kind: 'bambu';
+  readonly area: DecorArea;
+  readonly portrait?: DecorArea | null;
+  /** Cañas por unidad² en tier alto. */
+  readonly density: number;
+  /** Densidad al final del macizo, como fracción de la del principio: < 1 se aclara. */
+  readonly taper?: number;
+  /** Alto de las cañas, en unidades: de las más bajas a las más altas. */
+  readonly height: readonly [number, number];
+  readonly seed: number;
+}
+
+export type DecorItem = DecorTorii | DecorShrub | DecorGrove;
+
+/**
  * El "preset de ambiente" de la estación: qué forma tiene el terreno, por qué
  * lado se levanta, a qué altura está el camino. Es lo que evita que el fondo
  * sea siempre el mismo. La decoración concreta (cerezos, toriis repetidos,
@@ -121,6 +185,11 @@ export interface StationEnvironment {
    */
   readonly lateral: number;
   readonly skyTint?: SkyTint;
+  /**
+   * La decoración de la estación **y de su tramo de salida** (Fase 4). La
+   * llevan al mundo `scene/decor/placement.ts` y `StationDecor`.
+   */
+  readonly decor: readonly DecorItem[];
 }
 
 /**
@@ -219,6 +288,14 @@ const NO_CARDS: StationTramo = { cards: [] };
 const TRAMO_EVENTOS: StationTramo = { cards: [], flat: 50 };
 
 /**
+ * De la Home a Ubicación: cómo se recorre el sitio, a la izquierda (el torii
+ * queda a la derecha). Es la única explicación de la interfaz que hay.
+ */
+const TRAMO_INICIO: StationTramo = {
+  cards: [{ id: 'bienvenida', side: 'izquierda', kind: 'texto' }],
+};
+
+/**
  * De Ubicación a la sakura: dónde está Kyoto y cómo es, antes de llegar a los
  * cerezos. Provisional: las dos tarjetas de mapa dejan el hueco del mapa
  * antiguo desplegable, que se hace en la Fase 5.
@@ -230,6 +307,63 @@ const TRAMO_UBICACION: StationTramo = {
     { id: 'resena', side: 'izquierda', kind: 'texto' },
   ],
 };
+
+/**
+ * La Home y su tramo: el cartel de `1.png` —el torii a la derecha, cortado por
+ * el borde; bambú en la esquina; un arbusto al pie— y un bosquecillo de bambú
+ * que se aclara hasta abrirse al valle de Ubicación. Los números están
+ * calibrados con `bun run check:path` (sección «El cartel de la Home»).
+ */
+const DECOR_INICIO: readonly DecorItem[] = [
+  { kind: 'torii', variant: 'ryobu', at: { d: -6.25, u: 5 }, portrait: { d: 6.6, u: 3.6 } },
+  { kind: 'arbusto', seed: 11, at: { d: -9.2, u: 5.6 }, portrait: { d: 5, u: 4.6 } },
+  // Delante: cañas jóvenes cortadas por la esquina inferior izquierda.
+  {
+    kind: 'bambu',
+    seed: 21,
+    density: 0.55,
+    height: [3.2, 4.8],
+    area: { side: 'izquierda', from: -14, to: -6, inner: 4.5, outer: 9 },
+    // En vertical no: el viaje de vuelta desde Ubicación pasa por la izquierda
+    // del eje y lo atravesaría (check:path, «La cámara nunca entra»).
+    portrait: null,
+  },
+  // Detrás del texto, ya con niebla.
+  {
+    kind: 'bambu',
+    seed: 22,
+    density: 0.12,
+    height: [5.5, 9.5],
+    area: { side: 'izquierda', from: 0, to: 18, inner: 6.5, outer: 12 },
+  },
+  // Lejos, detrás del torii.
+  {
+    kind: 'bambu',
+    seed: 23,
+    density: 0.16,
+    height: [5.5, 9.5],
+    area: { side: 'derecha', from: 6, to: 26, inner: 7.5, outer: 13 },
+  },
+  // El tramo: el bosquecillo se aclara hacia el valle.
+  {
+    kind: 'bambu',
+    seed: 24,
+    density: 0.2,
+    taper: 0.15,
+    height: [5.5, 9.5],
+    area: { side: 'izquierda', from: 18, to: 48, inner: 6, outer: 12 },
+  },
+  {
+    kind: 'bambu',
+    seed: 25,
+    density: 0.2,
+    taper: 0.15,
+    height: [5.5, 9.5],
+    area: { side: 'derecha', from: 26, to: 52, inner: 5, outer: 12 },
+  },
+  { kind: 'arbusto', seed: 12, at: { d: 14, u: -5.5 } },
+  { kind: 'arbusto', seed: 13, at: { d: 34, u: 6 } },
+];
 
 /**
  * El orden es el del camino, y es también el orden de lectura de `13.png`:
@@ -247,8 +381,14 @@ export const JOURNEY: readonly Station[] = [
     inSidebar: false,
     palette: { halo: '#FFFACD', accent: '#D82609', ground: '#EDE6DD' },
     // Home: jardín llano. Sólo una colina insinuada a la izquierda, de fondo.
-    environment: { hills: 'suaves', hillSides: ['izquierda'], altitude: 0, lateral: 0 },
-    tramo: NO_CARDS,
+    environment: {
+      hills: 'suaves',
+      hillSides: ['izquierda'],
+      altitude: 0,
+      lateral: 0,
+      decor: DECOR_INICIO,
+    },
+    tramo: TRAMO_INICIO,
     ambient: {
       petals: 'media',
       petalKind: 'bambu',
@@ -270,7 +410,13 @@ export const JOURNEY: readonly Station[] = [
     inSidebar: true,
     palette: { halo: '#FFFFFF', accent: '#C4181A', ground: '#F3EFE4' },
     // Valle abierto: ondulación baja por los dos costados.
-    environment: { hills: 'suaves', hillSides: ['izquierda', 'derecha'], altitude: 0, lateral: -8 },
+    environment: {
+      hills: 'suaves',
+      hillSides: ['izquierda', 'derecha'],
+      altitude: 0,
+      lateral: -8,
+      decor: [],
+    },
     tramo: TRAMO_UBICACION,
     ambient: {
       petals: 'baja',
@@ -300,6 +446,7 @@ export const JOURNEY: readonly Station[] = [
       altitude: 0,
       lateral: 4,
       skyTint: { color: '#EB81A5', amount: 0.1 },
+      decor: [],
     },
     tramo: TRAMO_EVENTOS,
     ambient: {
@@ -329,6 +476,7 @@ export const JOURNEY: readonly Station[] = [
       altitude: 14,
       lateral: -12,
       skyTint: { color: '#D82609', amount: 0.14 },
+      decor: [],
     },
     tramo: NO_CARDS,
     ambient: {
@@ -357,7 +505,7 @@ export const JOURNEY: readonly Station[] = [
     palette: { halo: '#FFCCBC', accent: '#B1341F', ground: '#E8D6C3' },
     // Ladera: el relieve sólo por la derecha; el camino sube un poco más y,
     // de aquí a Gion, baja.
-    environment: { hills: 'montanosa', hillSides: ['derecha'], altitude: 17, lateral: 8 },
+    environment: { hills: 'montanosa', hillSides: ['derecha'], altitude: 17, lateral: 8, decor: [] },
     tramo: NO_CARDS,
     ambient: {
       // Los tres lugares comparten ambiente pasivo: aquí el protagonista es el
@@ -388,6 +536,7 @@ export const JOURNEY: readonly Station[] = [
       altitude: 8,
       lateral: -10,
       skyTint: { color: '#FFD699', amount: 0.16 },
+      decor: [],
     },
     tramo: NO_CARDS,
     ambient: {
@@ -419,6 +568,7 @@ export const JOURNEY: readonly Station[] = [
       altitude: 8,
       lateral: 0,
       skyTint: { color: '#B4CCAD', amount: 0.12 },
+      decor: [],
     },
     tramo: NO_CARDS,
     ambient: {

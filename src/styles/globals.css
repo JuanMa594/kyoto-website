@@ -1,6 +1,14 @@
 @import 'tailwindcss';
 @import './tokens.css';
 
+/* `--ink` del cartel de la Home (Fase 4): registrada como número para que la
+   animación CSS de respaldo la interpole en vez de saltar de 0 a 1. */
+@property --ink {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 1;
+}
+
 /* El canvas 3D vive detrás de todo el DOM y nunca se desmonta. El contenido
    real (texto, enlaces, encabezados) existe siempre como DOM de verdad encima:
    es lo que leen Google y los lectores de pantalla. */
@@ -84,6 +92,37 @@
     font-size: var(--text-kanji);
     line-height: var(--text-kanji--line-height);
     letter-spacing: 0.04em;
+  }
+
+  /* Un kanji que se puede dibujar (`InkKanji`): cada carácter es un SVG de
+     1em con el glifo de Zen Old Mincho. Los trazos de la máscara son blancos
+     (lo que dejan ver) y van enteros por defecto. */
+  .ink-kanji {
+    display: inline-flex;
+    gap: 0.04em;
+    font-size: var(--text-kanji);
+    line-height: 1;
+  }
+
+  .ink-kanji__char {
+    width: 1em;
+    height: 1em;
+    overflow: visible;
+  }
+
+  .ink-kanji__glyph {
+    font-family: var(--font-kanji);
+    fill: currentColor;
+  }
+
+  .ink-kanji__stroke {
+    fill: none;
+    stroke: #fff;
+    stroke-width: 16;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 0;
   }
 
   .brush {
@@ -246,6 +285,134 @@
     translate: 0 0.75rem;
   }
 
+  /* ── El cartel de la Home (Fase 4) ─────────────────────────────────────
+     El bloque de texto se centra en el 28 % del ancho y en el tercio medio,
+     como KYOTO / 京都 en 1.png; el torii está a la derecha, en la escena. */
+  .home-cartel {
+    display: grid;
+    min-height: 100dvh;
+    align-items: center;
+  }
+
+  .home-cartel__text {
+    width: min(40vw, 38rem);
+    margin-left: 8vw;
+    text-align: center;
+  }
+
+  .home-cartel__title {
+    margin: 0;
+  }
+
+  /* --ink va de 0 a 1 en la entrada: la palabra se empapa de izquierda a
+     derecha y el interletrado se cierra. En reposo vale 1. */
+  .home-cartel__word {
+    --ink: 1;
+    display: block;
+    font-size: var(--text-cartel);
+    line-height: var(--text-cartel--line-height);
+    letter-spacing: calc((1 - var(--ink)) * 0.12em);
+    text-transform: uppercase;
+    color: var(--color-shu);
+    mask-image: linear-gradient(90deg, #000 calc(var(--ink) * 140% - 40%), transparent calc(var(--ink) * 140%));
+  }
+
+  .home-cartel__letter {
+    display: inline-block;
+  }
+
+  .home-cartel__kanji {
+    margin-top: 0.35em;
+    color: var(--color-shu);
+  }
+
+  .home-cartel__tagline {
+    margin-top: 1.5rem;
+    font-size: 1.35rem;
+  }
+
+  /* En vertical el bloque sube a la parte alta del tercio medio y deja libre
+     la derecha, donde está el torii. */
+  @media (orientation: portrait) {
+    .home-cartel {
+      align-items: start;
+      padding-top: 28dvh;
+    }
+
+    .home-cartel__text {
+      width: min(68vw, 30rem);
+      margin-left: 6vw;
+    }
+  }
+
+  /* La invitación a caminar. */
+  .walk-hint {
+    display: inline-flex;
+    margin-top: 2.5rem;
+    align-items: center;
+    gap: 0.9rem;
+    opacity: 0.8;
+    transition: opacity var(--dur-largo) var(--ease-washi);
+  }
+
+  .walk-hint[data-walking] {
+    opacity: 0;
+  }
+
+  .walk-hint__stones {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .walk-hint__stone {
+    width: 0.7rem;
+    height: 0.55rem;
+    fill: var(--color-sumi-faint);
+    animation: walk-step 1.8s var(--ease-washi) infinite both;
+  }
+
+  .walk-hint[data-motion='off'] .walk-hint__stone {
+    animation: none;
+    opacity: 0.7;
+  }
+
+  @keyframes walk-step {
+    0%,
+    100% {
+      opacity: 0.15;
+    }
+    35% {
+      opacity: 0.9;
+    }
+  }
+
+  /* ── La entrada (Fase 4) ──────────────────────────────────────────────
+     Con `data-intro` el cartel empieza escondido; HomeIntro lo compone y
+     quita la marca. `on` es el estado antes de que hidrate el JS: si el JS
+     no llega, el cartel aparece solo a los 4 s. */
+  html[data-intro] [data-cartel-word] {
+    --ink: 0;
+  }
+
+  html[data-intro] .home-cartel .ink-kanji,
+  html[data-intro] [data-cartel-late] {
+    opacity: 0;
+  }
+
+  html[data-intro='on'] [data-cartel-word],
+  html[data-intro='on'] .home-cartel .ink-kanji,
+  html[data-intro='on'] [data-cartel-late] {
+    animation: cartel-fallback 0.6s var(--ease-washi) 4s forwards;
+  }
+
+  @keyframes cartel-fallback {
+    to {
+      --ink: 1;
+      opacity: 1;
+    }
+  }
+
   /* ── La navegación (Fase 3C) ───────────────────────────────────────────
      El riel de escritorio: siete paradas sobre un arco pegado al borde
      derecho. Aquí vive la geometría en reposo —plegado—; el despliegue
@@ -261,6 +428,33 @@
     width: 0;
     height: min(64vh, 560px);
     translate: 0 -50%;
+  }
+
+  /* Bruma de papel detrás del riel plegado (Fase 4). Sobre el crema apenas se
+     nota; delante del kasagi y del nuki del torii de la Home, aclara el rojo
+     lo justo para que se lean las piedrecitas y la marca «tú». Desplegado, los
+     círculos tienen su propia cara y la bruma se va. */
+  .rail::before {
+    position: absolute;
+    top: -8%;
+    right: -1.75rem;
+    bottom: -8%;
+    width: 3.5rem;
+    content: '';
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--color-washi) 58%, transparent) 30%,
+      color-mix(in srgb, var(--color-washi) 58%, transparent) 70%,
+      transparent
+    );
+    mask-image: linear-gradient(180deg, transparent, #000 12%, #000 88%, transparent);
+    pointer-events: none;
+    transition: opacity var(--dur-medio) var(--ease-washi);
+  }
+
+  .rail[data-open]::before {
+    opacity: 0;
   }
 
   .rail__list {

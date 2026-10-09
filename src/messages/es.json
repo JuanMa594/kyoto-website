@@ -67,10 +67,9 @@
     }
   },
   "home": {
-    "eyebrow": "Una experiencia continua",
     "title": "Kyoto",
-    "subtitle": "Sigue el camino de piedras.",
-    "enter": "Empezar el camino"
+    "tagline": "Caminata por el corazón de Japón.",
+    "walk": "Desliza para caminar"
   },
   "tramo": {
     "label": "Camino hacia {station}",
@@ -79,6 +78,12 @@
     "mapPlaceholder": "Mapa antiguo · llega en la Fase 5"
   },
   "tramos": {
+    "inicio": {
+      "bienvenida": {
+        "title": "Cómo se recorre",
+        "body": "Este sitio es un camino. Al bajar avanzas por él, y cada lugar de Kyoto aparece cuando llegas. Para saltar a otra sección usa el riel de piedras de la derecha (en el móvil, la barra de abajo). 音 enciende el sonido del ambiente y 静 aquieta la escena."
+      }
+    },
     "ubicacion": {
       "japon": {
         "title": "En el corazón de Japón",

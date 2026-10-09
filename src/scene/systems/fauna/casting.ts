@@ -13,6 +13,7 @@
 
 import type { FaunaKind } from '@/config/journey';
 import { lerp } from '@/lib/procedural';
+import { crossesDecor, decorFootprints } from '@/scene/decor/footprints';
 import type { PathFrame } from '@/scene/path/journeyPath';
 
 import {
@@ -37,6 +38,11 @@ import {
   speciesSpec,
   type BehaviorName,
 } from './bestiary';
+
+/** Intentos de colocar un acto sin que atraviese la decoración (Fase 4). */
+export const DECOR_RETRIES = 4;
+/** Si ninguno cabe, se espera esto antes de volver a probar, en segundos. */
+const DECOR_BACKOFF = 3;
 
 export interface CastingConfig {
   /** Hueco mínimo y máximo entre actos, en segundos. */
@@ -244,7 +250,18 @@ function castAct(
 
   memory.counter += 1;
   memory.lastSpecies = chosen.kind;
-  return createAct(chosen, memory.counter, now, camera, random);
+  // Lo que atravesaría un pilar o una caña no sale: se prueba con otro sorteo
+  // de sitio y, si no cabe, se deja para dentro de un rato.
+  const footprints = decorFootprints(camera.aspect <= 1);
+  for (let attempt = 0; attempt < DECOR_RETRIES; attempt += 1) {
+    const act = createAct(chosen, memory.counter, now, camera, random);
+    if (!crossesDecor(act, footprints)) return act;
+  }
+  memory.nextAt = now + DECOR_BACKOFF;
+  // Sin esto, la recompensa por quedarse quieto volvería a intentarlo en el
+  // frame siguiente: cuenta como si acabara de pasar algo.
+  memory.emptySince = now;
+  return null;
 }
 
 /**

@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { MotionEngine } from '@/animation/MotionEngine';
 import { AmbientAudio } from '@/audio/AmbientAudio';
 import { EnvironmentProbe } from '@/components/EnvironmentProbe';
+import { introScript } from '@/components/home/introScript';
 import { JourneyNav } from '@/components/nav/JourneyNav';
 import { AmbientControls } from '@/components/ui/AmbientControls';
 import { staticLocale } from '@/i18n/params';
@@ -43,7 +44,13 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
   const t = await getTranslations({ locale, namespace: 'ui' });
 
   return (
-    <html lang={locale} className={fontVariables}>
+    // El script de la entrada añade data-intro antes de hidratar.
+    <html lang={locale} className={fontVariables} suppressHydrationWarning>
+      <head>
+        {/* La entrada de la Home: decide antes de pintar si el cartel empieza
+            escondido (ver components/home/introScript.ts). */}
+        <script dangerouslySetInnerHTML={{ __html: introScript() }} />
+      </head>
       <body>
         <a className="skip-link" href="#contenido">
           {t('skipToContent')}

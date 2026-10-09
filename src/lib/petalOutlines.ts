@@ -74,19 +74,19 @@ export function momijiOutline(): OutlinePoint[] {
 }
 
 /** Hoja de bambú: lanceolada, larga y con una curva suave hacia un lado. */
-export function bambuOutline(): OutlinePoint[] {
+export function bambuOutline(segments = SEGMENTS): OutlinePoint[] {
   const width = 0.16;
   const bend = 0.14;
 
   const half: OutlinePoint[] = [];
-  for (let i = 0; i <= SEGMENTS; i += 1) {
-    const u = i / SEGMENTS;
+  for (let i = 0; i <= segments; i += 1) {
+    const u = i / segments;
     half.push({ x: bend * u * u + width * Math.sin(Math.PI * u) ** 0.8, y: u });
   }
 
   const outline = [...half];
-  for (let i = SEGMENTS - 1; i >= 1; i -= 1) {
-    const u = i / SEGMENTS;
+  for (let i = segments - 1; i >= 1; i -= 1) {
+    const u = i / segments;
     outline.push({ x: bend * u * u - width * Math.sin(Math.PI * u) ** 0.8, y: u });
   }
 

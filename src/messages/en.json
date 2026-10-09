@@ -67,10 +67,9 @@
     }
   },
   "home": {
-    "eyebrow": "One continuous experience",
     "title": "Kyoto",
-    "subtitle": "Follow the stone path.",
-    "enter": "Start the path"
+    "tagline": "A walk through the heart of Japan.",
+    "walk": "Scroll to walk"
   },
   "tramo": {
     "label": "Path to {station}",
@@ -79,6 +78,12 @@
     "mapPlaceholder": "Old map · coming in Phase 5"
   },
   "tramos": {
+    "inicio": {
+      "bienvenida": {
+        "title": "How to walk it",
+        "body": "This site is a path. As you scroll you move along it, and each place in Kyoto appears when you reach it. To jump to another section, use the stone rail on the right (on a phone, the bar at the bottom). 音 turns on the ambient sound and 静 quiets the scene."
+      }
+    },
     "ubicacion": {
       "japon": {
         "title": "In the heart of Japan",

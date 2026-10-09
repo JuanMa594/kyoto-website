@@ -10,6 +10,8 @@ import { lerp } from '@/lib/procedural';
 import type { QualityProfile } from '@/scene/quality/tiers';
 import { PATH, zoneBlend } from '@/scene/path/journeyPath';
 
+import { INTRO } from './intro';
+
 /**
  * El aire del camino: el fondo, la niebla y el sol.
  *
@@ -65,8 +67,12 @@ export function Atmosphere({ palette, profile }: AtmosphereProps) {
 
     background.lerpColors(tones[zone.from]!.sky, tones[zone.to]!.sky, zone.t);
     fog.color.lerpColors(tones[zone.from]!.fog, tones[zone.to]!.fog, zone.t);
-    fog.near = lerp(from.ambient.fog.near, to.ambient.fog.near, zone.t) * profile.fogScale;
-    fog.far = lerp(from.ambient.fog.far, to.ambient.fog.far, zone.t) * profile.fogScale;
+    // La entrada de la Home abre la bruma: INTRO.fog va de casi 0 a 1.
+    const reveal = INTRO.fog;
+    const near = lerp(from.ambient.fog.near, to.ambient.fog.near, zone.t) * profile.fogScale;
+    const far = lerp(from.ambient.fog.far, to.ambient.fog.far, zone.t) * profile.fogScale;
+    fog.near = near * reveal;
+    fog.far = Math.max(fog.near + 0.5, far * reveal);
   });
 
   return null;

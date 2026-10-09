@@ -1,55 +1,56 @@
 import { getTranslations } from 'next-intl/server';
 
 import { ActiveStation } from '@/components/ActiveStation';
+import { HomeIntro } from '@/components/home/HomeIntro';
+import { WalkHint } from '@/components/home/WalkHint';
+import { InkKanji } from '@/components/kanji/InkKanji';
 import { ContentArrival } from '@/components/sections/ContentArrival';
 import { PathTramo } from '@/components/sections/PathTramo';
 import { getStation } from '@/config/journey';
 import { staticLocale } from '@/i18n/params';
 
 /**
- * Home 京都 — versión de la Fase 1.
+ * Home 京都 — el cartel de `1.png` (Fase 4).
  *
- * La composición definitiva (torii 3D, bambú, hero de cartel) es de la Fase 4.
- * Lo que sí es definitivo aquí es la estructura: título tipográfico a un lado,
- * el objeto protagonista al otro, y todo el texto como DOM real por encima del
- * canvas.
+ * KYOTO / 京都 a la izquierda y el torii a la derecha, en la escena (la
+ * decoración de `journey.ts`). Todo el texto es DOM real: las letras animadas y
+ * el kanji dibujable van `aria-hidden`, y al lado está el título que se lee.
+ * La entrada (`HomeIntro`) anima lo marcado con `data-cartel-*`.
  */
 export default async function HomePage({ params }: { params: Promise<{ locale: string }> }) {
   const locale = await staticLocale(params);
-
   const t = await getTranslations({ locale, namespace: 'home' });
-  const scaffold = await getTranslations({ locale, namespace: 'scaffold' });
   const station = getStation('inicio');
+  const title = t('title');
 
   return (
     <>
       <ActiveStation slug="inicio" />
+      <HomeIntro />
 
       <ContentArrival key="inicio">
-        <main id="contenido" tabIndex={-1} className="mx-auto min-h-dvh max-w-6xl px-6 py-[14vh]">
-          <p className="brush tracking-[0.3em] uppercase opacity-60">{t('eyebrow')}</p>
+        <main id="contenido" tabIndex={-1} className="home-cartel">
+          <div className="home-cartel__text">
+            <h1 className="home-cartel__title">
+              <span className="sr-only">
+                {title} <span lang="ja">{station.kanji}</span>
+              </span>
+              <span className="home-cartel__word" data-cartel-word="" aria-hidden="true">
+                {[...title].map((letter, i) => (
+                  <span key={i} className="home-cartel__letter" data-cartel-letter="">
+                    {letter}
+                  </span>
+                ))}
+              </span>
+              <InkKanji text={station.kanji} className="home-cartel__kanji" />
+            </h1>
 
-          {/* El título y el kanji son el otro protagonista del cuadro, junto al
-              objeto 3D. De ahí el tamaño: es un cartel, no un encabezado. */}
-          <h1 className="mt-4">
-            <span
-              className="block"
-              style={{
-                fontSize: 'var(--text-hero)',
-                lineHeight: 'var(--text-hero--line-height)',
-                color: 'var(--color-shu)',
-              }}
-            >
-              {t('title')}
-            </span>
-            <span className="kanji mt-2 block opacity-90">{station.kanji}</span>
-          </h1>
+            <p className="home-cartel__tagline brush" data-cartel-late="">
+              {t('tagline')}
+            </p>
 
-          <p className="mt-8 max-w-prose text-xl">{t('subtitle')}</p>
-
-          <p className="paper mt-10 inline-block px-4 py-3 opacity-80">
-            <strong>{scaffold('phase')}</strong> — {scaffold('sceneLabel')}
-          </p>
+            <WalkHint label={t('walk')} />
+          </div>
         </main>
       </ContentArrival>
 

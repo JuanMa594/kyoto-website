@@ -1,5 +1,7 @@
 import { Color, MeshStandardMaterial, type IUniform } from 'three';
 
+import { cartelUniforms, withCartelLook } from '@/scene/shaders/cartelLook';
+
 /**
  * Deformación por regiones: cómo se anima un modelo que no tiene esqueleto.
  *
@@ -367,8 +369,7 @@ export function createDeformMaterial(profile: DeformProfile, look: DeformLook): 
         ? [profile.wings.minX, profile.wings.maxX, profile.wings.minY, profile.wings.maxY]
         : [0, 0, 0, 0],
     },
-    uWashi: { value: new Color(look.washi) },
-    uInk: { value: new Color(look.ink) },
+    ...cartelUniforms(look.washi, look.ink),
     uPaint: { value: look.paint ? 1 : 0 },
     uPaintBody: { value: new Color(look.paint?.body ?? '#ffffff') },
     uPaintWing: { value: new Color(look.paint?.wing ?? '#ffffff') },
@@ -396,12 +397,13 @@ export function createDeformMaterial(profile: DeformProfile, look: DeformLook): 
       )
       .replace('#include <begin_vertex>', 'vec3 transformed = faunaPosition;');
 
-    shader.fragmentShader = shader.fragmentShader
+    // La mirada de cartel (washi y filo de tinta) va primero: el color propio
+    // del animal se inserta después, entre el include y el tinte, y el orden
+    // queda como siempre —saturación, luego washi—.
+    shader.fragmentShader = withCartelLook(shader.fragmentShader)
       .replace(
         '#include <common>',
         `#include <common>
-        uniform vec3 uWashi;
-        uniform vec3 uInk;
         uniform float uPaint;
         uniform vec3 uPaintBody;
         uniform vec3 uPaintWing;`,
@@ -420,24 +422,12 @@ export function createDeformMaterial(profile: DeformProfile, look: DeformLook): 
           // paleta (la libélula) ya traen sus colores y no se tocan.
           float faunaLuma = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
           diffuseColor.rgb = max(mix(vec3(faunaLuma), diffuseColor.rgb, 1.2), 0.0);
-        }
-        // Un 5 % de washi en la piel: el animal toma la luz del papel sin
-        // apagar su color.
-        diffuseColor.rgb = mix(diffuseColor.rgb, uWashi, 0.05);`,
-      )
-      .replace(
-        '#include <opaque_fragment>',
-        `// Filo de tinta: donde la superficie se pone de canto respecto de la
-        // cámara, la luz se oscurece hacia el sumi. Es el contorno de una
-        // pincelada, sin segunda pasada ni malla de silueta.
-        float faunaRim = 1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0);
-        outgoingLight = mix(outgoingLight, uInk, smoothstep(0.6, 0.97, faunaRim) * 0.42);
-        #include <opaque_fragment>`,
+        }`,
       );
   };
 
   // Todos los individuos comparten programa: lo que los distingue son uniforms.
-  material.customProgramCacheKey = () => 'fauna-deform-v4';
+  material.customProgramCacheKey = () => 'fauna-deform-v5';
 
   return { material, uniforms };
 }

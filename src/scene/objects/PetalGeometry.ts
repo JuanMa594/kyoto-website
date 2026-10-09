@@ -30,7 +30,7 @@ import { bambuOutline, momijiOutline, sakuraOutline, type OutlinePoint } from '@
  * La malla se normaliza para que su lado mayor mida 1, de modo que la escala de
  * cada capa (`PetalLayer.scale`) se lea directamente en unidades de mundo.
  */
-function fanFromOutline(outline: readonly OutlinePoint[], cup: number, sizeFactor: number): BufferGeometry {
+export function outlineGeometry(outline: readonly OutlinePoint[], cup: number, sizeFactor: number): BufferGeometry {
   const ys = outline.map((p) => p.y);
   const xs = outline.map((p) => p.x);
   const midY = (Math.min(...ys) + Math.max(...ys)) / 2;
@@ -72,11 +72,11 @@ function fanFromOutline(outline: readonly OutlinePoint[], cup: number, sizeFacto
 export function petalGeometry(kind: PetalKind): BufferGeometry {
   switch (kind) {
     case 'sakura':
-      return fanFromOutline(sakuraOutline(), 0.13, 1);
+      return outlineGeometry(sakuraOutline(), 0.13, 1);
     case 'momiji':
-      return fanFromOutline(momijiOutline(), 0.1, 1.3);
+      return outlineGeometry(momijiOutline(), 0.1, 1.3);
     case 'bambu':
-      return fanFromOutline(bambuOutline(), 0.07, 1.15);
+      return outlineGeometry(bambuOutline(), 0.07, 1.15);
     case 'ninguna':
       return new BufferGeometry();
   }

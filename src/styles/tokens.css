@@ -42,6 +42,13 @@
   --color-bambu: #a3b58e;
   --color-bambu-pale: #b9d0a3;
 
+  /* 苔 · el verde del arbusto de 1.png. Se midió aparte (`bun run palette`
+     no lo saca: queda por debajo del 0,1 % del cuadro): claro, medio y la
+     sombra del interior de la mata. */
+  --color-koke: #78b848;
+  --color-koke-mid: #509030;
+  --color-koke-deep: #306828;
+
   --color-ishi: #ede6dd;
   --color-ishi-deep: #c8bfaf;
   --color-kami: #ffffff;
@@ -59,6 +66,11 @@
   --text-hero--line-height: 0.86;
   --text-kanji: clamp(2.5rem, 7vw, 6rem);
   --text-kanji--line-height: 1;
+
+  /* El KYOTO del cartel de la Home: en 1.png ocupa un tercio del ancho, no la
+     mitad como el hero genérico. */
+  --text-cartel: clamp(3.5rem, 9vw, 9.5rem);
+  --text-cartel--line-height: 0.9;
 
   /* ── Ritmo ───────────────────────────────────────────────────────────
      Un solo vocabulario de curvas para DOM y escena. GSAP las consume desde

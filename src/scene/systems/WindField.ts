@@ -169,6 +169,18 @@ export function updateWind(delta: number, baseTarget: number): void {
   WIND.z = Math.sin(WIND.angle) * WIND.strength;
 }
 
+/**
+ * Una ráfaga a demanda: la de la entrada de la Home (Fase 4). Sólo arranca si
+ * no hay otra en curso, y entra en «sube» desde la espera, donde la ráfaga
+ * vale 0: empalma en el valor, sin escalón. Lo que dure y cómo se vaya lo
+ * decide la máquina de siempre.
+ */
+export function requestGust(strength = 0.95): void {
+  if (phase !== 'espera') return;
+  peak = strength;
+  enterPhase('sube', gustTiming().attack);
+}
+
 /** Deja el aire quieto. Lo llama el driver cuando se apaga el movimiento. */
 export function resetWind(): void {
   WIND.strength = 0;

@@ -13,7 +13,8 @@
     "models": "bun run scripts/optimize-models.ts",
     "geo": "bun run scripts/build-geo.ts",
     "palette": "bun run scripts/sample-palette.ts",
-    "check:path": "bun run scripts/check-path.ts && bun run scripts/check-fauna.ts && bun run scripts/check-nav.ts"
+    "kanji": "bun run scripts/build-kanji.ts",
+    "check:path": "bun run scripts/check-path.ts && bun run scripts/check-fauna.ts && bun run scripts/check-nav.ts && bun run scripts/check-decor.ts"
   },
   "dependencies": {
     "@react-three/drei": "10.7.8",

@@ -38,7 +38,8 @@ bun run fonts        # regenera los .woff2 subseteados
 bun run models       # assets/models/source → public/models (fauna optimizada)
 bun run geo          # Natural Earth → icons/japan.generated.ts (Japón del ícono)
 bun run palette      # muestrea los colores de docs/referencias/*.png
-bun run check:path   # comprobaciones puras del camino, el terreno, la cámara, el scroll, la fauna y la navegación
+bun run kanji        # KanjiVG → components/kanji/strokes.generated.ts (trazos de los kanji)
+bun run check:path   # comprobaciones puras del camino, el terreno, la cámara, el scroll, la fauna, la navegación y la decoración
 ```
 
 En desarrollo, **`?fauna=<especie>`** en cualquier página (`/es/ubicacion?fauna=libelula`)
@@ -110,6 +111,15 @@ src/
 │   ├─ objects/stoneGeometry.ts← piedra procedural (12 formas instanciadas)
 │   ├─ objects/PetalGeometry.ts← pétalo, arce y hoja de bambú por contorno
 │   ├─ objects/fauna/          ← cuerpos: modelo + deformación, animado, luz
+│   ├─ objects/torii/          ← el torii ryōbu: medidas (puro), geometría y componente
+│   ├─ objects/Shrub.tsx       ← el arbusto podado en nube (o-karikomi)
+│   ├─ decor/                  ← ★ la decoración de journey.ts (Fase 4)
+│   │   ├─ placement.ts        ← descriptor → mundo, por aspecto (puro)
+│   │   ├─ footprints.ts       ← huellas: piedras, cámara y fauna (puro)
+│   │   ├─ bamboo.ts shrub.ts  ← cañas, hojas y masas (puro, three)
+│   │   ├─ materials.ts        ← MeshStandardMaterial + cartel + viento
+│   │   └─ StationDecor.tsx    ← monta la zona y sus dos vecinas
+│   ├─ shaders/                ← cartelLook (washi + tinta) y windSway (flexión y aleteo)
 │   ├─ PostProcessing.tsx      ← profundidad de campo (sólo tier alto)
 │   ├─ systems/elevation.ts    ← ★ altura del terreno, global (función pura)
 │   ├─ systems/Terrain.tsx     ← una malla para todo el camino, color por zona
@@ -117,6 +127,9 @@ src/
 │   ├─ systems/Atmosphere.tsx  ← niebla, cielo y sol que siguen a la cámara
 │   ├─ systems/WindField.ts    ← ★ un solo viento, con ráfagas (Fase 2A)
 │   ├─ systems/WindDriver.tsx  ← lo hace avanzar dentro del <Canvas>
+│   ├─ systems/sway.ts         ← ★ los muelles del bambú y los arbustos (CPU → uBend)
+│   ├─ systems/BambooGrove.tsx ← el bambú de una estación, instanciado
+│   ├─ systems/intro.ts        ← `INTRO`: la bruma de la entrada de la Home
 │   ├─ systems/PetalSystem.tsx ← ★ pétalos: posición calculada en el shader
 │   ├─ systems/petals.ts       ← capas, densidad y colores (puro, sin React)
 │   ├─ systems/fauna/          ← ★ bestiario, conductas, anclaje, casting y director
@@ -133,6 +146,8 @@ src/
 │   ├─ useRailProgress.ts      ← la marca «tú», desde gsap.ticker (fuera de React)
 │   └─ icons/                  ← los seis íconos calculados + sus microanimaciones
 ├─ components/sections/        ← StationShell, PathTramo (el tramo), ContentArrival
+├─ components/home/            ← HomeIntro (la entrada), introScript, WalkHint (Fase 4)
+├─ components/kanji/           ← InkKanji: el kanji dibujado trazo a trazo (KanjiVG)
 ├─ i18n/                       ← routing, request, navigation, params
 ├─ messages/{es,en}.json       ← textos
 ├─ styles/
@@ -144,8 +159,9 @@ src/
 └─ lib/procedural.ts           ← PRNG, ruido direccional, damping
 ```
 
-Fuera de `src/`: `scripts/` (pipelines de fuentes, paleta, modelos y el Japón
-del ícono de Ubicación) y `assets/` (originales). Los modelos originales de `assets/models/source/` **no
+Fuera de `src/`: `scripts/` (pipelines de fuentes, paleta, modelos, kanji y el Japón
+del ícono de Ubicación) y `assets/` (originales; los trazos de KanjiVG, CC BY-SA,
+en `assets/kanji/`). Los modelos originales de `assets/models/source/` **no
 se versionan** —la garza pesa 127 MB y GitHub no acepta más de 100—; sí se
 versionan los optimizados de `public/models/`. Créditos y licencias en
 `assets/models/LICENSES.md`.
@@ -163,6 +179,15 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   Un tramo puede empezar con un llano recto (`tramo.flat`, en unidades): el de
   Eventos camina 50 u entre los cerezos antes de que empiece la subida a
   Fushimi. Los tramos crecen cuando una página les pone tarjetas.
+- **Lo que hay a los lados del camino se declara en `journey.ts`**
+  (`environment.decor`, Fase 4): objetos sueltos (`torii`, `arbusto`) y
+  macizos (`bambu`), en coordenadas del camino —`d` desde la estación, `u` desde
+  el eje—, con otra colocación opcional para pantallas verticales
+  (`portrait`). **La decoración de una estación incluye su tramo de salida.**
+  `scene/decor/placement.ts` la lleva al mundo y `footprints.ts` publica sus
+  huellas: nada pisa las piedras, la cámara nunca pasa a menos de 1,5 u y la
+  fauna no atraviesa pilares ni cañas (el reparto prueba otro sitio). Todo lo
+  comprueba `check:path` (`scripts/check-decor.ts`).
 - **La posición de la cámara decide qué se ve y qué se oye**, no la ruta. Vive
   en `PATH` (`scene/path/journeyPath.ts`), con un único escritor, `CameraRig`;
   el store guarda sólo `zone`, que leen el ambiente, el audio y la fauna. La
@@ -440,6 +465,31 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   (`kiteFit`), apenas se mueve en el plano. Por eso `check:path` mide la
   velocidad de salida en 3D: medida sólo en XZ daba 0,25 u/s a un animal que
   sube a 1,4.
+- **Una franja de decoración entera le cierra el paso a toda la fauna.** Los
+  actos cruzan el cuadro de lado a lado y entran desde fuera: con el macizo de
+  bambú como obstáculo único, en el tramo de la Home no salía ni uno. Para la
+  fauna cuenta **cada caña** (margen de un cuarto del cuerpo); la franja la
+  miran sólo la cámara y las piedras. Las hojas son blandas: los gorriones
+  pueden cruzarlas.
+- **El viaje de vuelta recorta las curvas por dentro.** Al volver de Ubicación
+  a la Home, el filtro de viaje lleva la cámara hasta 2,8 u a la izquierda del
+  eje: un macizo cercano por ese lado quedaba a 0,3 u de la cámara. Por eso en
+  vertical la Home no tiene bambú cercano (`portrait: null`), y `check:path`
+  simula los viajes, no sólo el caminar.
+- **Lo que se mece se dobla después de la matriz de instancia** (`windSway`):
+  la flexión va en ejes del objeto, que para los macizos son los del mundo. Un
+  objeto que se mece **no se gira** (el `<Shrub>` va sin rotación) o la ráfaga
+  lo doblaría en otra dirección. Y su sombra necesita el mismo viento en un
+  `customDepthMaterial`, o sería la de la planta quieta.
+- **StrictMode monta, desmonta y vuelve a montar cada efecto en desarrollo.**
+  La entrada de la Home se mataba en ese desmontaje simulado y en `bun run dev`
+  no se veía nunca. Lo que dura más que un render y no debe repetirse vive a
+  nivel de módulo, y la limpieza se aplaza un tick (`HomeIntro`).
+- **En el export, las precargas RSC de Next 16 dan 404 con `serve`.** El
+  cliente pide `__next.$d$locale.__PAGE__.txt` y el export escribe
+  `__next.$d$locale/__PAGE__.txt`. No rompe nada —la navegación cae a la
+  petición completa—, pero el hosting de la Fase 9 tendrá que servirlas o
+  reescribirlas.
 
 ---
 
@@ -498,7 +548,7 @@ llega en las fases 4–8 y se cuelga de ese mismo objeto.
 | 3A | · El mundo: sendero, terreno continuo, cámara con scroll, tramo y llegada | ✅ |
 | 3B | · La fauna en el camino (anclada al mundo, cercanía por estación) | ✅ |
 | 3C | · La navegación (sidebar radial, íconos por código, móvil, teclado) | ✅ |
-| 4 | Home 京都 | ⏸ |
+| 4 | Home 京都: torii, bambú, arbusto, cartel, entrada y tramo hacia Ubicación | 🔍 en revisión |
 | 5 | Ubicación 位置 | ⏸ |
 | 6 | Lugares | ⏸ |
 | 7 | Eventos 桜 | ⏸ |

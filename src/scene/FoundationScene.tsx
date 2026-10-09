@@ -5,6 +5,7 @@ import type { ScenePalette } from '@/lib/css-vars';
 import type { QualityProfile } from '@/scene/quality/tiers';
 import { Atmosphere, Sun } from '@/scene/systems/Atmosphere';
 import { FaunaDirector } from '@/scene/systems/fauna/FaunaDirector';
+import { StationDecor } from '@/scene/decor/StationDecor';
 import { PetalZones } from '@/scene/systems/PetalSystem';
 import { StonePath } from '@/scene/systems/StonePath';
 import { Terrain } from '@/scene/systems/Terrain';
@@ -44,6 +45,10 @@ export function FoundationScene({ station, palette, profile }: FoundationScenePr
 
       <Terrain palette={palette} profile={profile} />
       <StonePath color={palette.ishi} profile={profile} />
+
+      {/* Lo que hay a los lados del camino: el torii y el bambú de la Home, y lo
+          que traigan las fases siguientes. Se declara en journey.ts. */}
+      <StationDecor station={station} palette={palette} profile={profile} />
 
       {/* Lo que cae del cielo en cada zona —sakura en eventos, momiji en los
           templos, hojas de bambú en la home—, fundido entre estaciones.

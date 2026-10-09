@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 
 import { blendByZone, PATH } from '@/scene/path/journeyPath';
 
+import { resetSway, updateSway } from './sway';
 import { resetWind, updateWind } from './WindField';
 
 /**
@@ -25,10 +26,15 @@ export function WindDriver({ enabled }: { enabled: boolean }) {
     // Al volver de una pestaña en segundo plano el delta puede valer varios
     // segundos; sin tope, la máquina de ráfagas saltaría medio ciclo de golpe.
     updateWind(Math.min(delta, 0.1), blendByZone(PATH.d, (station) => station.ambient.wind));
+    // El bambú y los arbustos, con el viento que acaba de soplar.
+    updateSway(Math.min(delta, 0.1));
   });
 
   useEffect(() => {
-    if (!enabled) resetWind();
+    if (!enabled) {
+      resetWind();
+      resetSway();
+    }
   }, [enabled]);
 
   return null;
