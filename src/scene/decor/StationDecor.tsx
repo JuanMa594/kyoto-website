@@ -11,6 +11,7 @@ import { Torii } from '@/scene/objects/torii/Torii';
 import { stationIndex } from '@/scene/path/journeyPath';
 import type { QualityProfile } from '@/scene/quality/tiers';
 import { BambooGrove } from '@/scene/systems/BambooGrove';
+import { ContactShadows } from '@/scene/systems/ContactShadows';
 import { MossPatches } from '@/scene/systems/MossPatches';
 
 import { stationDecorLayout } from './placement';
@@ -67,6 +68,7 @@ function DecorSet({ index, portrait, palette, profile }: DecorSetProps) {
       })}
       {lanterns.length > 0 && <StoneLanterns lanterns={lanterns} palette={palette} profile={profile} />}
       {layout.groves.length > 0 && <BambooGrove groves={layout.groves} palette={palette} profile={profile} />}
+      <ContactShadows index={index} portrait={portrait} palette={palette} profile={profile} />
       <MossPatches index={index} portrait={portrait} palette={palette} profile={profile} />
     </>
   );

@@ -118,6 +118,8 @@ src/
 │   │   ├─ placement.ts        ← descriptor → mundo, por aspecto (puro)
 │   │   ├─ footprints.ts       ← huellas: piedras, cámara y fauna (puro)
 │   │   ├─ moss.ts             ← dónde crece el musgo (puro)
+│   │   ├─ contact.ts          ← las sombras de contacto: pilares, faroles, arbustos, cañas (puro)
+│   │   ├─ ground.ts           ← altura y normal para lo que se tiende en el suelo (puro)
 │   │   ├─ bamboo.ts shrub.ts  ← cañas, hojas y masas (puro, three)
 │   │   ├─ materials.ts        ← MeshStandardMaterial + cartel + viento
 │   │   └─ StationDecor.tsx    ← monta la zona y sus dos vecinas
@@ -131,7 +133,8 @@ src/
 │   ├─ systems/WindDriver.tsx  ← lo hace avanzar dentro del <Canvas>
 │   ├─ systems/sway.ts         ← ★ los muelles del bambú y los arbustos (CPU → uBend)
 │   ├─ systems/BambooGrove.tsx ← el bambú de una estación, instanciado
-│   ├─ systems/MossPatches.tsx ← el musgo: parches planos, el dibujo en el shader
+│   ├─ systems/MossPatches.tsx ← el musgo: parches planos, el dibujo y su halo en el shader
+│   ├─ systems/ContactShadows.tsx ← la penumbra al pie de lo plantado, una draw call
 │   ├─ systems/intro.ts        ← `INTRO`: la bruma de la entrada de la Home
 │   ├─ systems/PetalSystem.tsx ← ★ pétalos: posición calculada en el shader
 │   ├─ systems/petals.ts       ← capas, densidad y colores (puro, sin React)
@@ -193,7 +196,8 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   El musgo no se declara parche a parche: crece al pie de esas mismas bases y
   de cada caña, en el borde de los macizos, en corros por el terreno abierto y
   junto a las piedras, en la cantidad que diga
-  `environment.moss`. Todo lo comprueba `check:path` (`scripts/check-decor.ts`).
+  `environment.moss`. Cada base y cada caña lleva además su sombra de
+  contacto. Todo lo comprueba `check:path` (`scripts/check-decor.ts`).
 - **La posición de la cámara decide qué se ve y qué se oye**, no la ruta. Vive
   en `PATH` (`scene/path/journeyPath.ts`), con un único escritor, `CameraRig`;
   el store guarda sólo `zone`, que leen el ambiente, el audio y la fauna. La
@@ -482,6 +486,12 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   eje: un macizo cercano por ese lado quedaba a 0,3 u de la cámara. Por eso en
   vertical la Home no tiene bambú cercano (`portrait: null`), y `check:path`
   simula los viajes, no sólo el caminar.
+- **Un fondo de decoración también le cierra el paso a la fauna, aunque esté
+  lejos.** La garza que vadea entra andando desde fuera del cuadro, y a la
+  distancia a la que nace, «fuera del cuadro» es justo donde va el bambú de
+  fondo (|u| 12–23): con un fondo continuo salía en un 17 % de los sorteos
+  (antes, 33 %). El fondo va en bosquetes con claros (`backdropBamboo` en
+  `journey.ts`), y con ellos vuelve al 31 %.
 - **Lo que se mece se dobla después de la matriz de instancia** (`windSway`):
   la flexión va en ejes del objeto, que para los macizos son los del mundo. Un
   objeto que se mece **no se gira** (el `<Shrub>` va sin rotación) o la ráfaga

@@ -250,7 +250,16 @@ torii se va más al fondo y el texto sube (`portrait` en la decoración).
   plantado y de las cañas (también las del fondo), en el borde de los macizos,
   por el terreno abierto entre el camino y el bambú —en la revisión se veía
   vacío— y a trechos junto a las piedras. Los parches se agrupan en corros y
-  tienen tres verdes, para leerse como musgo y no como manchas. Una draw
+  tienen tres verdes, para leerse como musgo y no como manchas. Su borde se
+  funde con el suelo, más cuanto más lejos (de lejos parecían calcomanías), y
+  lo rodea un halo de tierra húmeda que lo ancla.
+- **Sombras de contacto** (`scene/decor/contact.ts`, `ContactShadows`): una
+  penumbra radial al pie de cada pilar, farol, arbusto y caña. Una draw call; en
+  los tiers sin sombras es lo único que pega lo plantado al suelo.
+- **Fondo de bambú** en los dos costados (|u| 12–23), más alto y de alturas más
+  dispares, ralo y con 16 hojas por caña: la niebla lo vuelve sombra y rellena
+  los laterales. Va en bosquetes con claros para que la garza que vadea pueda
+  entrar al cuadro (`backdropBamboo`). Una draw
   call; el contorno, los cojines y su relieve salen del shader, sin texturas.
   Cuánto, `environment.moss`.
 - **Las hojas del bambú planean, no aletean**: giran enteras sobre su peciolo y
@@ -258,8 +267,8 @@ torii se va más al fondo y el texto sube (`portrait` en la decoración).
   dar vueltas. La primera versión «parecían mariposas».
 
 Rendimiento medido (tier alto, GPU integrada): +11 draw calls y ~100 k triángulos
-por frame con sombras, a 60 fps; con faroles y musgo, 61 draw calls en el cartel
-(antes 55), aún a 60 fps. Detalle:
+por frame con sombras, a 60 fps; con faroles, musgo, sombras de contacto y fondo
+de bambú, 61–62 draw calls en el cartel (antes 55), aún a 60 fps. Detalle:
 `docs/superpowers/specs/2026-10-08-fase-4-home-design.md`.
 
 ### 5.5 Ambiente

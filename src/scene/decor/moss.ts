@@ -17,10 +17,10 @@ import { JOURNEY } from '@/config/journey';
 import { lerp, mulberry32 } from '@/lib/procedural';
 import { pathX, STATION_DEPTHS } from '@/scene/path/journeyPath';
 import { stoneLayout } from '@/scene/path/stones';
-import { groundY } from '@/scene/systems/elevation';
 
 import { groveCulms } from './bamboo';
 import { objectBases } from './footprints';
+import { groundPose } from './ground';
 import { areaU, stationDecorLayout } from './placement';
 
 export interface MossPatch {
@@ -38,9 +38,6 @@ export interface MossPatch {
   /** 0–1: del verde hondo al medio. */
   readonly tone: number;
 }
-
-/** Cuánto se levanta del terreno: sin esto, el parche parpadea con él. */
-const LIFT = 0.012;
 
 /** Parches al pie de cada clase de objeto (con musgo 1 y tier alto). */
 const PER_BASE = { torii: 3, farol: 6, arbusto: 4 } as const;
@@ -71,22 +68,16 @@ export function stationMoss(index: number, portrait: boolean, densityScale: numb
   const patches: MossPatch[] = [];
 
   const add = (x: number, z: number, size: number) => {
-    const y0 = groundY(x, z);
-    // La normal del terreno, por diferencias.
-    const dx = groundY(x + 0.25, z) - groundY(x - 0.25, z);
-    const dz = groundY(x, z + 0.25) - groundY(x, z - 0.25);
-    const nx = -dx / 0.5;
-    const nz = -dz / 0.5;
-    const length = Math.hypot(nx, 1, nz);
+    const pose = groundPose(x, z);
     const aspect = lerp(0.6, 1, random());
     patches.push({
       x,
-      y: y0 + LIFT,
+      y: pose.y,
       z,
       yaw: random() * Math.PI * 2,
       width: size * aspect,
       length: size,
-      normal: [nx / length, 1 / length, nz / length],
+      normal: pose.normal,
       seed: random(),
       tone: random(),
     });

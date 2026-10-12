@@ -30,7 +30,12 @@ export interface Culm {
   readonly spring: number;
   /** 0 = caña joven (verde); 1 = vieja (más amarilla). */
   readonly tone: number;
+  /** Hojas de esta caña: las de su macizo (`DecorGrove.leaves`). */
+  readonly leaves: number;
 }
+
+/** Hojas por caña si el macizo no dice otra cosa. */
+export const LEAVES_PER_CULM = 34;
 
 /** Separación mínima entre dos cañas. */
 const MIN_GAP = 0.42;
@@ -67,6 +72,7 @@ export function groveCulms(grove: PlacedGrove, densityScale: number): Culm[] {
       phase: random(),
       spring: culmSpring(height, random()),
       tone: random(),
+      leaves: item.leaves ?? LEAVES_PER_CULM,
     });
   }
   return culms;
@@ -79,7 +85,7 @@ export interface LeafPlacement {
 }
 
 /** Ramilletes de hojas a lo largo de la mitad alta de cada caña, caídos hacia fuera. */
-export function culmLeaves(culms: readonly Culm[], seed: number, perCulm = 34): LeafPlacement[] {
+export function culmLeaves(culms: readonly Culm[], seed: number): LeafPlacement[] {
   const random = mulberry32(seed);
   const leaves: LeafPlacement[] = [];
   const euler = new Euler(0, 0, 0, 'YXZ');
@@ -87,7 +93,7 @@ export function culmLeaves(culms: readonly Culm[], seed: number, perCulm = 34): 
   culms.forEach((culm, index) => {
     const tilt = new Quaternion().setFromEuler(new Euler(culm.tiltX, 0, culm.tiltZ));
     const sprays = 5 + Math.floor(random() * 2);
-    const perSpray = Math.round(perCulm / sprays);
+    const perSpray = Math.round(culm.leaves / sprays);
     for (let k = 0; k < sprays; k += 1) {
       const along = lerp(0.28, 0.97, (k + random() * 0.6) / sprays);
       const anchor = new Vector3(0, along * culm.height, 0)

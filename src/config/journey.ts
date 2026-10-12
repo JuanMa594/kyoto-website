@@ -167,6 +167,11 @@ export interface DecorGrove {
   /** Alto de las cañas, en unidades: de las más bajas a las más altas. */
   readonly height: readonly [number, number];
   readonly seed: number;
+  /**
+   * Hojas por caña (34 si no se dice). Un macizo de fondo, que la niebla ya
+   * vuelve sombra, lleva menos: no se distinguen y cuestan triángulos.
+   */
+  readonly leaves?: number;
 }
 
 export type DecorItem = DecorTorii | DecorShrub | DecorLantern | DecorGrove;
@@ -325,6 +330,27 @@ const TRAMO_UBICACION: StationTramo = {
 };
 
 /**
+ * Un fondo de bambú a un costado: bosquetes ralos, altos y de pocas hojas, uno
+ * por cada tramo `[from, to]`, con su semilla (`seed`, `seed + 1`, …).
+ */
+function backdropBamboo(
+  side: Side,
+  inner: number,
+  outer: number,
+  seed: number,
+  spans: readonly (readonly [number, number])[],
+): DecorGrove[] {
+  return spans.map(([from, to], k) => ({
+    kind: 'bambu',
+    seed: seed + k,
+    density: 0.08,
+    height: [6, 13],
+    leaves: 16,
+    area: { side, from, to, inner, outer },
+  }));
+}
+
+/**
  * La Home y su tramo: el cartel de `1.png` —el torii a la derecha, cortado por
  * el borde; bambú en la esquina; un arbusto al pie— y un bosquecillo de bambú
  * que se aclara hasta abrirse al valle de Ubicación. Los números están
@@ -349,7 +375,7 @@ const DECOR_INICIO: readonly DecorItem[] = [
     kind: 'bambu',
     seed: 22,
     density: 0.12,
-    height: [5.5, 9.5],
+    height: [5, 10.5],
     area: { side: 'izquierda', from: 0, to: 18, inner: 6.5, outer: 12 },
   },
   // Lejos, detrás del torii.
@@ -357,7 +383,7 @@ const DECOR_INICIO: readonly DecorItem[] = [
     kind: 'bambu',
     seed: 23,
     density: 0.16,
-    height: [5.5, 9.5],
+    height: [5, 10.5],
     area: { side: 'derecha', from: 6, to: 26, inner: 7.5, outer: 13 },
   },
   // El tramo: el bosquecillo se aclara hacia el valle.
@@ -366,7 +392,7 @@ const DECOR_INICIO: readonly DecorItem[] = [
     seed: 24,
     density: 0.2,
     taper: 0.15,
-    height: [5.5, 9.5],
+    height: [5, 10.5],
     area: { side: 'izquierda', from: 18, to: 48, inner: 6, outer: 12 },
   },
   {
@@ -374,9 +400,24 @@ const DECOR_INICIO: readonly DecorItem[] = [
     seed: 25,
     density: 0.2,
     taper: 0.15,
-    height: [5.5, 9.5],
+    height: [5, 10.5],
     area: { side: 'derecha', from: 26, to: 52, inner: 5, outer: 12 },
   },
+  // El fondo de los dos costados, detrás de los macizos: cañas más altas y
+  // de alturas más dispares, ralas y con pocas hojas. La niebla las vuelve
+  // sombras de bambú; rellenan los laterales sin tocar el pasillo. Van en
+  // bosquetes con claros entre medias: por ellos entra la garza que vadea
+  // (que llega andando desde fuera del cuadro), y dan ritmo al fondo.
+  ...backdropBamboo('izquierda', 12.5, 22, 260, [
+    [4, 15],
+    [22, 33],
+    [40, 50],
+  ]),
+  ...backdropBamboo('derecha', 13.5, 23, 270, [
+    [2, 12],
+    [19, 31],
+    [38, 54],
+  ]),
   { kind: 'arbusto', seed: 12, at: { d: 14, u: -5.5 } },
   { kind: 'arbusto', seed: 13, at: { d: 34, u: 6 } },
   // Los faroles, ya fuera del cartel: un yukimi entre el musgo al empezar a

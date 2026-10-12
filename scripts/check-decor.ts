@@ -34,6 +34,7 @@ import {
   type DecorLayout,
   type PlacedObject,
 } from '../src/scene/decor/placement';
+import { stationContacts } from '../src/scene/decor/contact';
 import { stationMoss } from '../src/scene/decor/moss';
 import { MASS_TRIANGLES_MAX, SHRUB_LEAF_TRIANGLES, SHRUB_LEAVES, shrubBlobs, shrubLeaves } from '../src/scene/decor/shrub';
 import { LANTERN_SIZE } from '../src/scene/objects/toro/toro';
@@ -394,7 +395,19 @@ check(
 );
 const mossTriangles = moss.length * 2;
 
-const totalTriangles = toriiTriangles + bambooTriangles + shrubTriangles + lanternTriangles + mossTriangles;
+section('Las sombras de contacto');
+
+const contacts = stationContacts(HOME, false, 1);
+const contactBases = homeLand.objects.flatMap(objectBases).length + homeCulms.length;
+check('una por cada pilar, farol, arbusto y caña', contacts.length === contactBases, `${contacts.length} / ${contactBases}`);
+check(
+  'cada una pegada al terreno, por debajo del musgo',
+  contacts.every((c) => c.y > groundY(c.x, c.z) && c.y < groundY(c.x, c.z) + 0.012),
+);
+const contactTriangles = contacts.length * 2;
+
+const totalTriangles =
+  toriiTriangles + bambooTriangles + shrubTriangles + lanternTriangles + mossTriangles + contactTriangles;
 check('la Home entera cabe en 150 000 triángulos (tier alto)', totalTriangles <= 150000, `${totalTriangles}`);
 
 /* ── 9. La fauna ───────────────────────────────────────────────────────── */
