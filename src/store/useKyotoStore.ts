@@ -69,6 +69,14 @@ interface KyotoState {
   /** Marca de tiempo del último scroll: el director de fauna la usa para el modo inactivo. */
   lastScrollAt: number;
   markScroll: () => void;
+
+  /* ── Ubicación ─────────────────────────────────────────────────────── */
+  /**
+   * El zoom de la maqueta de Japón (Fase 5A): todo Japón o Kinki. La pose
+   * intermedia, que cambia a 60 fps, vive en `MAQUETA.zoomT`.
+   */
+  mapZoom: 'japon' | 'kyoto';
+  setMapZoom: (zoom: 'japon' | 'kyoto') => void;
 }
 
 type PersistedPrefs = Pick<
@@ -116,6 +124,9 @@ export const useKyotoStore = create<KyotoState>()(
       setPointer: (x, y) => set({ pointer: { x, y } }),
       lastScrollAt: 0,
       markScroll: () => set({ lastScrollAt: Date.now() }),
+
+      mapZoom: 'japon',
+      setMapZoom: (zoom) => set({ mapZoom: zoom }),
     }),
     {
       name: 'kyoto:prefs',

@@ -71,6 +71,37 @@
     "tagline": "A walk through the heart of Japan.",
     "walk": "Scroll to walk"
   },
+  "ubicacion": {
+    "romaji": "Ichi",
+    "srTitle": "Location — Ichi",
+    "tagline": "Location · where Kyoto is",
+    "summary": "In the heart of Honshū, in western Japan. Explore the map: each prefecture tells you its name. Tap Kyoto to zoom in.",
+    "zoomIn": "Zoom in on Kyoto",
+    "zoomOut": "See all of Japan",
+    "fichaLabel": "Kyoto at a glance",
+    "ficha": {
+      "prefectura": {
+        "label": "Prefecture",
+        "value": "Kyoto (京都府)"
+      },
+      "region": {
+        "label": "Region",
+        "value": "Kansai (Kinki)"
+      },
+      "coords": {
+        "label": "Coordinates",
+        "value": "35.0° N · 135.8° E"
+      },
+      "poblacion": {
+        "label": "Population",
+        "value": "~1.46 million people"
+      },
+      "distancias": {
+        "label": "Distances",
+        "value": "Ōsaka ~45 km · Nara ~35 km · Tokyo ~370 km (2 h 15 by shinkansen)"
+      }
+    }
+  },
   "tramo": {
     "label": "Path to {station}",
     "continue": "Continue the path",

@@ -355,3 +355,31 @@ Y además: sonido propio de la maqueta, Okinawa, la noche.
 | Zoom ×2,8 | Que Kinki quepa en la mitad izquierda sin acercarse a la cámara; si no, menos aumento |
 | Profundidad de campo | Que la maqueta quede en foco en tier alto |
 | Peso de la geometría | Si construirla al montar pasa de un frame, repartir en `requestIdleCallback` |
+
+## 12. Desviaciones al implementar
+
+Lo que cambió respecto de este diseño al construirlo y revisarlo en el navegador:
+
+| Tema | Diseño | Implementado | Por qué |
+|---|---|---|---|
+| Huella de la bandeja | Un círculo | Un **rectángulo girado** (`rectangulo`, nuevo en `footprints.ts`) y un círculo pequeño al pie del atril | Un círculo que cubriera las esquinas (3,2 u) le quitaba al camino un metro de cada lado |
+| Colocación | d 0, u −3,5 | **d −5, u −5,8, yaw 0,15** | La cámara, al caminar hacia Eventos, se abre a la izquierda; con ≥ 1,5 u, la bandeja no pasa del ~31 % del ancho |
+| Medidas | 40° → 50°, ×2,8, atril de 2,25 | **45° → 55°, ×4,2**, eje a 2,8 u | Con ×2,8 Kinki quedaba pequeña y sus nombres se pisaban; más alta, la maqueta cae en el tercio medio |
+| Cara de las losas | washi | **kami** (blanco) | Sobre la bandeja de piedra, el washi apenas se distinguía; `2.png` las tiene blancas |
+| Etiquetas | Encima de su punto | **Debajo**, en dos líneas; en el zoom, sin la de Kyoto | Tapaban el pin y se pisaban en Kinki |
+| Ficha | Debajo del botón | **En el sitio del resumen** mientras dura el zoom | No cabía en 900 px de alto |
+| Vertical | d ≈ 8, junto al borde | **d 20, u −4,5, escala 0,8** (`DecorAt.scale`, nuevo); sin los nombres de Kinki en el zoom | El cuadro de un teléfono (≈ 0,45) no da para más; queda pendiente de revisar (PLAN §11) |
+| Kanji al cargar | Se dibuja también en la primera carga | **Sólo al llegar** desde otra estación | En la primera carga ya está pintado en el HTML: dibujarlo sería borrarlo y volver a pintarlo |
+| Archivo del componente | `Maqueta.tsx` | **`MaquetaJapon.tsx`** | En Windows choca con `maqueta.ts` (TS1149) |
+| Nombres para el DOM | Del dato | **`names.generated.ts`** aparte | Para no meter los polígonos (~80 KB) en el JS de la página |
+| Movimiento reducido | — | **`MAQUETA.wake()`** | El canvas pinta a demanda: sin pedir frame, el zoom no se veía |
+| Presupuesto | +5–6 draw calls | **+16** (con la pasada de sombra), +24 k triángulos, 60 fps | Bandeja, base y losas con dos materiales cada una, el atril, el pin y sus sombras |
+
+## 13. Revisión del usuario (1)
+
+| Pedido | Hecho |
+|---|---|
+| En el zoom, los nombres de Kinki se solapan | `labelLayout.ts`: cada etiqueta prueba sitios alrededor de su punto (abajo, arriba, a los lados, en diagonal y dos anillos más lejos) y se queda con el primero libre, sin pisar a las demás ni al pin; las lejanas llevan una línea de tinta. Prueba primero el sitio que tenía, para no saltar |
+| El mapa se ve pálido: más color, dentro de la paleta | Las prefecturas, por región, en tonos pálidos de la paleta (`regions.ts`), Kinki en blanco. El mar, con un velo de índigo |
+| Olas a pinceladas, con aire de arte japonés | Cinco grupos de tres trazos (`waves.ts`): crestas cuya curvatura crece hasta el rizo, que se afinan en las puntas; el pincel seco y las vetas, en el shader. Pintadas en la bandeja: con el zoom no se mueven |
+| Color del mar y de las olas | El usuario eligió **añadir el índigo 藍** (`--color-ai`, #165E83) a la paleta, sólo para esto |

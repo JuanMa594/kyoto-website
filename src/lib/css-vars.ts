@@ -51,6 +51,11 @@ export function clearCssVarCache(): void {
 export function scenePalette() {
   return {
     washi: readCssVar('--color-washi', '#fffacd'),
+    kami: readCssVar('--color-kami', '#ffffff'),
+    washiDeep: readCssVar('--color-washi-deep', '#f6efbe'),
+    sakuraBlush: readCssVar('--color-sakura-blush', '#ffccbc'),
+    matchaSoft: readCssVar('--color-matcha-soft', '#b4ccad'),
+    ai: readCssVar('--color-ai', '#165e83'),
     washiFog: readCssVar('--color-washi-fog', '#fdf7d4'),
     shu: readCssVar('--color-shu', '#d82609'),
     sumi: readCssVar('--color-sumi', '#300500'),

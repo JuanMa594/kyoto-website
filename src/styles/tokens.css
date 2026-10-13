@@ -49,6 +49,11 @@
   --color-koke-mid: #509030;
   --color-koke-deep: #306828;
 
+  /* 藍 · el índigo del aizome, el azul de las olas de Hokusai. Sólo para el
+     mar de la maqueta de Ubicación (Fase 5A): muy diluido en la bandeja y en
+     las pinceladas de las olas. */
+  --color-ai: #165e83;
+
   --color-ishi: #ede6dd;
   --color-ishi-deep: #c8bfaf;
   --color-kami: #ffffff;

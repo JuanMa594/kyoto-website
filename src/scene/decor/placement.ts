@@ -74,15 +74,16 @@ export function stationDecorLayout(index: number, portrait: boolean): DecorLayou
     const x = pathX(d) + at.u;
     const z = -d;
     // Al otro lado del camino el objeto se da la vuelta: lo que se extiende
-    // (las vigas de un torii) se aleja siempre del camino.
-    const flip = at.u < 0 ? Math.PI : 0;
+    // (las vigas de un torii) se aleja siempre del camino. La maqueta no: mira
+    // siempre a la cámara.
+    const flip = at.u < 0 && item.kind !== 'maqueta' ? Math.PI : 0;
     objects.push({
       item,
       x,
       y: groundY(x, z),
       z,
       yaw: tangentYaw(d) + (item.yaw ?? 0) + flip,
-      scale: item.scale ?? 1,
+      scale: (at.scale ?? 1) * (item.scale ?? 1),
     });
   }
 

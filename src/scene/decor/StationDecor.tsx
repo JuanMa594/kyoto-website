@@ -1,7 +1,7 @@
 'use client';
 
 import { useThree } from '@react-three/fiber';
-import { useMemo } from 'react';
+import { lazy, Suspense, useMemo } from 'react';
 
 import { JOURNEY, type Station } from '@/config/journey';
 import type { ScenePalette } from '@/lib/css-vars';
@@ -15,6 +15,9 @@ import { ContactShadows } from '@/scene/systems/ContactShadows';
 import { MossPatches } from '@/scene/systems/MossPatches';
 
 import { stationDecorLayout } from './placement';
+
+/** La maqueta de Ubicación, en diferido: su dato pesa ~80 KB y sólo hace falta cerca de allí. */
+const Maqueta = lazy(() => import('@/scene/objects/maqueta/MaquetaJapon'));
 
 interface StationDecorProps {
   /** La estación de la **zona** (la de la cámara), no la de la ruta. */
@@ -64,6 +67,13 @@ function DecorSet({ index, portrait, palette, profile }: DecorSetProps) {
       {layout.objects.map((placed, k) => {
         if (placed.item.kind === 'torii') return <Torii key={k} placed={placed} palette={palette} profile={profile} />;
         if (placed.item.kind === 'arbusto') return <Shrub key={k} placed={placed} palette={palette} profile={profile} />;
+        if (placed.item.kind === 'maqueta') {
+          return (
+            <Suspense key={k} fallback={null}>
+              <Maqueta placed={placed} palette={palette} profile={profile} />
+            </Suspense>
+          );
+        }
         return null;
       })}
       {lanterns.length > 0 && <StoneLanterns lanterns={lanterns} palette={palette} profile={profile} />}

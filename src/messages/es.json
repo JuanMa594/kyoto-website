@@ -71,6 +71,37 @@
     "tagline": "Caminata por el corazón de Japón.",
     "walk": "Desliza para caminar"
   },
+  "ubicacion": {
+    "romaji": "Ichi",
+    "srTitle": "Ubicación — Ichi",
+    "tagline": "Ubicación · dónde queda Kyoto",
+    "summary": "En el corazón de Honshū, al oeste de Japón. Recorre el mapa: cada prefectura dice su nombre. Toca Kyoto para acercarte.",
+    "zoomIn": "Acercarse a Kyoto",
+    "zoomOut": "Ver todo Japón",
+    "fichaLabel": "Kyoto en datos",
+    "ficha": {
+      "prefectura": {
+        "label": "Prefectura",
+        "value": "Kyoto (京都府)"
+      },
+      "region": {
+        "label": "Región",
+        "value": "Kansai (Kinki)"
+      },
+      "coords": {
+        "label": "Coordenadas",
+        "value": "35,0° N · 135,8° E"
+      },
+      "poblacion": {
+        "label": "Población",
+        "value": "~1,46 millones de habitantes"
+      },
+      "distancias": {
+        "label": "Distancias",
+        "value": "Ōsaka ~45 km · Nara ~35 km · Tokio ~370 km (2 h 15 en shinkansen)"
+      }
+    }
+  },
   "tramo": {
     "label": "Camino hacia {station}",
     "continue": "Seguir el camino",

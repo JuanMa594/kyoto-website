@@ -36,7 +36,7 @@ bun run preview      # sirve out/ como lo haría el hosting
 bun run typecheck    # tsc --noEmit
 bun run fonts        # regenera los .woff2 subseteados
 bun run models       # assets/models/source → public/models (fauna optimizada)
-bun run geo          # Natural Earth → icons/japan.generated.ts (Japón del ícono)
+bun run geo          # Natural Earth → el Japón del ícono y las prefecturas de la maqueta de Ubicación
 bun run palette      # muestrea los colores de docs/referencias/*.png
 bun run kanji        # KanjiVG → components/kanji/strokes.generated.ts (trazos de los kanji)
 bun run check:path   # comprobaciones puras del camino, el terreno, la cámara, el scroll, la fauna, la navegación y la decoración
@@ -114,6 +114,8 @@ src/
 │   ├─ objects/torii/          ← el torii ryōbu: medidas (puro), geometría y componente
 │   ├─ objects/toro/           ← los faroles kasuga y yukimi: medidas (puro), tornos y componente
 │   ├─ objects/Shrub.tsx       ← el arbusto podado en nube (o-karikomi)
+│   ├─ objects/maqueta/        ← ★ la maqueta de Japón de Ubicación (Fase 5A): dato generado,
+│   │                            medidas y poses (puro), geometría, losas en el shader, MAQUETA
 │   ├─ decor/                  ← ★ la decoración de journey.ts (Fase 4)
 │   │   ├─ placement.ts        ← descriptor → mundo, por aspecto (puro)
 │   │   ├─ footprints.ts       ← huellas: piedras, cámara y fauna (puro)
@@ -151,7 +153,8 @@ src/
 │   ├─ railProgress.ts         ← profundidad → riel, barra y abanico (puro)
 │   ├─ useRailProgress.ts      ← la marca «tú», desde gsap.ticker (fuera de React)
 │   └─ icons/                  ← los seis íconos calculados + sus microanimaciones
-├─ components/sections/        ← StationShell, PathTramo (el tramo), ContentArrival
+├─ components/sections/        ← StationShell, PathTramo (el tramo), ContentArrival, CartelTitle
+├─ components/ubicacion/       ← MaquetaInput (la mano), MaquetaToggle, PrefectureLabels, KyotoFicha (5A)
 ├─ components/home/            ← HomeIntro (la entrada), introScript, WalkHint (Fase 4)
 ├─ components/kanji/           ← InkKanji: el kanji dibujado trazo a trazo (KanjiVG)
 ├─ i18n/                       ← routing, request, navigation, params
@@ -187,7 +190,7 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   Fushimi. Los tramos crecen cuando una página les pone tarjetas.
 - **Lo que hay a los lados del camino se declara en `journey.ts`**
   (`environment.decor`, Fase 4): objetos sueltos (`torii`, `arbusto`, `farol`
-  kasuga o yukimi) y macizos (`bambu`), en coordenadas del camino —`d` desde la estación, `u` desde
+  kasuga o yukimi, la `maqueta` de Ubicación) y macizos (`bambu`), en coordenadas del camino —`d` desde la estación, `u` desde
   el eje—, con otra colocación opcional para pantallas verticales
   (`portrait`). **La decoración de una estación incluye su tramo de salida.**
   `scene/decor/placement.ts` la lleva al mundo y `footprints.ts` publica sus
@@ -526,6 +529,26 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   `__next.$d$locale/__PAGE__.txt`. No rompe nada —la navegación cae a la
   petición completa—, pero el hosting de la Fase 9 tendrá que servirlas o
   reescribirlas.
+- **En Windows, `maqueta.ts` y `Maqueta.tsx` son el mismo archivo.** El
+  sistema de archivos no distingue mayúsculas: TypeScript se queja (TS1149) y
+  un `import()` puede resolver al que no es. Por eso el componente de la
+  maqueta se llama `MaquetaJapon.tsx`, junto a sus medidas en `maqueta.ts`.
+- **Con movimiento reducido el canvas sólo pinta a demanda**
+  (`frameloop="demand"`). Todo lo que cambia por un gesto —el cursor sobre la
+  maqueta, el zoom— tiene que pedir su frame con `invalidate()`: si no, el
+  botón dice «zoom» y la escena sigue igual. La maqueta lo hace con
+  `MAQUETA.wake()`, que pone la escena y llama el DOM.
+- **`quantile` de topojson-simplify ordena los pesos de mayor a menor**: su `p`
+  es la fracción de puntos que **se queda**, no la que se quita. Y como cada
+  frontera es un solo arco para las dos vecinas, en la salida cuenta doble:
+  1.800 puntos en la topología son ~2.500 vértices por prefectura sumados.
+- **Los planos de recorte necesitan `renderer.localClippingEnabled`** y, para
+  la sombra, `clipShadows` en el material; están en el espacio del mundo, así
+  que se recalculan cada frame desde el grupo que los lleva (la bandeja).
+- **Un dato pesado no va al bundle de la página.** Los polígonos de la maqueta
+  (~80 KB) se cargan con `lazy()` desde `StationDecor`; el DOM, que sólo
+  necesita los nombres, lee `names.generated.ts`. Importar `PREFECTURES` desde
+  un componente de la página lo metería en el primer JS de Ubicación.
 
 ---
 
@@ -585,7 +608,9 @@ llega en las fases 4–8 y se cuelga de ese mismo objeto.
 | 3B | · La fauna en el camino (anclada al mundo, cercanía por estación) | ✅ |
 | 3C | · La navegación (sidebar radial, íconos por código, móvil, teclado) | ✅ |
 | 4 | Home 京都: torii, bambú, arbusto, cartel, entrada, tramo hacia Ubicación, faroles y musgo | ✅ |
-| 5 | Ubicación 位置 | ⏸ |
+| 5 | Ubicación 位置, en dos bloques: | 🔎 |
+| 5A | · El cartel: la maqueta de Japón, hover, zoom a Kinki, el pin, Ichi / 位置 y la ficha | 🔎 en revisión |
+| 5B | · El tramo hacia Eventos: carteles de madera con los mapas antiguos, la roca pintada | ⏸ |
 | 6 | Lugares | ⏸ |
 | 7 | Eventos 桜 | ⏸ |
 | 8 | Gastronomía 京料理 | ⏸ |

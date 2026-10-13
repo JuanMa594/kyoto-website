@@ -39,6 +39,14 @@ import { stationMoss } from '../src/scene/decor/moss';
 import { MASS_TRIANGLES_MAX, SHRUB_LEAF_TRIANGLES, SHRUB_LEAVES, shrubBlobs, shrubLeaves } from '../src/scene/decor/shrub';
 import { LANTERN_SIZE } from '../src/scene/objects/toro/toro';
 import { lanternGeometry } from '../src/scene/objects/toro/toroGeometry';
+import { MAQUETA_LIFT, MAQUETA_PLAN, MAQUETA_SIZE, MAQUETA_ZOOM } from '../src/scene/objects/maqueta/maqueta';
+import { PREFECTURE_NAMES } from '../src/scene/objects/maqueta/names.generated';
+import { KYOTO_CITY, PREFECTURES } from '../src/scene/objects/maqueta/prefectures.generated';
+import { layoutLabels, type LabelRect } from '../src/components/ubicacion/labelLayout';
+import { maquetaGeometry } from '../src/scene/objects/maqueta/maquetaGeometry';
+import { REGION_TONE } from '../src/scene/objects/maqueta/regions';
+import { waveStrokes } from '../src/scene/objects/maqueta/waves';
+import { contentToTray, KINKI, KYOTO_INDEX, slabTargets, trayPose, trayToObject } from '../src/scene/objects/maqueta/zoom';
 import { kasagiProfile, RYOBU } from '../src/scene/objects/torii/ryobu';
 import { ryobuToriiGeometry } from '../src/scene/objects/torii/toriiGeometry';
 import { STATION_DEPTHS, stationIndex } from '../src/scene/path/journeyPath';
@@ -48,6 +56,8 @@ import { speciesSpec } from '../src/scene/systems/fauna/bestiary';
 import { clearOfDecor, createAct, DECOR_RETRIES, type CameraState } from '../src/scene/systems/fauna/casting';
 import { SPRINGS, stepSpring } from '../src/scene/systems/sway';
 import { requestGust, updateWind, WIND } from '../src/scene/systems/WindField';
+import messagesEn from '../src/messages/en.json';
+import messagesEs from '../src/messages/es.json';
 import { check, finish, range, section } from './check-kit';
 
 /** Radio de una piedra del camino en planta, con su escala máxima. */
@@ -482,6 +492,331 @@ for (let n = 0; n < 40; n += 1) {
   worstCast = Math.max(worstCast, performance.now() - started);
 }
 check('el reparto más caro de la garza cabe en 8 ms', worstCast <= 8, `${worstCast.toFixed(1)} ms`);
+
+/* ── 9b. El cartel de Ubicación (Fase 5A) ──────────────────────────────── */
+
+section('El cartel de Ubicación');
+
+const UBI = stationIndex('ubicacion');
+const maquetaOf = (layout: DecorLayout) => layout.objects.filter((o) => o.item.kind === 'maqueta');
+check(
+  'Ubicación tiene una maqueta, en horizontal y en vertical',
+  maquetaOf(stationDecorLayout(UBI, false)).length === 1 && maquetaOf(stationDecorLayout(UBI, true)).length === 1,
+);
+check('46 prefecturas, sin Okinawa', PREFECTURES.length === 46 && !PREFECTURES.some((p) => p.code === 47));
+check('Kinki tiene las siete y Kyoto es una de ellas', KINKI.length === 7 && KINKI.includes(KYOTO_INDEX));
+const shiga = PREFECTURES.find((p) => p.code === 25);
+check('el lago Biwa es un agujero en Shiga', !!shiga && shiga.base.some((poly) => poly.length >= 2));
+check(
+  'todos los anillos con ≥ 3 vértices y pares x, z',
+  PREFECTURES.every((p) => [...p.base, ...p.slab].every((poly) => poly.every((r) => r.length >= 6 && r.length % 2 === 0))),
+);
+
+// Las dos poses: la bandeja nunca toca el suelo, cabe en su huella y no pasa de su alto.
+for (const t of [0, 1]) {
+  const pose = trayPose(t);
+  const out = { x: 0, y: 0, z: 0 };
+  const h = MAQUETA_SIZE.tray / 2;
+  let lowest = Number.POSITIVE_INFINITY;
+  let outside = 0;
+  let top = Number.NEGATIVE_INFINITY;
+  for (const [x, z] of [
+    [-h, -h],
+    [h, -h],
+    [-h, h],
+    [h, h],
+  ] as const) {
+    for (const y of [-MAQUETA_SIZE.trayThickness, 0]) {
+      trayToObject(x, y, z, pose.tilt, out);
+      lowest = Math.min(lowest, out.y);
+      top = Math.max(top, out.y);
+      outside = Math.max(outside, Math.abs(out.x) - MAQUETA_PLAN.hx, Math.abs(out.z) - MAQUETA_PLAN.hz);
+    }
+  }
+  check(`pose ${t}: el borde de delante queda a ≥ 0,25 u del suelo`, lowest >= 0.25, lowest.toFixed(2));
+  check(`pose ${t}: la bandeja cabe en su huella`, outside <= 0, `sobra ${Math.max(0, outside).toFixed(2)} u`);
+  check(`pose ${t}: no pasa de su alto`, top + 0.3 <= MAQUETA_SIZE.top, `${top.toFixed(2)} + 0,3 ≤ ${MAQUETA_SIZE.top}`);
+}
+
+// En la pose de Japón, el mapa entero dentro de la bandeja; en el zoom, Kinki entera.
+function polygonsInside(indices: readonly number[], t: number): boolean {
+  const pose = trayPose(t);
+  const point = { x: 0, z: 0 };
+  const half = (MAQUETA_SIZE.tray / 2) * MAQUETA_SIZE.clip;
+  return indices.every((i) =>
+    PREFECTURES[i]!.slab.every((poly) => {
+      const ring = poly[0]!;
+      for (let k = 0; k < ring.length; k += 2) {
+        contentToTray(ring[k]!, ring[k + 1]!, pose, point);
+        if (Math.abs(point.x) > half || Math.abs(point.z) > half) return false;
+      }
+      return true;
+    }),
+  );
+}
+check('Japón entero dentro de la bandeja', polygonsInside(PREFECTURES.map((_, i) => i), 0));
+check('zoom: Kinki entera dentro de la bandeja', polygonsInside(KINKI, 1));
+const kyotoZoomed = { x: 0, z: 0 };
+contentToTray(KYOTO_CITY[0], KYOTO_CITY[1], trayPose(1), kyotoZoomed);
+check(
+  'zoom: Kyoto cae donde dice MAQUETA_ZOOM.kyotoAt',
+  Math.hypot(kyotoZoomed.x - MAQUETA_ZOOM.kyotoAt[0], kyotoZoomed.z - MAQUETA_ZOOM.kyotoAt[1]) < 1e-9,
+);
+
+// Los objetivos de las losas: Kyoto elevada, el resto de Japón se retira en el zoom.
+const lift = new Float32Array(PREFECTURES.length);
+const sea = new Float32Array(PREFECTURES.length);
+slabTargets(0, -1, lift, sea);
+check('en Japón, Kyoto elevada y nada fundido', lift[KYOTO_INDEX]! > 0 && sea.every((s) => s === 0));
+slabTargets(1, -1, lift, sea);
+const outside = PREFECTURES.map((_, i) => i).filter((i) => !KINKI.includes(i));
+check(
+  'en el zoom, lo de fuera de Kinki se hunde y se funde con el mar',
+  outside.every((i) => lift[i]! < 0 && sea[i]! > 0.5) && KINKI.every((i) => sea[i] === 0),
+);
+slabTargets(0, 12, lift, sea);
+check('la prefectura bajo el cursor sube', lift[12]! >= MAQUETA_LIFT.hover - 1e-6);
+
+// La geometría: sin normales nulas (los puntos negros), con presupuesto y un aPref por losa.
+const mapParts = maquetaGeometry();
+let mapTriangles = 0;
+let mapBad = 0;
+for (const g of Object.values(mapParts)) {
+  const position = g.getAttribute('position');
+  const normal = g.getAttribute('normal');
+  mapTriangles += (g.index ? g.index.count : position.count) / 3;
+  for (let i = 0; i < normal.count; i += 1) {
+    const length = Math.hypot(normal.getX(i), normal.getY(i), normal.getZ(i));
+    if (!Number.isFinite(length) || length < 0.5) mapBad += 1;
+  }
+}
+check('maqueta: ninguna normal nula ni NaN', mapBad === 0, `${mapBad}`);
+check('maqueta: menos de 40 000 triángulos', mapTriangles < 40000, `${mapTriangles}`);
+const slabPrefs = new Set(Array.from(mapParts.slabs.getAttribute('aPref').array));
+const basePrefs = new Set(Array.from(mapParts.base.getAttribute('aPref').array));
+check('cada losa y cada base llevan su aPref', slabPrefs.size === PREFECTURES.length && basePrefs.size === PREFECTURES.length);
+const slabBox = { min: Number.POSITIVE_INFINITY, max: Number.NEGATIVE_INFINITY };
+const slabY = mapParts.slabs.getAttribute('position');
+for (let i = 0; i < slabY.count; i += 1) {
+  slabBox.min = Math.min(slabBox.min, slabY.getY(i));
+  slabBox.max = Math.max(slabBox.max, slabY.getY(i));
+}
+check(
+  'las losas van encima de la base',
+  Math.abs(slabBox.min - MAQUETA_SIZE.baseHeight) < 1e-4 &&
+    Math.abs(slabBox.max - MAQUETA_SIZE.baseHeight - MAQUETA_SIZE.slabHeight) < 1e-4,
+  `${slabBox.min.toFixed(3)}–${slabBox.max.toFixed(3)}`,
+);
+check(
+  'base y losas: sólo caras de arriba y cantos (sin tapas de abajo)',
+  [mapParts.base, mapParts.slabs].every((g) => {
+    const normal = g.getAttribute('normal');
+    for (let i = 0; i < normal.count; i += 1) if (normal.getY(i) < -0.5) return false;
+    return true;
+  }),
+);
+
+check(
+  'base y losas: las caras de arriba existen y miran arriba',
+  [mapParts.base, mapParts.slabs].every((g) => {
+    const caps = g.groups[0];
+    if (!caps || caps.count < PREFECTURES.length * 3) return false;
+    const normal = g.getAttribute('normal');
+    for (let i = caps.start; i < caps.start + caps.count; i += 1) if (normal.getY(i) < 0.99) return false;
+    return true;
+  }),
+);
+
+check(
+  'los nombres ligeros van en el mismo orden que las prefecturas',
+  PREFECTURE_NAMES.length === PREFECTURES.length &&
+    PREFECTURE_NAMES.every((n, i) => n.name === PREFECTURES[i]!.name && n.nameJa === PREFECTURES[i]!.nameJa),
+);
+
+// Las prefecturas, por región, como los mapas de Edo: ocho regiones con su tono.
+const regions = new Set(PREFECTURES.map((p) => p.region));
+check(
+  'ocho regiones, todas con su tono',
+  regions.size === 8 && [...regions].every((r) => r in REGION_TONE),
+  [...regions].join(', '),
+);
+check('Kinki va en blanco (kami): Kyoto y el pin destacan', REGION_TONE.Kinki.token === 'kami');
+check(
+  'Kinki son las siete del zoom',
+  PREFECTURES.every((p, i) => (p.region === 'Kinki') === KINKI.includes(i)),
+);
+
+// Las olas: pinceladas en el mar, dentro de la bandeja, nunca sobre tierra.
+function pointInRing(ring: readonly number[], x: number, z: number): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 2; i < ring.length; j = i, i += 2) {
+    const xi = ring[i]!;
+    const zi = ring[i + 1]!;
+    const xj = ring[j]!;
+    const zj = ring[j + 1]!;
+    if (zi > z !== zj > z && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
+  }
+  return inside;
+}
+function ringDistance(ring: readonly number[], x: number, z: number): number {
+  let best = Number.POSITIVE_INFINITY;
+  for (let i = 0, j = ring.length - 2; i < ring.length; j = i, i += 2) {
+    const ax = ring[j]!;
+    const az = ring[j + 1]!;
+    const dx = ring[i]! - ax;
+    const dz = ring[i + 1]! - az;
+    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1)));
+    best = Math.min(best, Math.hypot(x - ax - t * dx, z - az - t * dz));
+  }
+  return best;
+}
+/** Distancia a la costa: negativa en tierra. */
+function landDistance(x: number, z: number): number {
+  let best = Number.POSITIVE_INFINITY;
+  for (const p of PREFECTURES) {
+    for (const poly of p.base) {
+      const outer = poly[0]!;
+      const distance = ringDistance(outer, x, z);
+      if (pointInRing(outer, x, z) && !poly.slice(1).some((hole) => pointInRing(hole, x, z))) return -distance;
+      best = Math.min(best, distance);
+    }
+  }
+  return best;
+}
+const strokes = waveStrokes();
+check('entre 8 y 16 pinceladas de olas', strokes.length >= 8 && strokes.length <= 16, `${strokes.length}`);
+let shore = Number.POSITIVE_INFINITY;
+let offTray = 0;
+const trayEdge = (MAQUETA_SIZE.tray / 2) * MAQUETA_SIZE.clip - 0.08;
+for (const stroke of strokes) {
+  for (const p of stroke.points) {
+    shore = Math.min(shore, landDistance(p.x, p.z) - p.width / 2);
+    if (Math.abs(p.x) > trayEdge || Math.abs(p.z) > trayEdge) offTray += 1;
+  }
+}
+check('ninguna pincelada toca tierra (≥ 0,05 u de la costa)', shore >= 0.05, `${shore.toFixed(3)} u`);
+check('todas dentro de la bandeja', offTray === 0, `${offTray} puntos fuera`);
+check(
+  'cada pincelada se afina en las puntas',
+  strokes.every((s) => s.points[0]!.width < 0.3 * Math.max(...s.points.map((p) => p.width))),
+);
+
+// Las etiquetas del zoom: Kinki apiñada no se pisa, ni tapa el pin.
+const overlaps = (a: LabelRect, b: LabelRect) =>
+  a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+const crowd = [
+  { x: 300, y: 300 },
+  { x: 312, y: 306 },
+  { x: 322, y: 322 },
+  { x: 304, y: 332 },
+  { x: 334, y: 300 },
+  { x: 288, y: 344 },
+].map((a) => ({ ax: a.x, ay: a.y, w: 92, h: 44 }));
+const pinRect: LabelRect = { x: 296, y: 250, w: 30, h: 48 };
+const laid = layoutLabels(crowd, [pinRect], []);
+const rects = laid.map((l, i) => ({ x: l.x, y: l.y, w: crowd[i]!.w, h: crowd[i]!.h }));
+check(
+  'etiquetas: en un corro apretado, ninguna se pisa',
+  rects.every((a, i) => rects.every((b, j) => i === j || !overlaps(a, b))),
+);
+check('etiquetas: ninguna tapa el pin', rects.every((r) => !overlaps(r, pinRect)));
+check(
+  'etiquetas: cada una cerca de su punto (≤ 130 px)',
+  laid.every((l, i) => Math.hypot(l.x + crowd[i]!.w / 2 - crowd[i]!.ax, l.y + crowd[i]!.h / 2 - crowd[i]!.ay) <= 130),
+);
+const alone = layoutLabels([{ ax: 100, ay: 100, w: 80, h: 40 }], [], [])[0]!;
+check('etiquetas: una sola va debajo de su punto, sin línea', alone.slot === 0 && !alone.leader && alone.y > 100);
+const again = layoutLabels(crowd, [pinRect], laid.map((l) => l.slot));
+check('etiquetas: con la elección anterior libre, no saltan', again.every((l, i) => l.slot === laid[i]!.slot));
+
+// Los textos del cartel, en los dos idiomas.
+for (const messages of [messagesEs, messagesEn] as const) {
+  const u = (messages as { ubicacion?: Record<string, unknown> }).ubicacion ?? {};
+  const ficha = (u.ficha ?? {}) as Record<string, { label?: unknown; value?: unknown }>;
+  const strings = ['romaji', 'srTitle', 'tagline', 'summary', 'zoomIn', 'zoomOut', 'fichaLabel'];
+  check(
+    `${messages === messagesEs ? 'es' : 'en'}: los textos del cartel de Ubicación`,
+    strings.every((k) => typeof u[k] === 'string') &&
+      ['prefectura', 'region', 'coords', 'poblacion', 'distancias'].every(
+        (k) => typeof ficha[k]?.label === 'string' && typeof ficha[k]?.value === 'string',
+      ),
+  );
+}
+
+// La fauna de Ubicación sigue teniendo sitio con la maqueta.
+const ubiRandom = mulberry32(5150);
+for (const portrait of [false, true]) {
+  for (const d of [STATION_DEPTHS[UBI]!, STATION_DEPTHS[UBI]! + 20]) {
+    const rig = createRig();
+    snapRig(rig, d);
+    const camera: CameraState = { d, velocity: 0, frame: rig.frame, aspect: portrait ? 9 / 16 : 16 / 9, traveling: false };
+    for (const kind of JOURNEY[UBI]!.ambient.fauna) {
+      const spec = speciesSpec(kind)!;
+      let viable = 0;
+      let total = 0;
+      for (const behavior of spec.behaviors) {
+        for (let n = 0; n < 60; n += 1) {
+          const act = createAct({ kind, behavior }, n, 0, camera, ubiRandom);
+          total += 1;
+          if (clearOfDecor(act, decorFootprints(portrait), d)) viable += 1;
+        }
+      }
+      const effective = 1 - (1 - viable / total) ** DECOR_RETRIES;
+      check(
+        `${kind} en d=${d} (${portrait ? 'vertical' : 'horizontal'}): sale en ≥ 75 % de los repartos`,
+        effective >= 0.75,
+        `${Math.round(effective * 100)} %`,
+      );
+    }
+  }
+}
+
+// El cartel: la maqueta en la mitad izquierda en 16:9, entera en cuadro en los dos aspectos.
+function stationCamera(index: number, aspect: number): PerspectiveCamera {
+  const rig = createRig();
+  snapRig(rig, STATION_DEPTHS[index]!);
+  const camera = new PerspectiveCamera(34, aspect, 0.1, 1000);
+  camera.position.set(rig.camera.x, rig.camera.y, rig.camera.z);
+  camera.lookAt(rig.focus.x, rig.focus.y, rig.focus.z);
+  camera.updateMatrixWorld();
+  return camera;
+}
+for (const [label, aspect, portrait] of [
+  ['16:9', 16 / 9, false],
+  // Un teléfono de hoy es más estrecho que 9:16.
+  ['9:19,5', 0.45, true],
+] as const) {
+  const placed = maquetaOf(stationDecorLayout(UBI, portrait))[0]!;
+  const camera = stationCamera(UBI, aspect);
+  const local = { x: 0, y: 0, z: 0 };
+  const world = { x: 0, z: 0 };
+  let minX = 1;
+  let maxX = 0;
+  let minY = 1;
+  let maxY = 0;
+  const h = MAQUETA_SIZE.tray / 2;
+  for (const [x, z] of [
+    [-h, -h],
+    [h, -h],
+    [-h, h],
+    [h, h],
+  ] as const) {
+    trayToObject(x, 0, z, trayPose(0).tilt, local);
+    objectToWorld(placed, local.x, local.z, world);
+    const p = onScreen(camera, world.x, placed.y + local.y * placed.scale, world.z);
+    minX = Math.min(minX, p.x);
+    maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y);
+    maxY = Math.max(maxY, p.y);
+  }
+  check(
+    `${label} · la bandeja entera en cuadro`,
+    minX >= 0.01 && maxX <= 0.99 && minY >= 0.02 && maxY <= 0.98,
+    `x ${(minX * 100).toFixed(0)}–${(maxX * 100).toFixed(0)} %, y ${(minY * 100).toFixed(0)}–${(maxY * 100).toFixed(0)} %`,
+  );
+  if (!portrait) check('16:9 · la bandeja en la mitad izquierda', maxX <= 0.52, `hasta el ${(maxX * 100).toFixed(0)} %`);
+  else check('9:19,5 · la bandeja por debajo del título (desde el 33 % del alto)', minY >= 0.33, `${(minY * 100).toFixed(0)} %`);
+}
 
 /* ── 10. Los kanji ─────────────────────────────────────────────────────── */
 

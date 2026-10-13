@@ -15,6 +15,7 @@
  */
 
 import { JOURNEY } from '@/config/journey';
+import { MAQUETA_PLAN, MAQUETA_SIZE } from '@/scene/objects/maqueta/maqueta';
 import { LANTERN_SIZE } from '@/scene/objects/toro/toro';
 import { RYOBU_FOOTPRINTS } from '@/scene/objects/torii/ryobu';
 import { frameToWorld, pathX, type PathFrame, type Point3 } from '@/scene/path/journeyPath';
@@ -55,7 +56,24 @@ export interface BandFootprint {
   readonly faunaMargin: number;
 }
 
-export type Footprint = CircleFootprint | BandFootprint;
+/**
+ * Un rectángulo girado en planta: la bandeja de la maqueta (Fase 5A). Un
+ * círculo que cubriera sus esquinas le quitaría al camino un metro de cada
+ * lado.
+ */
+export interface RectFootprint {
+  readonly kind: 'rectangulo';
+  readonly x: number;
+  readonly z: number;
+  /** El giro de three alrededor de Y: el eje local x del rectángulo. */
+  readonly yaw: number;
+  readonly hx: number;
+  readonly hz: number;
+  readonly top: number;
+  readonly faunaMargin: number;
+}
+
+export type Footprint = CircleFootprint | BandFootprint | RectFootprint;
 
 /** Una base de un objeto suelto: su huella y lo que de verdad toca el suelo. */
 export interface ObjectBase extends CircleFootprint {
@@ -95,6 +113,20 @@ export function objectBases(o: PlacedObject): ObjectBase[] {
       },
     ];
   }
+  if (item.kind === 'maqueta') {
+    // El pie del atril. La bandeja va aparte, como rectángulo (`trayFootprint`).
+    return [
+      {
+        kind: 'circulo',
+        x: o.x,
+        z: o.z,
+        r: MAQUETA_SIZE.columnRadius * 1.25 * o.scale,
+        foot: MAQUETA_SIZE.foot * o.scale,
+        top: o.y + MAQUETA_SIZE.top * o.scale,
+        faunaMargin: SOLID_MARGIN,
+      },
+    ];
+  }
   return [
     {
       kind: 'circulo',
@@ -110,6 +142,20 @@ export function objectBases(o: PlacedObject): ObjectBase[] {
   ];
 }
 
+/** La bandeja de la maqueta en planta: un rectángulo que cubre sus dos poses. */
+export function trayFootprint(o: PlacedObject): RectFootprint {
+  return {
+    kind: 'rectangulo',
+    x: o.x,
+    z: o.z,
+    yaw: o.yaw,
+    hx: MAQUETA_PLAN.hx * o.scale,
+    hz: MAQUETA_PLAN.hz * o.scale,
+    top: o.y + MAQUETA_SIZE.top * o.scale,
+    faunaMargin: SOLID_MARGIN,
+  };
+}
+
 const cache = new Map<boolean, readonly Footprint[]>();
 
 /** Todas las huellas del camino para un aspecto, calculadas una vez. */
@@ -122,7 +168,10 @@ export function decorFootprints(portrait: boolean): readonly Footprint[] {
   JOURNEY.forEach((_, index) => {
     const layout = stationDecorLayout(index, portrait);
 
-    for (const o of layout.objects) list.push(...objectBases(o));
+    for (const o of layout.objects) {
+      list.push(...objectBases(o));
+      if (o.item.kind === 'maqueta') list.push(trayFootprint(o));
+    }
 
     for (const g of layout.groves) {
       const [u0, u1] = areaU(g.area);
@@ -161,6 +210,17 @@ export function decorFootprints(portrait: boolean): readonly Footprint[] {
  */
 export function footprintDistance(f: Footprint, x: number, z: number): number {
   if (f.kind === 'circulo') return Math.hypot(x - f.x, z - f.z) - f.r;
+  if (f.kind === 'rectangulo') {
+    // Al sistema del rectángulo: la inversa del giro de three.
+    const dx = x - f.x;
+    const dz = z - f.z;
+    const cos = Math.cos(f.yaw);
+    const sin = Math.sin(f.yaw);
+    const lx = Math.abs(dx * cos - dz * sin) - f.hx;
+    const lz = Math.abs(dx * sin + dz * cos) - f.hz;
+    if (lx <= 0 && lz <= 0) return Math.max(lx, lz);
+    return Math.hypot(Math.max(lx, 0), Math.max(lz, 0));
+  }
   const d = -z;
   const u = x - pathX(d);
   const du = Math.max(f.u0 - u, 0, u - f.u1);
@@ -177,7 +237,7 @@ export function insideFootprint(f: Footprint, x: number, y: number, z: number, m
 
 /** Distancia en planta de una huella al origen de un acto, para descartar las lejanas. */
 function distanceToFrame(f: Footprint, frame: PathFrame): number {
-  if (f.kind === 'circulo') return Math.hypot(f.x - frame.x, f.z - frame.z);
+  if (f.kind === 'circulo' || f.kind === 'rectangulo') return Math.hypot(f.x - frame.x, f.z - frame.z);
   const d = -frame.z;
   return Math.max(f.d0 - d, 0, d - f.d1);
 }
@@ -221,6 +281,10 @@ export function crossesDecor(act: FaunaAct, footprints: readonly Footprint[]): b
   const reach = act.spec.size;
   const touching = near.filter((f) => {
     if (f.kind === 'franja') return true;
+    if (f.kind === 'rectangulo') {
+      const r = Math.hypot(f.hx, f.hz) + reach;
+      return f.x + r > minX && f.x - r < maxX && f.z + r > minZ && f.z - r < maxZ;
+    }
     return f.x + f.r + reach > minX && f.x - f.r - reach < maxX && f.z + f.r + reach > minZ && f.z - f.r - reach < maxZ;
   });
 

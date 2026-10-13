@@ -3,8 +3,10 @@
 > Documento de referencia del proyecto. Consolida las decisiones tomadas en la fase de
 > definición. Si algo cambia, se actualiza aquí y no en la memoria de nadie.
 >
-> Estado: **Fase 4 completa** (Home 京都: el cartel de `1.png`, la entrada, el tramo
-> hacia Ubicación, los faroles y el musgo). La siguiente es la Fase 5, Ubicación 位置.
+> Estado: **Fase 5A implementada, en revisión** (Ubicación 位置: la maqueta de Japón, el
+> zoom a Kinki y *Ichi* / 位置). Después viene la 5B, el tramo hacia Eventos. La Fase 4 está
+> completa (Home 京都: el cartel de `1.png`, la entrada, el tramo hacia Ubicación, los
+> faroles y el musgo).
 > La Fase 3 está completa — 3A (el mundo), 3B (la
 > fauna en el camino) y 3C (la navegación). La Fase 2 está completa (2A motor, 2B ambiente, 2C vida).
 > El estado vivo de las fases y las convenciones del repo están en `CLAUDE.md`.
@@ -272,6 +274,47 @@ por frame con sombras, a 60 fps; con faroles, musgo, sombras de contacto y fondo
 de bambú, 61–62 draw calls en el cartel (antes 55), aún a 60 fps. Detalle:
 `docs/superpowers/specs/2026-10-08-fase-4-home-design.md`.
 
+### 5.4c Ubicación (Fase 5A)
+
+El cartel de `2.png` en espejo respecto de la Home: la **maqueta de Japón** a la
+izquierda del camino, *Ichi* / 位置 a la derecha (DOM real, en el verde koke-deep de
+la referencia, que es ahora el acento de la estación: el pin y Kyoto son lo único rojo).
+
+- **La maqueta** es un objeto más de `environment.decor` (`kind: 'maqueta'`): una
+  bandeja de piedra inclinada 45° hacia la cámara sobre un atril de tambores, con
+  Japón en dos capas —la base de costa (cara sumi, cantos koke) y las 46 losas de
+  las prefecturas (cara blanca), encogidas un pelo para que entre ellas asome la
+  base: las juntas de tinta—. Sin Okinawa, como `2.png` y `13.png`. El lago Biwa
+  es un agujero en Shiga. El dato sale de Natural Earth con **topología
+  compartida** (`bun run geo`) y se carga en diferido: pesa ~80 KB.
+- **Color, como los mapas de Edo** (revisión de la 5A): cada región en un tono
+  pálido de la paleta (`regions.ts`), Kinki en blanco; el mar, la piedra de la
+  bandeja con un velo de **índigo 藍** (`--color-ai`, nuevo); y unas pocas
+  **olas a pinceladas** —crestas que acaban en rizo, con el borde de pincel seco
+  hecho en el shader— en los claros del mar (`waves.ts`; `check:path` comprueba
+  que no tocan tierra).
+- **Las etiquetas no se pisan**: cada una prueba sitios alrededor de su punto y,
+  si queda lejos, una línea de tinta la une a su prefectura (`labelLayout.ts`).
+- **El pin**, como el de `2.png`: gota blanca con contorno shu y el disco rojo,
+  2.5D, siempre de frente a la cámara.
+- **Hover**: la prefectura bajo el cursor sube con un muelle y dice su nombre
+  (romaji y kanji, en una etiqueta DOM). La mano aparece sólo sobre Kyoto. En
+  táctil, un toque muestra el nombre.
+- **Zoom** al tocar Kyoto (o con el botón, que es la vía del teclado): la bandeja
+  se endereza a 55° y el contenido crece ×4,2 alrededor de Kyoto, recortado por
+  la bandeja; lo de fuera de Kinki se hunde y se funde con el mar. La cámara no se
+  mueve. Se deshace con otro toque, Escape, el botón, al echar a andar o al irse.
+  En el zoom, la **ficha de Kyoto** ocupa el sitio del resumen.
+- **位置** se dibuja trazo a trazo al llegar a la estación (no en la primera carga
+  de la visita: ya está pintado en el HTML). El título es `CartelTitle`, que
+  usarán Eventos y los tres Lugares.
+- **Vertical**: el título arriba y el resto debajo de la maqueta, que queda más
+  lejos y algo menor (ver §11).
+
+Rendimiento medido (tier alto, GPU integrada): la maqueta suma 16 draw calls (48 →
+64 en el cartel, con su sombra) y ~24 k triángulos, a 60 fps. Detalle:
+`docs/superpowers/specs/2026-10-13-fase-5a-el-cartel-design.md`.
+
 ### 5.5 Ambiente
 
 - **Pétalos y hojas** en varias capas de profundidad, con viento direccional variable.
@@ -472,6 +515,7 @@ valores ya no son estimaciones: son medidas.
 | Rubor | `--color-sakura-blush` | `#FFCCBC` | Círculos 2 y 4 de `13.png` |
 | Ámbar | `--color-kohaku` | `#FFD699` | Círculo del farol, `13.png` |
 | Matcha suave | `--color-matcha-soft` | `#B4CCAD` | Círculo de gastronomía, `13.png` |
+| Índigo 藍 | `--color-ai` | `#165E83` | No se midió: es el *aiiro* tradicional, el azul de las olas de Hokusai. Sólo para el mar de la maqueta de Ubicación (decidido con el usuario en la revisión de la 5A) |
 | Bambú | `--color-bambu` | `#A3B58E` | Hojas de bambú de `1.png` |
 | Musgo | `--color-koke` · `-mid` · `-deep` | `#78B848` · `#509030` · `#306828` | El arbusto de `1.png`, medido aparte (no llega al 0,1 % del cuadro) |
 | Piedra | `--color-ishi` | `#EDE6DD` | Círculo del torii, `13.png` |
@@ -551,7 +595,7 @@ instancia miles de veces y reacciona al input. Un dibujo estático no.
 | **Ambiente sonoro** | Sintetizado con la Web Audio API: ruido rosa filtrado para el viento (la frecuencia sigue al `WindField`), parciales con decaimiento para el *fūrin*, ráfagas cortas para los grillos, envolvente sobre oscilador ruidoso para el graznido | Web Audio nativa |
 | **Pétalos y hojas** | Densidad por zona con pico en cada ráfaga. Contorno paramétrico triangulado en abanico (pétalo de cerezo con su muesca, arce de cinco lóbulos por el valor absoluto de cos(2.5θ), hoja lanceolada de bambú) + `InstancedMesh` con la posición calculada **en el vertex shader** | R3F + GLSL |
 | **Estallido de pétalos al click** | `confetti.shapeFromPath()` con la silueta de un pétalo | canvas-confetti |
-| **Mapa de Japón** | GeoJSON de prefecturas → `SVGLoader` → `ExtrudeGeometry` = mapa 3D extruido, Kyoto se eleva al hover | three + `d3-geo` |
+| **Mapa de Japón** | Prefecturas de Natural Earth simplificadas con topología compartida y encogidas (juntas de tinta) por `bun run geo` → `ExtrudeGeometry` en dos capas fundidas con un id por prefectura (`aPref`) → la elevación y el fundido, en el shader. El zoom escala el contenido dentro de la bandeja con planos de recorte | three + topojson + clipper-lib (sólo desarrollo) |
 | **Agua / estanque** | `MeshReflectorMaterial` con distorsión | drei |
 | **Niebla y atmósfera** | `fog` + `<Cloud>` + god rays | drei + postprocessing |
 | **Títulos kanji 3D** | `Text3D` con la fuente subseteada, extruido con luz rasante | drei |
@@ -689,7 +733,7 @@ fase** para revisión antes de seguir.
 | **3C** | · La navegación | Sidebar radial (`13.png`) con íconos generados por código · progreso del camino · nav móvil · teclado · transiciones | ✅ |
 | **4** | Home 京都 | Torii 3D, bambú, arbusto, título tipográfico, composición del hero · decoración declarada en `journey.ts` · entrada «el cartel se compone» · tramo hacia Ubicación con tarjeta de bienvenida · faroles kasuga y yukimi, musgo y halo de papel en el texto (revisión) | ✅ |
 | **5** | Ubicación 位置 | Se parte en dos bloques con parada propia, ver abajo | ⏸ |
-| **5A** | · El cartel | Maqueta de Japón por prefecturas sobre un atril de piedra, inclinada hacia la cámara · hover que levanta cada prefectura con su nombre · zoom a Kyoto (Kinki y el lago Biwa) · pin blanco con contorno shu · *Ichi* y 位置 dibujado con `<InkKanji>` · ficha de Kyoto. Detalle: `docs/superpowers/specs/2026-10-13-fase-5a-el-cartel-design.md` | ⏸ |
+| **5A** | · El cartel | Maqueta de Japón por prefecturas sobre un atril de piedra, inclinada hacia la cámara · hover que levanta cada prefectura con su nombre · zoom a Kyoto (Kinki y el lago Biwa) · pin blanco con contorno shu · *Ichi* y 位置 dibujado con `<InkKanji>` · ficha de Kyoto. Detalle: `docs/superpowers/specs/2026-10-13-fase-5a-el-cartel-design.md` | 🔎 |
 | **5B** | · El tramo hacia Eventos | Los dos mapas antiguos, desplegables, **no como tarjetas sino como carteles de madera insertados en el camino** (en 3A son tarjetas provisionales, con el hueco del mapa), junto a la reseña breve de Kyoto · **una roca pequeña vertical pintada** con la esquina de `2.png` (torii, Fuji y sol rojo), que se sacó del cartel para no sobrecargarlo · la decoración del valle · los textos del tramo cuentan la **historia** (la capital de mil años, Heian-kyō) para no repetir la geografía de la ficha de 5A | ⏸ |
 | **6** | Lugares | Plantilla + Fushimi Inari, Kiyomizu-dera, Gion · sus kanji dibujados con `<InkKanji>` · variante `inari` del torii · **tramos**: de Eventos a Fushimi, paso por los costados del santuario y subida escalonada —gradas en la malla del terreno— con toriis (`5.png`); de Fushimi a Kiyomizu-dera, un bosque denso de bambú y un puente de madera sobre una pequeña vaguada antes de la plataforma del templo; de Kiyomizu-dera a Gion, la bajada termina en calzadas tradicionales y faroles | ⏸ |
 | **7** | Eventos | Sakura + rueda de estaciones / calendario del año · 桜 dibujado con `<InkKanji>` · **tramo de llegada**: el bosque de cerezos al acercarse a la sakura (el aumento progresivo de pétalos ya lo hace 3A) | ⏸ |
@@ -724,6 +768,7 @@ buena medida rellenar contenido sobre una plantilla que ya funciona.
 | La noche | ⏳ Fase posterior, sin número aún. Anochecer según la hora: la de Japón (GMT+9: «ahora mismo en Kyoto es de noche») o la de quien visita. Trae de vuelta las luciérnagas y el bloom |
 | Giroscopio en iOS | ❌ Descartado. Sólo daría el parallax al inclinar un iPhone (en Android ya funciona), y a cambio pediría un botón más en la barra móvil para el diálogo de permiso del sistema. No compensa |
 | Profundidad del contenido | ⏳ ¿Tarjetas cortas o artículos largos? Define si se usa MDX o datos en TS |
+| La maqueta en vertical | ⏳ A revisar con el usuario. En un teléfono (≈ 0,45 de aspecto) la maqueta no pasa de ~35 % del ancho: el camino ocupa el centro, a la derecha choca con la cámara al caminar y más cerca se sale del cuadro. Está entera y se puede tocar, pero se lee pequeña; en el zoom sólo se ve el nombre de lo que se toca. Alternativas: aceptarlo, abrir el zoom por defecto en vertical, o un mapa plano en el DOM sólo para móvil |
 | Fauna en vertical | ✅ Cerrado. **El milano**: sus círculos se estrechan con el aspecto real (`kiteFit`, nunca por debajo de la mitad) y en 9:16 se le ve el **75 %** de su acto (antes, 36 %). **La ardilla que corre y se para** (`correrYParar`) mide sus márgenes con el cuadro real: **65 %** en 9:16 (antes, 28 %); la duración no cambia, así que en vertical corre más despacio en unidades del mundo pero cruza la pantalla a un ritmo parecido. **El resto se queda así**, decidido con el usuario: en móvil ya hay mucho en pantalla y faltan las decoraciones y el contenido (9:16 frente a 16:9: bandada 30/75 %, revolotear 26/67 %, vadear 50/89 %, visitaAlSuelo 76/90 %, perseguir 72/86 %, callejear 58/86 %, deambular 50/81 %) |
 | Dominio y hosting | ⏳ Fase 9 |
 | Assets de Canva | ⚠️ Con marca de agua. Sólo referencia, nunca producción |

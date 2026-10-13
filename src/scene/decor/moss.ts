@@ -40,7 +40,7 @@ export interface MossPatch {
 }
 
 /** Parches al pie de cada clase de objeto (con musgo 1 y tier alto). */
-const PER_BASE = { torii: 3, farol: 6, arbusto: 4 } as const;
+const PER_BASE = { torii: 3, farol: 6, arbusto: 4, maqueta: 6 } as const;
 
 /** Probabilidad de que una piedra tenga musgo al lado (con musgo 1). */
 const STONE_CHANCE = 0.25;

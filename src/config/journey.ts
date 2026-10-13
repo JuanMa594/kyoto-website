@@ -106,6 +106,11 @@ export interface SkyTint {
 export interface DecorAt {
   readonly d: number;
   readonly u: number;
+  /**
+   * Escala propia de esta colocación, por encima de la del objeto. Sirve para
+   * que en vertical un objeto quepa más lejos sin cambiar en horizontal.
+   */
+  readonly scale?: number;
 }
 
 /** Una franja a un costado del camino, entre dos profundidades y dos |u|. */
@@ -177,7 +182,17 @@ export interface DecorGrove {
   readonly leaves?: number;
 }
 
-export type DecorItem = DecorTorii | DecorShrub | DecorLantern | DecorGrove;
+/**
+ * La maqueta de Japón de Ubicación (Fase 5A): una bandeja de piedra con las
+ * prefecturas, inclinada hacia la cámara sobre su atril. No se voltea al otro
+ * lado del camino: mira siempre a la cámara. Le cierra el paso a la fauna.
+ * Medidas: `scene/objects/maqueta/maqueta.ts`.
+ */
+export interface DecorMaqueta extends DecorObjectBase {
+  readonly kind: 'maqueta';
+}
+
+export type DecorItem = DecorTorii | DecorShrub | DecorLantern | DecorGrove | DecorMaqueta;
 
 /**
  * El "preset de ambiente" de la estación: qué forma tiene el terreno, por qué
@@ -433,6 +448,18 @@ const DECOR_INICIO: readonly DecorItem[] = [
 ];
 
 /**
+ * Ubicación: el cartel de `2.png` en espejo respecto de la Home —la maqueta
+ * de Japón a la izquierda del camino, el texto a la derecha—. Girada hacia la
+ * cámara (`yaw`), que la ve desde la derecha. Calibrado con `bun run
+ * check:path` («El cartel de Ubicación»). El resto del valle es de la Fase 5B.
+ */
+const DECOR_UBICACION: readonly DecorItem[] = [
+  // En vertical no hay sitio junto al camino para una bandeja grande: más
+  // lejos y algo menor, entera en el cuadro de un teléfono (≈ 0,45).
+  { kind: 'maqueta', at: { d: -5, u: -5.8 }, portrait: { d: 20, u: -4.5, scale: 0.8 }, yaw: 0.15 },
+];
+
+/**
  * El orden es el del camino, y es también el orden de lectura de `13.png`:
  * mapa → sakura → torii → pagoda → farol → gastronomía.
  */
@@ -476,14 +503,17 @@ export const JOURNEY: readonly Station[] = [
     route: 'ubicacion',
     pathT: 64 / PATH_LENGTH,
     inSidebar: true,
-    palette: { halo: '#FFFFFF', accent: '#C4181A', ground: '#F3EFE4' },
+    // El acento es el verde de 2.png (koke-deep): así el pin y Kyoto son lo
+    // único rojo del cuadro, como la bandera.
+    palette: { halo: '#FFFFFF', accent: '#306828', ground: '#F3EFE4' },
     // Valle abierto: ondulación baja por los dos costados.
     environment: {
       hills: 'suaves',
       hillSides: ['izquierda', 'derecha'],
       altitude: 0,
       lateral: -8,
-      decor: [],
+      decor: DECOR_UBICACION,
+      moss: 0.5,
     },
     tramo: TRAMO_UBICACION,
     ambient: {

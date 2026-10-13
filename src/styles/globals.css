@@ -406,6 +406,207 @@
     }
   }
 
+  /* ── El cartel de Ubicación (Fase 5A) ─────────────────────────────────
+     2.png en espejo respecto de la Home: la maqueta a la izquierda, en la
+     escena; Ichi / 位置 y lo que se lee, a la derecha. En vertical el título
+     va arriba y el resto debajo de la maqueta, que cae entre el 35 y el 50 %
+     del alto (check:path, «El cartel de Ubicación»). */
+  /* Anclado arriba, no centrado: al aparecer la ficha el título no se mueve. */
+  .ubicacion-cartel {
+    display: grid;
+    min-height: 100dvh;
+    align-items: start;
+    justify-items: end;
+    padding-top: 20dvh;
+  }
+
+  /* Con el zoom, la ficha ocupa el sitio del resumen: dice lo mismo, en datos. */
+  .ubicacion-cartel__details:has(.kyoto-ficha) .ubicacion-cartel__summary {
+    display: none;
+  }
+
+  .ubicacion-cartel__text {
+    width: min(34vw, 32rem);
+    margin-right: 10vw;
+  }
+
+  .ubicacion-cartel__tagline {
+    margin-top: 1.25rem;
+    font-size: 1.35rem;
+  }
+
+  .ubicacion-cartel__summary {
+    margin-top: 1.5rem;
+    max-width: 30rem;
+  }
+
+  /* El título de cartel de una estación (`CartelTitle`): el romaji grande y,
+     debajo, el kanji dibujado. Ambos con el color de la estación. */
+  .cartel-title {
+    margin: 0;
+    color: var(--cartel-accent, var(--color-sumi));
+  }
+
+  .cartel-title__word {
+    display: block;
+    font-size: var(--text-cartel);
+    line-height: var(--text-cartel--line-height);
+  }
+
+  .cartel-title__kanji {
+    margin-top: 0.3em;
+  }
+
+  .cartel-button {
+    display: inline-flex;
+    margin-top: 1.5rem;
+    padding: 0.55rem 1.1rem;
+    border-left: 3px solid var(--color-koke-deep);
+    transition: translate var(--dur-rapido) var(--ease-washi);
+  }
+
+  .cartel-button:hover {
+    translate: 0 -2px;
+  }
+
+  .cartel-button:focus-visible {
+    outline: 2px solid var(--color-koke-deep);
+    outline-offset: 3px;
+  }
+
+  .kyoto-ficha {
+    display: grid;
+    gap: 0.35rem;
+    margin: 1.25rem 0 0;
+    padding: 1rem 1.25rem;
+    animation: ficha-in var(--dur-medio) var(--ease-washi) both;
+  }
+
+  .kyoto-ficha__row {
+    display: grid;
+    grid-template-columns: 7.5rem 1fr;
+    gap: 0.75rem;
+  }
+
+  .kyoto-ficha dt {
+    opacity: 0.65;
+  }
+
+  .kyoto-ficha dd {
+    margin: 0;
+  }
+
+  @keyframes ficha-in {
+    from {
+      opacity: 0;
+      translate: 0 0.5rem;
+    }
+  }
+
+  /* Los nombres sobre la maqueta: papel translúcido, colocados desde la
+     escena (PrefectureLabels). */
+  .pref-labels {
+    position: fixed;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .pref-label {
+    position: absolute;
+    top: 0;
+    left: 0;
+    padding: 0.1rem 0.55rem 0.2rem;
+    font-size: 1.2rem;
+    line-height: 1.15;
+    text-align: center;
+    white-space: nowrap;
+    background: color-mix(in srgb, var(--surface-paper) 82%, transparent);
+    border: 1px solid var(--border-hairline);
+    border-radius: 0.5rem;
+    opacity: 0;
+    transition: opacity var(--dur-rapido) var(--ease-washi);
+  }
+
+  /* La línea de tinta de las etiquetas que quedan lejos de su prefectura. */
+  .pref-labels__leaders {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .pref-labels__leaders line {
+    stroke: var(--color-sumi-soft);
+    stroke-width: 1.2;
+    stroke-linecap: round;
+    opacity: 0.7;
+  }
+
+  .pref-label__ja {
+    display: block;
+    font-family: var(--font-kanji);
+    font-size: 0.95rem;
+    opacity: 0.8;
+  }
+
+  .pref-label[data-on='true'] {
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .kyoto-ficha {
+      animation: none;
+    }
+  }
+
+  @media (orientation: portrait) {
+    .ubicacion-cartel {
+      justify-items: start;
+      align-items: stretch;
+      padding-top: 0;
+    }
+
+    .ubicacion-cartel__text {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      width: min(86vw, 30rem);
+      margin: 0 0 0 6vw;
+      padding: 9dvh 0 10dvh;
+    }
+
+    .ubicacion-cartel__title .cartel-title__word {
+      display: inline;
+      font-size: clamp(3rem, 14vw, 4.5rem);
+    }
+
+    .ubicacion-cartel__title .cartel-title__kanji {
+      margin: 0 0 0 0.35em;
+      font-size: clamp(2.5rem, 12vw, 3.75rem);
+      vertical-align: -0.1em;
+    }
+
+    .ubicacion-cartel__tagline {
+      margin-top: 0.5rem;
+    }
+
+    .ubicacion-cartel__summary {
+      margin-top: 0;
+    }
+
+    .kyoto-ficha {
+      padding: 0.75rem 1rem;
+    }
+
+    .kyoto-ficha__row {
+      grid-template-columns: 6rem 1fr;
+      gap: 0.5rem;
+    }
+  }
+
   /* ── La entrada (Fase 4) ──────────────────────────────────────────────
      Con `data-intro` el cartel empieza escondido; HomeIntro lo compone y
      quita la marca. `on` es el estado antes de que hidrate el JS: si el JS
