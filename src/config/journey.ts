@@ -135,7 +135,10 @@ export interface DecorTorii extends DecorObjectBase {
   readonly variant: 'ryobu';
 }
 
-/** Un arbusto podado en nube (o-karikomi). No le cierra el paso a la fauna. */
+/**
+ * Un arbusto podado en nube (o-karikomi). Le cierra el paso a la fauna que
+ * anda (y a lo que vuela por debajo de su copa).
+ */
 export interface DecorShrub extends DecorObjectBase {
   readonly kind: 'arbusto';
   readonly seed: number;

@@ -45,7 +45,7 @@ import { STATION_DEPTHS, stationIndex } from '../src/scene/path/journeyPath';
 import { stoneLayout } from '../src/scene/path/stones';
 import { groundY } from '../src/scene/systems/elevation';
 import { speciesSpec } from '../src/scene/systems/fauna/bestiary';
-import { createAct, DECOR_RETRIES, type CameraState } from '../src/scene/systems/fauna/casting';
+import { clearOfDecor, createAct, DECOR_RETRIES, type CameraState } from '../src/scene/systems/fauna/casting';
 import { SPRINGS, stepSpring } from '../src/scene/systems/sway';
 import { requestGust, updateWind, WIND } from '../src/scene/systems/WindField';
 import { check, finish, range, section } from './check-kit';
@@ -434,7 +434,9 @@ for (const portrait of [false, true]) {
         for (let n = 0; n < 60; n += 1) {
           const act = createAct({ kind, behavior }, n, 0, camera, faunaRandom);
           total += 1;
-          if (!crossesDecor(act, decorFootprints(portrait))) viable += 1;
+          // Con la misma regla que el reparto: lo que anda prueba su línea un
+          // poco más cerca o más lejos antes de darse por perdido.
+          if (clearOfDecor(act, decorFootprints(portrait), d)) viable += 1;
         }
       }
       // El reparto reintenta: lo que cuenta es la probabilidad de que salga
@@ -456,6 +458,30 @@ const blocked = decorFootprints(false).some(
   (f) => f.faunaMargin > 0 && insideFootprint(f, homeTorii.x, homeTorii.y + 1, homeTorii.z, 0),
 );
 check('el pie del torii cierra el paso', blocked);
+
+// Y el arbusto: la garza lo atravesaba a la vista.
+const homeShrub = homeLand.objects.find((o) => o.item.kind === 'arbusto')!;
+check(
+  'el arbusto cierra el paso',
+  decorFootprints(false).some(
+    (f) => f.faunaMargin > 0 && insideFootprint(f, homeShrub.x, homeShrub.y + 0.8, homeShrub.z, 0),
+  ),
+);
+
+// Probar otras líneas no puede costar un frame: el peor reparto, cronometrado.
+const timingRandom = mulberry32(77);
+let worstCast = 0;
+for (let n = 0; n < 40; n += 1) {
+  const rig = createRig();
+  snapRig(rig, 32);
+  const camera: CameraState = { d: 32, velocity: 0, frame: rig.frame, aspect: 16 / 9, traveling: false };
+  const started = performance.now();
+  for (let attempt = 0; attempt < DECOR_RETRIES; attempt += 1) {
+    if (clearOfDecor(createAct({ kind: 'garza', behavior: 'vadear' }, n, 0, camera, timingRandom), decorFootprints(false), 32)) break;
+  }
+  worstCast = Math.max(worstCast, performance.now() - started);
+}
+check('el reparto más caro de la garza cabe en 8 ms', worstCast <= 8, `${worstCast.toFixed(1)} ms`);
 
 /* ── 10. Los kanji ─────────────────────────────────────────────────────── */
 

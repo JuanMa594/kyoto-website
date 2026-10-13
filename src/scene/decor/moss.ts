@@ -43,7 +43,7 @@ export interface MossPatch {
 const PER_BASE = { torii: 3, farol: 6, arbusto: 4 } as const;
 
 /** Probabilidad de que una piedra tenga musgo al lado (con musgo 1). */
-const STONE_CHANCE = 0.35;
+const STONE_CHANCE = 0.25;
 
 /** Cada cuánto, a lo largo del borde de un macizo, se intenta un parche. */
 const GROVE_STEP = 1.2;
@@ -54,7 +54,7 @@ const CULM_CHANCE = 0.5;
 /** El terreno abierto: desde dónde (pasado el cartel), cada cuánto y con qué probabilidad hay un corro. */
 const OPEN_FROM = 0;
 const OPEN_STEP = 2.2;
-const OPEN_CHANCE = 0.85;
+const OPEN_CHANCE = 0.7;
 
 /** El musgo de la estación `index` y su tramo, para un aspecto. */
 export function stationMoss(index: number, portrait: boolean, densityScale: number): MossPatch[] {
@@ -148,7 +148,7 @@ export function stationMoss(index: number, portrait: boolean, densityScale: numb
       const x = pathX(along) + side * lerp(0.6, 7.5, random() ** 1.6);
       const z = -along;
       if (stones.some((s) => Math.hypot(s.x - x, s.z - z) < 1.1)) continue;
-      drift(x, z, 3 + Math.floor(random() * 3), 1.3, 0.6, 1.4);
+      drift(x, z, 2 + Math.floor(random() * 3), 1.2, 0.6, 1.3);
     }
   }
 

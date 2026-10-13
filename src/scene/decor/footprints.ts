@@ -26,8 +26,9 @@ import { areaU, objectToWorld, SHRUB_SIZE, stationDecorLayout, type PlacedObject
 
 /**
  * Margen que pide cada huella a la fauna, en fracción del cuerpo del animal.
- * 0 = no le cierra el paso (el arbusto: bajo y blando; la franja del macizo:
- * sólo la miran la cámara y las piedras).
+ * 0 = no le cierra el paso (la franja del macizo: sólo la miran la cámara y
+ * las piedras; para la fauna cuenta cada caña). Pilares, faroles y arbustos son
+ * sólidos.
  */
 const SOLID_MARGIN = 0.5;
 /** Una caña es delgada: basta con que el cuerpo no la atraviese de lleno. */
@@ -102,7 +103,9 @@ export function objectBases(o: PlacedObject): ObjectBase[] {
       r: SHRUB_SIZE.radius * o.scale,
       foot: SHRUB_SIZE.radius * 0.85 * o.scale,
       top: o.y + SHRUB_SIZE.height * o.scale,
-      faunaMargin: 0,
+      // Es una masa compacta de 1,35 de alto: la garza que vadea la
+      // atravesaba a la vista. Lo que vuela por encima de su copa, pasa.
+      faunaMargin: SOLID_MARGIN,
     },
   ];
 }

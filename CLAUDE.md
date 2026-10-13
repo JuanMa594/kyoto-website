@@ -192,7 +192,8 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   (`portrait`). **La decoración de una estación incluye su tramo de salida.**
   `scene/decor/placement.ts` la lleva al mundo y `footprints.ts` publica sus
   huellas: nada pisa las piedras, la cámara nunca pasa a menos de 1,5 u y la
-  fauna no atraviesa pilares, faroles ni cañas (el reparto prueba otro sitio).
+  fauna no atraviesa pilares, faroles, arbustos ni cañas (el reparto acerca o
+  aleja la línea de lo que anda y, si no cabe, prueba otro sitio).
   El musgo no se declara parche a parche: crece al pie de esas mismas bases y
   de cada caña, en el borde de los macizos, en corros por el terreno abierto y
   junto a las piedras, en la cantidad que diga
@@ -492,6 +493,14 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   fondo (|u| 12–23): con un fondo continuo salía en un 17 % de los sorteos
   (antes, 33 %). El fondo va en bosquetes con claros (`backdropBamboo` en
   `journey.ts`), y con ellos vuelve al 31 %.
+- **Lo que anda cruza el cuadro a una profundidad fija: un solo obstáculo en su
+  línea anula el acto.** El arbusto empezó sin cerrarle el paso a la fauna
+  («bajo y blando») y la garza lo atravesó a la vista. Al hacerlo sólido, la
+  garza del tramo bajó del 30 % al 10 % de los sorteos: el arbusto de d=34 cae
+  justo en sus líneas. Ahora, antes de descartar un acto que anda, el reparto
+  prueba la misma línea ±1,4 y ±2,8 u (`clearOfDecor` en `fauna/casting.ts`):
+  la garza pasa por delante o por detrás, y sale en un 50 %. Cuesta ≤ 2,4 ms
+  en el peor reparto.
 - **Lo que se mece se dobla después de la matriz de instancia** (`windSway`):
   la flexión va en ejes del objeto, que para los macizos son los del mundo. Un
   objeto que se mece **no se gira** (el `<Shrub>` va sin rotación) o la ráfaga
@@ -575,17 +584,17 @@ llega en las fases 4–8 y se cuelga de ese mismo objeto.
 | 3A | · El mundo: sendero, terreno continuo, cámara con scroll, tramo y llegada | ✅ |
 | 3B | · La fauna en el camino (anclada al mundo, cercanía por estación) | ✅ |
 | 3C | · La navegación (sidebar radial, íconos por código, móvil, teclado) | ✅ |
-| 4 | Home 京都: torii, bambú, arbusto, cartel, entrada, tramo hacia Ubicación, faroles y musgo | 🔍 en revisión |
+| 4 | Home 京都: torii, bambú, arbusto, cartel, entrada, tramo hacia Ubicación, faroles y musgo | ✅ |
 | 5 | Ubicación 位置 | ⏸ |
 | 6 | Lugares | ⏸ |
 | 7 | Eventos 桜 | ⏸ |
 | 8 | Gastronomía 京料理 | ⏸ |
 | 9 | Pulido, rendimiento, a11y, deploy | ⏸ |
 
-## Decisiones abiertas de la Fase 1
+## Decisiones de la Fase 1
 
-- **Fuente de kanji**: Zen Old Mincho (propuesta) vs Yuji Syuku. Comparar en
-  `/es/tipografia/`.
+Decidido al cerrar la Fase 4: la **fuente de kanji es Zen Old Mincho** (la de
+`<InkKanji>`). El muestrario `/es/tipografia/` queda por borrar.
 
 Decidido en la Fase 3: los **slugs se quedan en español** (`/en/ubicacion`). El
 export estático no tiene middleware que reescriba rutas traducidas; se

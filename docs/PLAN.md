@@ -3,8 +3,9 @@
 > Documento de referencia del proyecto. Consolida las decisiones tomadas en la fase de
 > definición. Si algo cambia, se actualiza aquí y no en la memoria de nadie.
 >
-> Estado: **Fase 4 implementada, en revisión** (Home 京都: el cartel de `1.png`, la
-> entrada y el tramo hacia Ubicación). La Fase 3 está completa — 3A (el mundo), 3B (la
+> Estado: **Fase 4 completa** (Home 京都: el cartel de `1.png`, la entrada, el tramo
+> hacia Ubicación, los faroles y el musgo). La siguiente es la Fase 5, Ubicación 位置.
+> La Fase 3 está completa — 3A (el mundo), 3B (la
 > fauna en el camino) y 3C (la navegación). La Fase 2 está completa (2A motor, 2B ambiente, 2C vida).
 > El estado vivo de las fases y las convenciones del repo están en `CLAUDE.md`.
 
@@ -686,7 +687,7 @@ fase** para revisión antes de seguir.
 | **3A** | · El mundo | Sendero desde `journey.ts` · terreno continuo · piedras en todo el recorrido · cámara sobre el camino con scroll · tramo y llegada automática · viaje entre estaciones | ✅ |
 | **3B** | · La fauna en el camino | Actos anclados al mundo · lo que vuela se adelanta (ancla que se desliza) · nace por delante al caminar · cercanía por estación · márgenes con la cámara real · nunca desaparece a la vista | ✅ |
 | **3C** | · La navegación | Sidebar radial (`13.png`) con íconos generados por código · progreso del camino · nav móvil · teclado · transiciones | ✅ |
-| **4** | Home 京都 | Torii 3D, bambú, arbusto, título tipográfico, composición del hero · decoración declarada en `journey.ts` · entrada «el cartel se compone» · tramo hacia Ubicación con tarjeta de bienvenida · faroles kasuga y yukimi, musgo y halo de papel en el texto (revisión) | 🔍 |
+| **4** | Home 京都 | Torii 3D, bambú, arbusto, título tipográfico, composición del hero · decoración declarada en `journey.ts` · entrada «el cartel se compone» · tramo hacia Ubicación con tarjeta de bienvenida · faroles kasuga y yukimi, musgo y halo de papel en el texto (revisión) | ✅ |
 | **5** | Ubicación 位置 | Mapa de Japón extruido e interactivo, zoom a Kyoto · el kanji 位置 dibujado con `<InkKanji>` · **tramo hacia Eventos**: los dos mapas antiguos, desplegables, **no como tarjetas sino como carteles de madera insertados en el camino** (en 3A son tarjetas provisionales, con el hueco del mapa), junto a la reseña breve de Kyoto | ⏸ |
 | **6** | Lugares | Plantilla + Fushimi Inari, Kiyomizu-dera, Gion · sus kanji dibujados con `<InkKanji>` · variante `inari` del torii · **tramos**: de Eventos a Fushimi, paso por los costados del santuario y subida escalonada —gradas en la malla del terreno— con toriis (`5.png`); de Fushimi a Kiyomizu-dera, un bosque denso de bambú y un puente de madera sobre una pequeña vaguada antes de la plataforma del templo; de Kiyomizu-dera a Gion, la bajada termina en calzadas tradicionales y faroles | ⏸ |
 | **7** | Eventos | Sakura + rueda de estaciones / calendario del año · 桜 dibujado con `<InkKanji>` · **tramo de llegada**: el bosque de cerezos al acercarse a la sakura (el aumento progresivo de pétalos ya lo hace 3A) | ⏸ |
@@ -703,7 +704,7 @@ buena medida rellenar contenido sobre una plantilla que ya funciona.
 | Tema | Estado |
 |---|---|
 | Licencia de One Jinja y Gaze Nozarashi | ⚠️ Ambas son versiones **Demo** con "All Rights Reserved". `fsType = 0` permite incrustarlas técnicamente, pero si el sitio se publica con ánimo comercial hay que comprar licencia o sustituirlas. Detalle en `assets/fonts/LICENSES.md` |
-| Fuente de kanji | ⏳ Zen Old Mincho vs Yuji Syuku — comparar en `/es/tipografia/` |
+| Fuente de kanji | ✅ Decidido al cerrar la Fase 4: **Zen Old Mincho**, la de `<InkKanji>`. Queda borrar el muestrario `/es/tipografia/` cuando se confirme |
 | Slugs por idioma | ✅ Decidido en la Fase 3: se quedan en español. El export estático no tiene middleware que reescriba `/en/location` → `ubicacion`; traducirlos obligaría a una ruta comodín generada desde `journey.ts`. Se reconsidera en la Fase 9 |
 | Pagoda, casas de Gion y platos | ⏳ Se resuelve en sus fases (ver §7) |
 | Kitsune | ⏳ Aplazado a la Fase 6, entre los toriis. El modelo está en `assets/models/source/` |
@@ -712,7 +713,9 @@ buena medida rellenar contenido sobre una plantilla que ya funciona.
 | **Créditos de KanjiVG** | ⚠️ Los trazos de los kanji son CC BY-SA 3.0 (© Ulrich Apel): entran en la misma sección de créditos. El «compartir igual» afecta sólo a `strokes.generated.ts`. Detalle en `assets/kanji/LICENSES.md` |
 | Faroles de piedra | ✅ En la revisión de la Fase 4: tres en el tramo de la Home (un yukimi y un par de kasuga), fuera del cartel. **Los dos tipos se reparten por el resto del camino en sus fases**, pensando en el modo noche |
 | Faroles encendidos | ⏳ **A la fase de la noche.** Las ventanas de papel ya son un material propio (`StoneLanterns`, `DAY_GLOW`); de noche subirá su brillo y se sumará la luz al sendero desde la cámara del fuego (`LANTERN_SIZE.fireY`), con presupuesto de luces: no una luz por farol |
-| Profundidad de campo en la Home | ⏳ El bambú de delante sale casi nítido con el rango actual (16 u). Estrecharlo lo desenfocaría, pero también las piedras cercanas en todas las estaciones: se decide en la revisión |
+| Profundidad de campo en la Home | ✅ Se queda como está (decidido al cerrar la Fase 4): estrecharla desenfocaría también las piedras cercanas de todas las estaciones |
+| Compilación del shader de la fauna | ⏳ Fase 9. El primer animal que entra en cuadro compila su programa en ese frame: ~120 ms de tirón unos 10 s después de cargar (perfil de CPU: `getProgramInfoLog` dentro de `getUniforms`, el programa de la fauna con deformación). Arreglo: precompilar los materiales de la fauna al cargar (`renderer.compileAsync`, que usa `KHR_parallel_shader_compile`) |
+| Sin WebGL | ⏳ Fase 9. El sitio se lee entero (DOM real), pero el `<Canvas>` se monta igual y deja en la consola «Error creating WebGL context». `SceneRoot` debería no montarlo si no hay contexto |
 | Precargas RSC en el export | ⏳ Fase 9: con `serve`, las precargas de segmento de Next 16 dan 404 (piden `__next.$d$locale.__PAGE__.txt`, el export escribe `__next.$d$locale/__PAGE__.txt`). No rompe la navegación; el hosting tendrá que servirlas |
 | Peso de la fauna | ⏳ ~0,96 MB en total; cada estación sólo carga su elenco. La mariposa se lleva 620 KB (esqueleto de 192 huesos que el simplificador no consigue bajar de 16.000 triángulos), y las posiciones de los modelos estáticos van sin cuantizar para que el shader vea coordenadas reales. Las dos cosas son candidatas a recorte en la Fase 9 |
 | Bloom y luciérnagas | ⏳ **A la fase de la noche.** Sobre un fondo washi (`#FFFACD`, luminancia ~0,97) un bloom no tiene nada más brillante que el fondo que hacer brillar: o ilumina el fondo entero o no hace nada. Por lo mismo, las luciérnagas (`kohaku`, `#FFD699`) no se veían en Gion, cuyo cielo además se tiñe de ese mismo ámbar, y ocupaban un tercio de sus actos. Se sacaron del reparto de Gion (la especie, su rig y su conducta siguen, y `check:path` las sigue recorriendo); vuelven con la noche, junto con el bloom y los faroles encendidos |

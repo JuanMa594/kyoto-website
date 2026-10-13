@@ -13,12 +13,13 @@
 
 import type { FaunaKind } from '@/config/journey';
 import { lerp } from '@/lib/procedural';
-import { crossesDecor, decorFootprints } from '@/scene/decor/footprints';
+import { crossesDecor, decorFootprints, type Footprint } from '@/scene/decor/footprints';
 import type { PathFrame } from '@/scene/path/journeyPath';
 
 import {
   CAMERA_Z,
   faunaDistanceAt,
+  FOG_CAP,
   fogFarAt,
   HURRY_GAP,
   leadFor,
@@ -254,13 +255,41 @@ function castAct(
   // de sitio y, si no cabe, se deja para dentro de un rato.
   const footprints = decorFootprints(camera.aspect <= 1);
   for (let attempt = 0; attempt < DECOR_RETRIES; attempt += 1) {
-    const act = createAct(chosen, memory.counter, now, camera, random);
-    if (!crossesDecor(act, footprints)) return act;
+    const act = clearOfDecor(createAct(chosen, memory.counter, now, camera, random), footprints, camera.d);
+    if (act) return act;
   }
   memory.nextAt = now + DECOR_BACKOFF;
   // Sin esto, la recompensa por quedarse quieto volvería a intentarlo en el
   // frame siguiente: cuenta como si acabara de pasar algo.
   memory.emptySince = now;
+  return null;
+}
+
+/**
+ * Cuánto se acerca o se aleja la línea de quien anda cuando la suya choca con
+ * la decoración, en unidades, en este orden.
+ */
+const LINE_SHIFTS = [1.4, -1.4, 2.8, -2.8] as const;
+
+/**
+ * El acto tal cual si no atraviesa la decoración; si no, y anda, la misma
+ * línea un poco más cerca o más lejos: la garza pasa por delante o por detrás
+ * del arbusto en vez de no salir. Lo que anda cruza el cuadro de lado a lado
+ * a una profundidad fija, así que un solo arbusto en su línea anula el acto
+ * entero. Nunca más cerca que el suelo de distancia de la conducta ni más
+ * lejos de media niebla. `null` si no cabe.
+ */
+export function clearOfDecor(act: FaunaAct, footprints: readonly Footprint[], cameraD: number): FaunaAct | null {
+  if (!crossesDecor(act, footprints)) return act;
+  if (isAerial(act.behavior)) return null;
+  const nearest = spawnFloor(act.behavior);
+  const farthest = Math.max(CAMERA_Z - act.depth, FOG_CAP * fogFarAt(cameraD));
+  for (const shift of LINE_SHIFTS) {
+    const distance = CAMERA_Z - act.depth - shift;
+    if (distance < nearest || distance > farthest) continue;
+    const moved = { ...act, depth: CAMERA_Z - distance };
+    if (!crossesDecor(moved, footprints)) return moved;
+  }
   return null;
 }
 
