@@ -79,6 +79,24 @@ const SLOTS: readonly ((w: number, h: number) => [number, number])[] = [
   ...ring(FARTHER),
 ];
 
+/**
+ * Lo que ocupa la flecha del cursor del sistema desde su punta (x, y), en px:
+ * baja y se abre hacia la derecha. Con margen.
+ */
+export function cursorRect(x: number, y: number): LabelRect {
+  return { x: x - 2, y: y - 2, w: 20, h: 26 };
+}
+
+/**
+ * El punto del que cuelga la etiqueta de la prefectura bajo el cursor: el
+ * cursor mismo, por debajo de su flecha. Colgada del centro de la prefectura,
+ * la flecha —que suele estar justo ahí— tapaba el nombre.
+ */
+export function cursorAnchor(x: number, y: number): { ax: number; ay: number } {
+  const arrow = cursorRect(x, y);
+  return { ax: x, ay: arrow.y + arrow.h };
+}
+
 function overlapArea(a: LabelRect, b: LabelRect): number {
   const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
   const h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);

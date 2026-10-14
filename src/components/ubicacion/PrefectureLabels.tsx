@@ -6,7 +6,7 @@ import { useEffect, useRef } from 'react';
 import { MAQUETA } from '@/scene/objects/maqueta/input';
 import { PREFECTURE_NAMES } from '@/scene/objects/maqueta/names.generated';
 
-import { layoutLabels, type LabelBox, type LabelRect } from './labelLayout';
+import { cursorAnchor, cursorRect, layoutLabels, type LabelBox, type LabelRect } from './labelLayout';
 
 /** Media anchura del pin en px, por cada px de alto (la gota es más alta que ancha). */
 const PIN_ASPECT = 0.36;
@@ -52,12 +52,24 @@ export function PrefectureLabels() {
       active.sort((a, b) =>
         a === MAQUETA.hover ? -1 : b === MAQUETA.hover ? 1 : MAQUETA.labelY[a]! - MAQUETA.labelY[b]!,
       );
+      // Con ratón, la de la prefectura bajo el cursor cuelga del cursor, por
+      // debajo de la flecha; y la flecha no la pisa ninguna otra.
+      const pointer = MAQUETA.pointer.present
+        ? {
+            x: ((MAQUETA.pointer.x + 1) / 2) * window.innerWidth,
+            y: ((1 - MAQUETA.pointer.y) / 2) * window.innerHeight,
+          }
+        : null;
       const boxes: LabelBox[] = active.map((i) => {
         const label = labels.current[i]!;
         sizes[i] ??= { w: label.offsetWidth, h: label.offsetHeight };
-        return { ax: MAQUETA.labelX[i]!, ay: MAQUETA.labelY[i]!, w: sizes[i].w, h: sizes[i].h };
+        const anchor =
+          pointer && i === MAQUETA.hover
+            ? cursorAnchor(pointer.x, pointer.y)
+            : { ax: MAQUETA.labelX[i]!, ay: MAQUETA.labelY[i]! };
+        return { ...anchor, w: sizes[i].w, h: sizes[i].h };
       });
-      const obstacles: LabelRect[] = [];
+      const obstacles: LabelRect[] = pointer ? [cursorRect(pointer.x, pointer.y)] : [];
       if (MAQUETA.pin.on) {
         const height = MAQUETA.pin.bottom - MAQUETA.pin.top;
         const half = height * PIN_ASPECT;
@@ -76,7 +88,8 @@ export function PrefectureLabels() {
         labels.current[i]!.style.transform = `translate3d(${place.x}px, ${place.y}px, 0)`;
         const leader = leaders.current[i];
         if (!leader) return;
-        if (!place.leader) {
+        // La que cuelga del cursor no lleva línea: su punto es el cursor.
+        if (!place.leader || (pointer && i === MAQUETA.hover)) {
           leader.setAttribute('visibility', 'hidden');
           return;
         }

@@ -19,7 +19,7 @@ export const MAQUETA_SIZE = {
   tray: 5,
   trayThickness: 0.14,
   /** Altura del centro de la cara de la bandeja sobre el suelo: el eje del giro. */
-  pivotY: 2.8,
+  pivotY: 3.9,
   /** Radio de los tambores del atril. */
   columnRadius: 0.42,
   /** Grosor de la base de costa y de las losas. */
@@ -33,20 +33,23 @@ export const MAQUETA_SIZE = {
   /** Radio de lo que toca el suelo: donde crece el musgo. */
   foot: 0.6,
   /** Alto máximo, con el pin y lo que sube una losa. */
-  top: 5.4,
+  top: 7.2,
 } as const;
 
 /** El zoom a Kyoto: de la pose de Japón (`t = 0`) a la de Kinki (`t = 1`). */
 export const MAQUETA_ZOOM = {
   /** Inclinación de la bandeja hacia la cámara, en radianes. */
-  tiltJapon: (45 * Math.PI) / 180,
-  tiltKyoto: (55 * Math.PI) / 180,
+  tiltJapon: (48 * Math.PI) / 180,
+  /** Sin cámara a la que mirar; con ella, la de `faceCamera` (de frente). */
+  tiltKyoto: (80 * Math.PI) / 180,
   /** Aumento del contenido alrededor de Kyoto. */
   scale: 4.2,
   /** Lo que crece el grosor de las losas en el zoom (menos que el plano). */
   heightScale: 1.5,
   /** Dónde cae Kyoto en la bandeja al terminar: al norte del centro, para que Kinki quede centrada. */
   kyotoAt: [0.18, -0.5] as readonly [number, number],
+  /** Lo que se adelanta la bandeja, de pie, para quedar delante de la columna. */
+  forward: 0.8,
   /** Segundos de la línea de tiempo. */
   duration: 1.6,
 } as const;

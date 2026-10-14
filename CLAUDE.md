@@ -545,6 +545,13 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
 - **Los planos de recorte necesitan `renderer.localClippingEnabled`** y, para
   la sombra, `clipShadows` en el material; están en el espacio del mundo, así
   que se recalculan cada frame desde el grupo que los lleva (la bandeja).
+- **Dos superficies a milímetros destellan a lo lejos (z-fighting).** El mar
+  de la maqueta era un plano a 2 mm de la cara de la bandeja: de cerca, bien;
+  desde el tramo de la Home, a 40–60 u, el buffer de profundidad ya no los
+  distinguía y la piedra y el mar se turnaban, píxel a píxel, con cualquier
+  movimiento. Lo que pinta una superficie va **en ella** (un atributo y el
+  shader, como `aSea`); lo que de verdad flota encima, a ≥ 1 cm y con
+  `polygonOffset`.
 - **Un dato pesado no va al bundle de la página.** Los polígonos de la maqueta
   (~80 KB) se cargan con `lazy()` desde `StationDecor`; el DOM, que sólo
   necesita los nombres, lee `names.generated.ts`. Importar `PREFECTURES` desde

@@ -425,6 +425,40 @@
     display: none;
   }
 
+  /* Y el título se recoge para que la ficha quepa entera: con el navegador al
+     90 % (su zoom de fábrica en muchos equipos) o en un portátil bajo, la
+     ficha se salía por abajo. Se mide en alto de pantalla (dvh), no en ancho. */
+  .ubicacion-cartel {
+    transition: padding-top var(--dur-largo) var(--ease-washi);
+  }
+
+  .ubicacion-cartel .cartel-title__word,
+  .ubicacion-cartel .cartel-title__kanji {
+    transition: font-size var(--dur-largo) var(--ease-washi);
+  }
+
+  @media (orientation: landscape) {
+    .ubicacion-cartel:has(.kyoto-ficha) {
+      padding-top: 9dvh;
+    }
+
+    .ubicacion-cartel:has(.kyoto-ficha) .cartel-title__word {
+      font-size: min(var(--text-cartel), 11dvh);
+    }
+
+    .ubicacion-cartel:has(.kyoto-ficha) .cartel-title__kanji {
+      font-size: min(var(--text-kanji), 8dvh);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ubicacion-cartel,
+    .ubicacion-cartel .cartel-title__word,
+    .ubicacion-cartel .cartel-title__kanji {
+      transition: none;
+    }
+  }
+
   .ubicacion-cartel__text {
     width: min(34vw, 32rem);
     margin-right: 10vw;

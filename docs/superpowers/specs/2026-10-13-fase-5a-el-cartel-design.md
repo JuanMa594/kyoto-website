@@ -383,3 +383,21 @@ Lo que cambió respecto de este diseño al construirlo y revisarlo en el navegad
 | El mapa se ve pálido: más color, dentro de la paleta | Las prefecturas, por región, en tonos pálidos de la paleta (`regions.ts`), Kinki en blanco. El mar, con un velo de índigo |
 | Olas a pinceladas, con aire de arte japonés | Cinco grupos de tres trazos (`waves.ts`): crestas cuya curvatura crece hasta el rizo, que se afinan en las puntas; el pincel seco y las vetas, en el shader. Pintadas en la bandeja: con el zoom no se mueven |
 | Color del mar y de las olas | El usuario eligió **añadir el índigo 藍** (`--color-ai`, #165E83) a la paleta, sólo para esto |
+
+## 14. Revisión del usuario (2)
+
+| Pedido | Hecho |
+|---|---|
+| Subir el mapa (~15–20 %) e inclinarlo un poco más | El eje del atril, de 2,8 a 3,9 u; la inclinación, de 45° a 48°. En 16:9 la bandeja pasa del 38–78 % al 28–67 % del alto |
+| Suavizar la sombra sobre el suelo | Ni la bandeja ni las losas ni el pin proyectan sombra dura: una penumbra de contacto ancha (r 2,6) y a media fuerza la sustituye (`contact.ts`). La columna sí la proyecta, como los faroles |
+| En el zoom, la cámara interpola hacia una vista frontal | **La cámara no se mueve** (regla dura 2 y `CameraRig`, único escritor): la maqueta se **gira y se endereza** hasta mirarla de frente (`faceCamera`, a 3° de la vista), con la misma curva del zoom, y se adelanta 0,8 u para no cruzarse con la columna |
+| El mapa lejano destellaba desde el tramo de la Home | Era **z-fighting**: el mar era un plano a 2 mm de la cara de la bandeja, y a 40–60 u la profundidad no los distingue. Ahora el mar va pintado en la propia bandeja (`aSea`); las olas, a 1,2 cm y con `polygonOffset` |
+| Las olas se quedaban quietas con el zoom | Cada pincelada sigue a su sitio del mapa sin cambiar de tamaño; las de Japón se alejan y se desvanecen, y aparecen tres grupos alrededor de Kinki |
+| La ficha no cabía con el navegador al 90 % | En el zoom, el título se recoge (en alto de pantalla) y el bloque sube; comprobado a 1874×977, 1778×1000, 1366×657 y 1600×900, sin quitar ningún dato |
+| El lago Biwa no se distinguía y subía con Shiga | Agua propia en índigo hondo (`LAKE_BIWA`), en el contenido y sin `aPref`: no sube al pasar el cursor |
+
+## 15. Revisión del usuario (3)
+
+| Pedido | Hecho |
+|---|---|
+| Al pasar el cursor, la flecha tapa a veces el nombre | Con ratón, la etiqueta de la prefectura bajo el cursor ya no cuelga del centro de la prefectura sino **del cursor**, por debajo de su flecha (`cursorAnchor`), y la flecha cuenta como obstáculo para las demás (`cursorRect`). En táctil, sin cursor, sigue en el centro |

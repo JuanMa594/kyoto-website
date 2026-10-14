@@ -20,7 +20,7 @@ interface PinProps {
  * cada frame sobre la losa de Kyoto y lo gira hacia la cámara, así que el
  * contorno —el bisel y el canto— se ve siempre, también con el parallax.
  */
-export const Pin = forwardRef<Group, PinProps>(function Pin({ palette, profile }, ref) {
+export const Pin = forwardRef<Group, PinProps>(function Pin({ palette }, ref) {
   const parts = useMemo(maquetaGeometry, []);
   const materials = useMemo(() => {
     const common = { key: 'maqueta-pin', washi: palette.washi, ink: palette.sumi };
@@ -40,7 +40,8 @@ export const Pin = forwardRef<Group, PinProps>(function Pin({ palette, profile }
 
   return (
     <group ref={ref}>
-      <mesh geometry={parts.pinFace} material={[materials.face, materials.rim]} castShadow={profile.shadows} />
+      {/* Sin sombra: sobre la bandeja de pie del zoom era una banda oscura que la cruzaba. */}
+      <mesh geometry={parts.pinFace} material={[materials.face, materials.rim]} />
       <mesh geometry={parts.pinDisc} material={materials.rim} />
     </group>
   );

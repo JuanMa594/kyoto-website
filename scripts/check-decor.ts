@@ -41,12 +41,12 @@ import { LANTERN_SIZE } from '../src/scene/objects/toro/toro';
 import { lanternGeometry } from '../src/scene/objects/toro/toroGeometry';
 import { MAQUETA_LIFT, MAQUETA_PLAN, MAQUETA_SIZE, MAQUETA_ZOOM } from '../src/scene/objects/maqueta/maqueta';
 import { PREFECTURE_NAMES } from '../src/scene/objects/maqueta/names.generated';
-import { KYOTO_CITY, PREFECTURES } from '../src/scene/objects/maqueta/prefectures.generated';
-import { layoutLabels, type LabelRect } from '../src/components/ubicacion/labelLayout';
+import { KYOTO_CITY, LAKE_BIWA, PREFECTURES } from '../src/scene/objects/maqueta/prefectures.generated';
+import { cursorAnchor, cursorRect, layoutLabels, type LabelRect } from '../src/components/ubicacion/labelLayout';
 import { maquetaGeometry } from '../src/scene/objects/maqueta/maquetaGeometry';
 import { REGION_TONE } from '../src/scene/objects/maqueta/regions';
-import { waveStrokes } from '../src/scene/objects/maqueta/waves';
-import { contentToTray, KINKI, KYOTO_INDEX, slabTargets, trayPose, trayToObject } from '../src/scene/objects/maqueta/zoom';
+import { WAVE_LIFT, waveStrokes } from '../src/scene/objects/maqueta/waves';
+import { contentToTray, faceCamera, KINKI, KYOTO_INDEX, slabTargets, trayPose, trayToObject } from '../src/scene/objects/maqueta/zoom';
 import { kasagiProfile, RYOBU } from '../src/scene/objects/torii/ryobu';
 import { ryobuToriiGeometry } from '../src/scene/objects/torii/toriiGeometry';
 import { STATION_DEPTHS, stationIndex } from '../src/scene/path/journeyPath';
@@ -512,9 +512,55 @@ check(
   PREFECTURES.every((p) => [...p.base, ...p.slab].every((poly) => poly.every((r) => r.length >= 6 && r.length % 2 === 0))),
 );
 
+// El zoom se lee de frente: la maqueta se gira y se endereza hacia la cámara
+// de la estación (la cámara no se mueve). Se mide con la colocación real.
+const ubiPlaced = maquetaOf(stationDecorLayout(UBI, false))[0]!;
+const ubiRig = createRig();
+snapRig(ubiRig, STATION_DEPTHS[UBI]!);
+const face = faceCamera(ubiPlaced, ubiRig.camera);
+{
+  const zoomed = trayPose(1, face);
+  const yaw = ubiPlaced.yaw + zoomed.yaw;
+  const normal = {
+    x: Math.sin(yaw) * Math.sin(zoomed.tilt),
+    y: Math.cos(zoomed.tilt),
+    z: Math.cos(yaw) * Math.sin(zoomed.tilt),
+  };
+  const pivotY = ubiPlaced.y + MAQUETA_SIZE.pivotY * ubiPlaced.scale;
+  const toCamera = { x: ubiRig.camera.x - ubiPlaced.x, y: ubiRig.camera.y - pivotY, z: ubiRig.camera.z - ubiPlaced.z };
+  const length = Math.hypot(toCamera.x, toCamera.y, toCamera.z);
+  const angle =
+    (Math.acos((normal.x * toCamera.x + normal.y * toCamera.y + normal.z * toCamera.z) / length) * 180) / Math.PI;
+  check('zoom: la bandeja queda de frente a la cámara (≤ 8°)', angle <= 8, `${angle.toFixed(1)}°`);
+  // De frente y girada, sigue lejos de la cámara y del camino.
+  const local = { x: 0, y: 0, z: 0 };
+  const corner = { x: 0, z: 0 };
+  const h = MAQUETA_SIZE.tray / 2;
+  let nearest = Number.POSITIVE_INFINITY;
+  for (const [x, z] of [
+    [-h, -h],
+    [h, -h],
+    [-h, h],
+    [h, h],
+  ] as const) {
+    trayToObject(x, 0, z, zoomed.tilt, local, zoomed.forward);
+    objectToWorld({ ...ubiPlaced, yaw: yaw }, local.x, local.z, corner);
+    nearest = Math.min(nearest, Math.hypot(corner.x - ubiRig.camera.x, corner.z - ubiRig.camera.z));
+  }
+  check('zoom: la bandeja girada queda a ≥ 1,5 u de la cámara', nearest >= 1.5, `${nearest.toFixed(2)} u`);
+}
+
+// La sombra de la bandeja sobre el suelo es una penumbra de contacto, suave;
+// ni la bandeja ni las losas proyectan sombra dura.
+const ubiContacts = stationContacts(UBI, false, 1);
+check(
+  'la bandeja deja una penumbra amplia y suave al pie del atril',
+  ubiContacts.some((c) => Math.hypot(c.x - ubiPlaced.x, c.z - ubiPlaced.z) < 0.01 && c.radius >= 2 && c.strength <= 0.6),
+);
+
 // Las dos poses: la bandeja nunca toca el suelo, cabe en su huella y no pasa de su alto.
 for (const t of [0, 1]) {
-  const pose = trayPose(t);
+  const pose = trayPose(t, face);
   const out = { x: 0, y: 0, z: 0 };
   const h = MAQUETA_SIZE.tray / 2;
   let lowest = Number.POSITIVE_INFINITY;
@@ -527,7 +573,7 @@ for (const t of [0, 1]) {
     [h, h],
   ] as const) {
     for (const y of [-MAQUETA_SIZE.trayThickness, 0]) {
-      trayToObject(x, y, z, pose.tilt, out);
+      trayToObject(x, y, z, pose.tilt, out, pose.forward);
       lowest = Math.min(lowest, out.y);
       top = Math.max(top, out.y);
       outside = Math.max(outside, Math.abs(out.x) - MAQUETA_PLAN.hx, Math.abs(out.z) - MAQUETA_PLAN.hz);
@@ -684,18 +730,56 @@ function landDistance(x: number, z: number): number {
   return best;
 }
 const strokes = waveStrokes();
-check('entre 8 y 16 pinceladas de olas', strokes.length >= 8 && strokes.length <= 16, `${strokes.length}`);
-let shore = Number.POSITIVE_INFINITY;
-let offTray = 0;
+const japanWaves = strokes.filter((s) => s.set === 'japon');
+const kinkiWaves = strokes.filter((s) => s.set === 'kinki');
+check('entre 8 y 16 pinceladas para Japón', japanWaves.length >= 8 && japanWaves.length <= 16, `${japanWaves.length}`);
+check('y entre 4 y 10 para el zoom a Kinki', kinkiWaves.length >= 4 && kinkiWaves.length <= 10, `${kinkiWaves.length}`);
+// Cada juego, en su pose: la pincelada sigue a su sitio del mapa (centro en el
+// contenido) y conserva su tamaño (el trazo, en unidades de la bandeja).
 const trayEdge = (MAQUETA_SIZE.tray / 2) * MAQUETA_SIZE.clip - 0.08;
-for (const stroke of strokes) {
-  for (const p of stroke.points) {
-    shore = Math.min(shore, landDistance(p.x, p.z) - p.width / 2);
-    if (Math.abs(p.x) > trayEdge || Math.abs(p.z) > trayEdge) offTray += 1;
+for (const [set, t] of [
+  ['japon', 0],
+  ['kinki', 1],
+] as const) {
+  const pose = trayPose(t);
+  const center = { x: 0, z: 0 };
+  let shore = Number.POSITIVE_INFINITY;
+  let offTray = 0;
+  for (const stroke of strokes.filter((s) => s.set === set)) {
+    contentToTray(stroke.center.x, stroke.center.z, pose, center);
+    for (const p of stroke.points) {
+      const x = center.x + p.x;
+      const z = center.z + p.z;
+      // A la costa, en unidades de la bandeja: el contenido está escalado.
+      const land = landDistance((x - pose.offsetX) / pose.scale, (z - pose.offsetZ) / pose.scale) * pose.scale;
+      shore = Math.min(shore, land - p.width / 2);
+      if (Math.abs(x) > trayEdge || Math.abs(z) > trayEdge) offTray += 1;
+    }
   }
+  check(`${set}: ninguna pincelada toca tierra (≥ 0,05 u de la costa)`, shore >= 0.05, `${shore.toFixed(3)} u`);
+  check(`${set}: todas dentro de la bandeja`, offTray === 0, `${offTray} puntos fuera`);
 }
-check('ninguna pincelada toca tierra (≥ 0,05 u de la costa)', shore >= 0.05, `${shore.toFixed(3)} u`);
-check('todas dentro de la bandeja', offTray === 0, `${offTray} puntos fuera`);
+check('las olas flotan sobre la bandeja, sin pisarse con ella (≥ 1 cm)', WAVE_LIFT >= 0.01, `${WAVE_LIFT} u`);
+
+// El lago Biwa: un agujero de verdad en la losa de Shiga, y su agua aparte.
+const mapPartsForLake = maquetaGeometry;
+const shigaIndex = PREFECTURES.findIndex((p) => p.code === 25);
+const lakeRing = LAKE_BIWA;
+const slabPosition = mapPartsForLake().slabs.getAttribute('position');
+const slabPref = mapPartsForLake().slabs.getAttribute('aPref');
+let wetTriangles = 0;
+for (let i = 0; i < slabPosition.count; i += 3) {
+  if (Math.round(slabPref.getX(i)) !== shigaIndex) continue;
+  const cx = (slabPosition.getX(i) + slabPosition.getX(i + 1) + slabPosition.getX(i + 2)) / 3;
+  const cz = (slabPosition.getZ(i) + slabPosition.getZ(i + 1) + slabPosition.getZ(i + 2)) / 3;
+  if (pointInRing(lakeRing, cx, cz)) wetTriangles += 1;
+}
+check('ninguna parte de la losa de Shiga cae sobre el lago', wetTriangles === 0, `${wetTriangles} triángulos`);
+check('el lago tiene su propia agua, sin aPref (no sube con Shiga)', !mapPartsForLake().lake.getAttribute('aPref'));
+check(
+  'el mar va pintado en la bandeja, no en una capa encima',
+  !('sea' in mapPartsForLake()) && !!mapPartsForLake().tray.getAttribute('aSea'),
+);
 check(
   'cada pincelada se afina en las puntas',
   strokes.every((s) => s.points[0]!.width < 0.3 * Math.max(...s.points.map((p) => p.width))),
@@ -726,6 +810,13 @@ check(
 );
 const alone = layoutLabels([{ ax: 100, ay: 100, w: 80, h: 40 }], [], [])[0]!;
 check('etiquetas: una sola va debajo de su punto, sin línea', alone.slot === 0 && !alone.leader && alone.y > 100);
+// La del cursor va colgada de él, por debajo de la flecha: el cursor no la tapa.
+const cursorAt = { x: 400, y: 300 };
+const underCursor = layoutLabels([{ ...cursorAnchor(cursorAt.x, cursorAt.y), w: 90, h: 46 }], [], [])[0]!;
+check(
+  'etiquetas: la del cursor no queda bajo la flecha',
+  !overlaps({ x: underCursor.x, y: underCursor.y, w: 90, h: 46 }, cursorRect(cursorAt.x, cursorAt.y)),
+);
 const again = layoutLabels(crowd, [pinRect], laid.map((l) => l.slot));
 check('etiquetas: con la elección anterior libre, no saltan', again.every((l, i) => l.slot === laid[i]!.slot));
 

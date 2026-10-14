@@ -25,6 +25,8 @@ import {
   LatheGeometry,
   Path,
   Shape,
+  ShapeGeometry,
+  Sphere,
   ShapeUtils,
   Vector2,
   Vector3,
@@ -32,8 +34,8 @@ import {
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 
 import { MAQUETA_SIZE } from './maqueta';
-import { PREFECTURES, type FlatPolygon, type FlatRing } from './prefectures.generated';
-import { waveStrokes } from './waves';
+import { LAKE_BIWA, PREFECTURES, type FlatPolygon, type FlatRing } from './prefectures.generated';
+import { WAVE_LIFT, waveStrokes } from './waves';
 
 export interface MaquetaParts {
   /** La bandeja y la ménsula que la une al atril (espacio de la bandeja). */
@@ -48,9 +50,12 @@ export interface MaquetaParts {
   readonly pinFace: BufferGeometry;
   /** El disco rojo del pin, delante de la cara. */
   readonly pinDisc: BufferGeometry;
-  /** El mar: la cara de la bandeja dentro del recorte, un pelo por encima (espacio de la bandeja). */
-  readonly sea: BufferGeometry;
-  /** Las olas: cintas planas sobre el mar, con `aBrush` (a lo largo, a lo ancho, semilla). */
+  /** El agua del lago Biwa, en el espacio del contenido: no sube con Shiga. */
+  readonly lake: BufferGeometry;
+  /**
+   * Las olas: cintas planas sobre el mar, con `aBrush` (a lo largo, a lo ancho,
+   * semilla) y `aWave` (el sitio del mapa que siguen y su juego).
+   */
   readonly waves: BufferGeometry;
 }
 
@@ -178,7 +183,16 @@ function trayGeometry(): BufferGeometry {
   const bracket = new BoxGeometry(BRACKET.half * 2, BRACKET.depth, BRACKET.half * 2);
   bracket.translate(0, -trayThickness - BRACKET.depth / 2 + 0.01, 0);
   collect(bracket, buckets, 0, false);
-  return build(buckets, false);
+  const geometry = build(buckets, false);
+  // El mar va pintado en la cara de arriba (`aSea`), no en una capa encima: dos
+  // superficies a milímetros se pelean en el buffer de profundidad a lo lejos,
+  // y la maqueta destellaba vista desde el tramo de la Home.
+  const normal = geometry.getAttribute('normal');
+  const position = geometry.getAttribute('position');
+  const sea = new Float32Array(position.count);
+  for (let i = 0; i < position.count; i += 1) sea[i] = normal.getY(i) > 0.99 && position.getY(i) > -0.001 ? 1 : 0;
+  geometry.setAttribute('aSea', new Float32BufferAttribute(sea, 1));
+  return geometry;
 }
 
 /**
@@ -253,29 +267,33 @@ function pinGeometry(): { face: BufferGeometry; disc: BufferGeometry } {
   return { face, disc: build(discBuckets, false) };
 }
 
-/** Lo que flotan el mar y las olas sobre la cara de la bandeja: no se pisan con ella. */
-const SEA_Y = 0.002;
-const WAVE_Y = 0.004;
+/** Lo alto del agua del lago: entre la bandeja (0) y la cara de la base. */
+const LAKE_Y = 0.022;
 
-function seaGeometry(): BufferGeometry {
-  const side = MAQUETA_SIZE.tray * MAQUETA_SIZE.clip;
-  const h = side / 2;
-  const geometry = new BufferGeometry();
-  geometry.setAttribute('position', new Float32BufferAttribute([-h, SEA_Y, -h, -h, SEA_Y, h, h, SEA_Y, h, -h, SEA_Y, -h, h, SEA_Y, h, h, SEA_Y, -h], 3));
-  geometry.setAttribute('normal', new Float32BufferAttribute(Array.from({ length: 6 }, () => [0, 1, 0]).flat(), 3));
-  geometry.computeBoundingSphere();
-  return geometry;
+function lakeGeometry(): BufferGeometry {
+  const shape = new Shape(ringPoints(LAKE_BIWA));
+  const geometry = new ShapeGeometry(shape);
+  geometry.rotateX(-Math.PI / 2);
+  geometry.translate(0, LAKE_Y, 0);
+  const buckets = [{ position: [], normal: [], pref: [] }] as Bucket[];
+  collect(geometry, buckets, 0, false);
+  return build(buckets, false);
 }
 
 /**
  * Cada pincelada, una cinta: dos vértices por punto, a cada lado de la curva,
  * separados por su ancho. `aBrush` lleva al shader dónde está cada fragmento
- * del trazo (a lo largo 0–1, a lo ancho −1…1) y la semilla del pincel.
+ * del trazo (a lo largo 0–1, a lo ancho −1…1) y la semilla del pincel; `aWave`,
+ * el sitio del mapa que sigue (contenido) y su juego (0 Japón, 1 Kinki). La
+ * posición es la del trazo respecto de ese sitio: el shader la suma a donde
+ * caiga el sitio con el zoom.
  */
 function wavesGeometry(): BufferGeometry {
   const position: number[] = [];
   const brush: number[] = [];
+  const wave: number[] = [];
   for (const stroke of waveStrokes()) {
+    const set = stroke.set === 'kinki' ? 1 : 0;
     const points = stroke.points;
     const side = points.map((p, i) => {
       const prev = points[Math.max(0, i - 1)]!;
@@ -291,21 +309,24 @@ function wavesGeometry(): BufferGeometry {
       const b = points[i + 1]!;
       const sa = side[i]!;
       const sb = side[i + 1]!;
-      const al = [a.x + (sa.nx * a.width) / 2, WAVE_Y, a.z + (sa.nz * a.width) / 2];
-      const ar = [a.x - (sa.nx * a.width) / 2, WAVE_Y, a.z - (sa.nz * a.width) / 2];
-      const bl = [b.x + (sb.nx * b.width) / 2, WAVE_Y, b.z + (sb.nz * b.width) / 2];
-      const br = [b.x - (sb.nx * b.width) / 2, WAVE_Y, b.z - (sb.nz * b.width) / 2];
+      const al = [a.x + (sa.nx * a.width) / 2, WAVE_LIFT, a.z + (sa.nz * a.width) / 2];
+      const ar = [a.x - (sa.nx * a.width) / 2, WAVE_LIFT, a.z - (sa.nz * a.width) / 2];
+      const bl = [b.x + (sb.nx * b.width) / 2, WAVE_LIFT, b.z + (sb.nz * b.width) / 2];
+      const br = [b.x - (sb.nx * b.width) / 2, WAVE_LIFT, b.z - (sb.nz * b.width) / 2];
       // Dos triángulos con la cara hacia arriba.
       position.push(...al, ...bl, ...ar, ...ar, ...bl, ...br);
       brush.push(a.along, 1, stroke.seed, b.along, 1, stroke.seed, a.along, -1, stroke.seed);
       brush.push(a.along, -1, stroke.seed, b.along, 1, stroke.seed, b.along, -1, stroke.seed);
+      for (let k = 0; k < 6; k += 1) wave.push(stroke.center.x, stroke.center.z, set);
     }
   }
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new Float32BufferAttribute(position, 3));
   geometry.setAttribute('normal', new Float32BufferAttribute(Array.from({ length: position.length / 3 }, () => [0, 1, 0]).flat(), 3));
   geometry.setAttribute('aBrush', new Float32BufferAttribute(brush, 3));
-  geometry.computeBoundingSphere();
+  geometry.setAttribute('aWave', new Float32BufferAttribute(wave, 3));
+  // Las olas se mueven en el shader: la esfera tiene que cubrir la bandeja entera.
+  geometry.boundingSphere = new Sphere(new Vector3(), MAQUETA_SIZE.tray);
   return geometry;
 }
 
@@ -322,7 +343,7 @@ export function maquetaGeometry(): MaquetaParts {
     column: columnGeometry(),
     pinFace: pin.face,
     pinDisc: pin.disc,
-    sea: seaGeometry(),
+    lake: lakeGeometry(),
     waves: wavesGeometry(),
   };
   return cached;

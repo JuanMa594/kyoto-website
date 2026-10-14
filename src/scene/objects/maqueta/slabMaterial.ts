@@ -1,6 +1,7 @@
 import {
   Color,
   MeshDepthMaterial,
+  Vector2,
   RGBADepthPacking,
   type IUniform,
   type MeshStandardMaterial,
@@ -200,15 +201,47 @@ export function fillLandColors(palette: ScenePalette, target: Float32Array): voi
   });
 }
 
+/** Cuánto índigo lleva el agua del lago Biwa: más honda que el mar, para que se distinga. */
+const LAKE_INK = 0.78;
+
+// El mar, pintado en la cara de la bandeja (aSea = 1). Sin backticks dentro.
+const TRAY_VERTEX_PARS = /* glsl */ `
+attribute float aSea;
+varying float vTraySea;
+`;
+
+const TRAY_FRAGMENT_PARS = /* glsl */ `
+uniform vec3 uTraySea;
+varying float vTraySea;
+`;
+
+const TRAY_FRAGMENT = /* glsl */ `
+diffuseColor.rgb = mix(diffuseColor.rgb, uTraySea, vTraySea);
+`;
+
 // El pincel seco de las olas: bordes deshechos y vetas a lo largo del trazo.
-// Sin backticks dentro.
+// Cada ola sigue a su sitio del mapa (aWave.xy, contenido) y se desvanece o
+// aparece con el zoom según su juego (aWave.z). Sin backticks dentro.
 const BRUSH_VERTEX_PARS = /* glsl */ `
 attribute vec3 aBrush;
+attribute vec3 aWave;
+uniform float uWaveScale;
+uniform vec2 uWaveOffset;
+uniform float uWaveZoom;
 varying vec3 vBrush;
+varying float vWaveFade;
+`;
+
+const BRUSH_VERTEX = /* glsl */ `
+transformed.x += aWave.x * uWaveScale + uWaveOffset.x;
+transformed.z += aWave.y * uWaveScale + uWaveOffset.y;
+vBrush = aBrush;
+vWaveFade = aWave.z > 0.5 ? smoothstep(0.55, 1.0, uWaveZoom) : 1.0 - smoothstep(0.0, 0.45, uWaveZoom);
 `;
 
 const BRUSH_FRAGMENT_PARS = /* glsl */ `
 varying vec3 vBrush;
+varying float vWaveFade;
 float mapBrushHash(vec2 p) {
   return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
@@ -232,31 +265,77 @@ float brushEdge = 1.0 - smoothstep(0.5, 1.0, brushAcross + (brushVein - 0.5) * 0
 float brushInk = brushEdge * mix(0.55, 1.0, brushVein);
 // Hacia el final del trazo el pincel se seca y deja hueco.
 brushInk *= smoothstep(0.12, 0.42, brushDry + 0.35 * (1.0 - vBrush.x));
-diffuseColor.a *= brushInk;
+diffuseColor.a *= brushInk * vWaveFade;
 `;
 
-export interface SeaMaterials {
-  readonly sea: MeshStandardMaterial;
-  readonly waves: MeshStandardMaterial;
+/** Lo que mueve las olas: la pose del contenido y el zoom. Los escribe `MaquetaJapon` cada frame. */
+export interface WaveUniforms {
+  readonly uWaveScale: { value: number };
+  readonly uWaveOffset: { value: Vector2 };
+  readonly uWaveZoom: { value: number };
 }
 
-/** El mar de la bandeja y las pinceladas de las olas, en índigo (`--color-ai`). */
-export function createSeaMaterials(palette: ScenePalette): SeaMaterials {
-  const common = { washi: palette.washi, ink: palette.sumi, rim: 0 };
-  const sea = createDecorMaterial({ ...common, key: 'maqueta-mar', color: `#${seaColor(palette).getHexString()}`, roughness: 0.95 });
-  const waves = createDecorMaterial({ ...common, key: 'maqueta-olas', color: palette.ai, roughness: 0.9 });
+export interface SeaMaterials {
+  /** La bandeja de piedra, con el mar pintado en su cara. */
+  readonly tray: MeshStandardMaterial;
+  readonly lake: MeshStandardMaterial;
+  readonly waves: MeshStandardMaterial;
+  readonly waveUniforms: WaveUniforms;
+}
+
+/** La bandeja con su mar, el lago y las olas, en índigo (`--color-ai`). */
+export function createSeaMaterials(palette: ScenePalette, clipping: Plane[]): SeaMaterials {
+  const common = { washi: palette.washi, ink: palette.sumi };
+
+  const tray = createDecorMaterial({ ...common, key: 'maqueta-bandeja', color: palette.ishi, roughness: 0.95, rim: 0.25 });
+  const traySea = { value: seaColor(palette) };
+  const trayBase = tray.onBeforeCompile;
+  tray.onBeforeCompile = (shader, renderer) => {
+    trayBase.call(tray, shader, renderer);
+    shader.uniforms.uTraySea = traySea;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', `#include <common>\n${TRAY_VERTEX_PARS}`)
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvTraySea = aSea;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\n${TRAY_FRAGMENT_PARS}`)
+      .replace('#include <color_fragment>', `#include <color_fragment>\n${TRAY_FRAGMENT}`);
+  };
+
+  const lakeColor = new Color(palette.ishi).lerp(new Color(palette.ai), LAKE_INK);
+  const lake = createDecorMaterial({
+    ...common,
+    key: 'maqueta-lago',
+    color: `#${lakeColor.getHexString()}`,
+    roughness: 0.6,
+    rim: 0,
+  });
+  lake.clippingPlanes = clipping;
+
+  const waveUniforms: WaveUniforms = {
+    uWaveScale: { value: 1 },
+    uWaveOffset: { value: new Vector2() },
+    uWaveZoom: { value: 0 },
+  };
+  const waves = createDecorMaterial({ ...common, key: 'maqueta-olas', color: palette.ai, roughness: 0.9, rim: 0 });
   waves.transparent = true;
   waves.opacity = 0.85;
   waves.depthWrite = false;
-  const base = waves.onBeforeCompile;
+  // Por encima de la bandeja también a lo lejos, donde la profundidad pierde precisión.
+  waves.polygonOffset = true;
+  waves.polygonOffsetFactor = -2;
+  waves.polygonOffsetUnits = -2;
+  waves.clippingPlanes = clipping;
+  const wavesBase = waves.onBeforeCompile;
   waves.onBeforeCompile = (shader, renderer) => {
-    base.call(waves, shader, renderer);
+    wavesBase.call(waves, shader, renderer);
+    Object.assign(shader.uniforms, waveUniforms);
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>\n${BRUSH_VERTEX_PARS}`)
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvBrush = aBrush;');
+      .replace('#include <begin_vertex>', `#include <begin_vertex>\n${BRUSH_VERTEX}`);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${BRUSH_FRAGMENT_PARS}`)
       .replace('#include <color_fragment>', `#include <color_fragment>\n${BRUSH_FRAGMENT}`);
   };
-  return { sea, waves };
+
+  return { tray, lake, waves, waveUniforms };
 }

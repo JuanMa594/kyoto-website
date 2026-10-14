@@ -426,6 +426,9 @@ export const MAP_SPAN = ${MAP_SPAN};
 /** La ciudad de Kyoto: ahí va el pin. */
 export const KYOTO_CITY: readonly [number, number] = [${round4(kyotoCity[0])}, ${round4(kyotoCity[1])}];
 
+/** El lago Biwa: su agua, aparte de la losa de Shiga (que lo tiene como agujero). */
+export const LAKE_BIWA: FlatRing = ${JSON.stringify(flatRing(lake[0]!))};
+
 /** Las 46 prefecturas de Kyushu a Hokkaido (sin Okinawa), por código. */
 export const PREFECTURES: readonly PrefectureData[] = ${JSON.stringify(prefectures)};
 `,

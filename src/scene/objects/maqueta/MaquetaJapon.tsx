@@ -9,6 +9,7 @@ import { registerPresets } from '@/animation/presets';
 import type { ScenePalette } from '@/lib/css-vars';
 import { createDecorMaterial } from '@/scene/decor/materials';
 import type { PlacedObject } from '@/scene/decor/placement';
+import { createRig, snapRig } from '@/scene/camera/pathRig';
 import { PATH, stationDepth } from '@/scene/path/journeyPath';
 import type { QualityProfile } from '@/scene/quality/tiers';
 import { stepSpring, type Spring, type SpringState } from '@/scene/systems/sway';
@@ -20,7 +21,7 @@ import { maquetaGeometry, PIN_HEIGHT } from './maquetaGeometry';
 import { Pin } from './Pin';
 import { KYOTO_CITY, PREFECTURES } from './prefectures.generated';
 import { createMapMaterials, createSeaMaterials, createSlabUniforms, fillLandColors } from './slabMaterial';
-import { KYOTO_INDEX, slabTargets, trayPose } from './zoom';
+import { faceCamera, KYOTO_INDEX, slabTargets, trayPose } from './zoom';
 
 interface MaquetaProps {
   placed: PlacedObject;
@@ -55,17 +56,21 @@ export default function Maqueta({ placed, palette, profile }: MaquetaProps) {
   const invalidate = useThree((state) => state.invalidate);
   const uniforms = useMemo(createSlabUniforms, []);
   const clipping = useMemo(() => [0, 1, 2, 3].map(() => new Plane()), []);
-  const materials = useMemo(() => {
+  const { materials, waveUniforms } = useMemo(() => {
     const common = { washi: palette.washi, ink: palette.sumi };
     fillLandColors(palette, uniforms.uLand.value);
+    const { waveUniforms: wave, ...sea } = createSeaMaterials(palette, clipping);
     return {
-      ...createMapMaterials(palette, uniforms, clipping),
-      ...createSeaMaterials(palette),
-      tray: createDecorMaterial({ ...common, key: 'maqueta-bandeja', color: palette.ishi, roughness: 0.95, rim: 0.25 }),
-      stone: createDecorMaterial({ ...common, key: 'maqueta-atril', color: palette.ishiDeep, roughness: 0.95 }),
+      materials: {
+        ...createMapMaterials(palette, uniforms, clipping),
+        ...sea,
+        stone: createDecorMaterial({ ...common, key: 'maqueta-atril', color: palette.ishiDeep, roughness: 0.95 }),
+      },
+      waveUniforms: wave,
     };
   }, [palette, uniforms, clipping]);
 
+  const object = useRef<Group>(null);
   const tray = useRef<Group>(null);
   const content = useRef<Group>(null);
   const slabs = useRef<Mesh>(null);
@@ -92,6 +97,13 @@ export default function Maqueta({ placed, palette, profile }: MaquetaProps) {
     [],
   );
   const stationD = useMemo(() => stationDepth('ubicacion'), []);
+  // De frente a la cámara de la estación, que no se mueve: el zoom gira y
+  // endereza la maqueta hasta leerse de frente.
+  const face = useMemo(() => {
+    const rig = createRig();
+    snapRig(rig, stationD);
+    return faceCamera(placed, rig.camera);
+  }, [placed, stationD]);
 
   useEffect(() => {
     gl.localClippingEnabled = true;
@@ -147,10 +159,11 @@ export default function Maqueta({ placed, palette, profile }: MaquetaProps) {
   }, [invalidate]);
 
   useFrame(({ camera, clock, size }, delta) => {
+    const objectGroup = object.current;
     const trayGroup = tray.current;
     const contentGroup = content.current;
     const slabMesh = slabs.current;
-    if (!trayGroup || !contentGroup || !slabMesh) return;
+    if (!objectGroup || !trayGroup || !contentGroup || !slabMesh) return;
 
     const store = useKyotoStore.getState();
     const motion = selectMotionAllowed(store);
@@ -162,11 +175,17 @@ export default function Maqueta({ placed, palette, profile }: MaquetaProps) {
 
     // La pose.
     const t = MAQUETA.zoomT;
-    const pose = trayPose(t);
+    const pose = trayPose(t, face);
+    objectGroup.rotation.y = placed.yaw + pose.yaw;
     trayGroup.rotation.x = pose.tilt;
+    trayGroup.position.z = pose.forward;
     contentGroup.scale.set(pose.scale, pose.heightScale, pose.scale);
     contentGroup.position.set(pose.offsetX, 0, pose.offsetZ);
-    trayGroup.updateMatrixWorld(true);
+    objectGroup.updateMatrixWorld(true);
+    // Las olas siguen a su sitio del mapa sin cambiar de tamaño.
+    waveUniforms.uWaveScale.value = pose.scale;
+    waveUniforms.uWaveOffset.value.set(pose.offsetX, pose.offsetZ);
+    waveUniforms.uWaveZoom.value = t;
 
     // Los planos de recorte, del espacio de la bandeja al mundo.
     const half = (MAQUETA_SIZE.tray / 2) * MAQUETA_SIZE.clip;
@@ -269,7 +288,7 @@ export default function Maqueta({ placed, palette, profile }: MaquetaProps) {
 
   return (
     <>
-      <group position={[placed.x, placed.y, placed.z]} rotation={[0, placed.yaw, 0]} scale={placed.scale}>
+      <group ref={object} position={[placed.x, placed.y, placed.z]} rotation={[0, placed.yaw, 0]} scale={placed.scale}>
         <mesh
           geometry={parts.column}
           material={materials.stone}
@@ -277,16 +296,13 @@ export default function Maqueta({ placed, palette, profile }: MaquetaProps) {
           receiveShadow={profile.shadows}
         />
         <group ref={tray} position={[0, MAQUETA_SIZE.pivotY, 0]}>
-          <mesh
-            geometry={parts.tray}
-            material={materials.tray}
-            castShadow={profile.shadows}
-            receiveShadow={profile.shadows}
-          />
-          {/* El mar y sus olas, pintados en la bandeja: el zoom no los mueve. */}
-          <mesh geometry={parts.sea} material={materials.sea} receiveShadow={profile.shadows} />
+          {/* Ni la bandeja ni las losas proyectan sombra: en el suelo su sombra
+              era un bloque duro. La pone una penumbra de contacto (contact.ts). */}
+          <mesh geometry={parts.tray} material={materials.tray} receiveShadow={profile.shadows} />
+          {/* Las olas siguen al mapa en el shader y se desvanecen con el zoom. */}
           <mesh geometry={parts.waves} material={materials.waves} renderOrder={1} />
           <group ref={content}>
+            <mesh geometry={parts.lake} material={materials.lake} receiveShadow={profile.shadows} />
             <mesh
               geometry={parts.base}
               material={[materials.baseFace, materials.baseSide]}
@@ -297,7 +313,6 @@ export default function Maqueta({ placed, palette, profile }: MaquetaProps) {
               geometry={parts.slabs}
               material={[materials.slabFace, materials.slabSide]}
               customDepthMaterial={materials.depth}
-              castShadow={profile.shadows}
               receiveShadow={profile.shadows}
             />
           </group>

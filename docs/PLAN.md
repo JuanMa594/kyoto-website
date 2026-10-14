@@ -281,7 +281,7 @@ izquierda del camino, *Ichi* / 位置 a la derecha (DOM real, en el verde koke-d
 la referencia, que es ahora el acento de la estación: el pin y Kyoto son lo único rojo).
 
 - **La maqueta** es un objeto más de `environment.decor` (`kind: 'maqueta'`): una
-  bandeja de piedra inclinada 45° hacia la cámara sobre un atril de tambores, con
+  bandeja de piedra inclinada 48° hacia la cámara sobre un atril de tambores, con
   Japón en dos capas —la base de costa (cara sumi, cantos koke) y las 46 losas de
   las prefecturas (cara blanca), encogidas un pelo para que entre ellas asome la
   base: las juntas de tinta—. Sin Okinawa, como `2.png` y `13.png`. El lago Biwa
@@ -301,9 +301,16 @@ la referencia, que es ahora el acento de la estación: el pin y Kyoto son lo ún
   (romaji y kanji, en una etiqueta DOM). La mano aparece sólo sobre Kyoto. En
   táctil, un toque muestra el nombre.
 - **Zoom** al tocar Kyoto (o con el botón, que es la vía del teclado): la bandeja
-  se endereza a 55° y el contenido crece ×4,2 alrededor de Kyoto, recortado por
-  la bandeja; lo de fuera de Kinki se hunde y se funde con el mar. La cámara no se
-  mueve. Se deshace con otro toque, Escape, el botón, al echar a andar o al irse.
+  se gira y se endereza hasta quedar **de frente a la cámara** (`faceCamera`),
+  adelantándose para no cruzarse con la columna, y el contenido crece ×4,2
+  alrededor de Kyoto, recortado por la bandeja; lo de fuera de Kinki se hunde y
+  se funde con el mar. La cámara no se mueve: es la maqueta la que se vuelve
+  hacia ella. Se deshace con otro toque, Escape, el botón, al echar a andar o al
+  irse. Las olas siguen a su sitio del mapa: las de Japón se alejan y se
+  desvanecen, y aparecen las de Kinki. El lago Biwa es agua índigo propia, que no
+  sube con Shiga.
+- **Sombra**: ni la bandeja ni las losas proyectan sombra dura; bajo la maqueta
+  hay una penumbra de contacto ancha y suave.
   En el zoom, la **ficha de Kyoto** ocupa el sitio del resumen.
 - **位置** se dibuja trazo a trazo al llegar a la estación (no en la primera carga
   de la visita: ya está pintado en el HTML). El título es `CartelTitle`, que

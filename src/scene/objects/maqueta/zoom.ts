@@ -22,9 +22,42 @@ export const KINKI: readonly number[] = PREFECTURES.flatMap((p, i) => (p.kinki ?
 
 const IS_KINKI = PREFECTURES.map((p) => p.kinki);
 
+/**
+ * Cómo queda de frente a la cámara la maqueta en el zoom: el giro extra sobre
+ * su rumbo (`yaw`) y la inclinación de la bandeja (`tilt`). Salen de dónde
+ * está la cámara de la estación, que no se mueve: es la maqueta la que se
+ * vuelve hacia ella para leerse de frente.
+ */
+export interface FaceAngles {
+  readonly yaw: number;
+  readonly tilt: number;
+}
+
+/** Lo que falta para quedar del todo de canto a la mirada: un pelo de relieve. */
+const FACE_MARGIN = (3 * Math.PI) / 180;
+
+/** Sin cámara (las comprobaciones de la pose): sólo se endereza. */
+const NO_FACE: FaceAngles = { yaw: 0, tilt: MAQUETA_ZOOM.tiltKyoto };
+
+/** Los ángulos para que la bandeja mire a `camera`, desde un objeto colocado. */
+export function faceCamera(
+  placed: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly scale: number },
+  camera: { readonly x: number; readonly y: number; readonly z: number },
+): FaceAngles {
+  const dx = camera.x - placed.x;
+  const dz = camera.z - placed.z;
+  // El giro de three que lleva el +z del objeto hacia la cámara.
+  let yaw = Math.atan2(dx, dz) - placed.yaw;
+  yaw = Math.atan2(Math.sin(yaw), Math.cos(yaw));
+  const dy = camera.y - (placed.y + MAQUETA_SIZE.pivotY * placed.scale);
+  return { yaw, tilt: Math.atan2(Math.hypot(dx, dz), dy) - FACE_MARGIN };
+}
+
 export interface TrayPose {
   /** Inclinación de la bandeja hacia la cámara, en radianes. */
   tilt: number;
+  /** Giro extra del objeto, sobre su rumbo, para quedar de frente. */
+  yaw: number;
   /** Escala del contenido en el plano. */
   scale: number;
   /** Escala del grosor del contenido. */
@@ -32,21 +65,28 @@ export interface TrayPose {
   /** Desplazamiento del contenido en la bandeja. */
   offsetX: number;
   offsetZ: number;
+  /**
+   * Lo que avanza la bandeja hacia la cámara al enderezarse: de pie, sin esto,
+   * la columna del atril asomaba por delante del mapa.
+   */
+  forward: number;
 }
 
 /**
  * La pose para un `t`. El contenido se escala alrededor de Kyoto: con `t = 0`
  * queda tal cual, y con `t = 1` Kyoto cae en `MAQUETA_ZOOM.kyotoAt`.
  */
-export function trayPose(t: number): TrayPose {
+export function trayPose(t: number, face: FaceAngles = NO_FACE): TrayPose {
   const scale = lerp(1, MAQUETA_ZOOM.scale, t);
   const [kx, kz] = KYOTO_CITY;
   return {
-    tilt: lerp(MAQUETA_ZOOM.tiltJapon, MAQUETA_ZOOM.tiltKyoto, t),
+    tilt: lerp(MAQUETA_ZOOM.tiltJapon, face.tilt, t),
+    yaw: face.yaw * t,
     scale,
     heightScale: lerp(1, MAQUETA_ZOOM.heightScale, t),
     offsetX: lerp(kx, MAQUETA_ZOOM.kyotoAt[0], t) - kx * scale,
     offsetZ: lerp(kz, MAQUETA_ZOOM.kyotoAt[1], t) - kz * scale,
+    forward: MAQUETA_ZOOM.forward * t,
   };
 }
 
@@ -67,12 +107,13 @@ export function trayToObject(
   z: number,
   tilt: number,
   out: { x: number; y: number; z: number },
+  forward = 0,
 ): void {
   const cos = Math.cos(tilt);
   const sin = Math.sin(tilt);
   out.x = x;
   out.y = MAQUETA_SIZE.pivotY + y * cos - z * sin;
-  out.z = y * sin + z * cos;
+  out.z = forward + y * sin + z * cos;
 }
 
 /**
