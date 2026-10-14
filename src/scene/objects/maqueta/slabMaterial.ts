@@ -204,6 +204,23 @@ export function fillLandColors(palette: ScenePalette, target: Float32Array): voi
 /** Cuánto índigo lleva el agua del lago Biwa: más honda que el mar, para que se distinga. */
 const LAKE_INK = 0.78;
 
+/**
+ * Lo que se adelanta el agua del lago hacia la cámara, en unidades: más que
+ * lo que queda por encima de ella la losa de Shiga levantada en el zoom
+ * ((0,14 − 0,022 + 0,12) × 1,5 ≈ 0,36). Al pin no lo tapa aunque esté más
+ * cerca: se pinta antes que él y no escribe profundidad (`renderOrder`).
+ */
+const LAKE_AHEAD_UNITS = 0.45;
+
+/**
+ * Por su propio rayo de vista: el vértice cae en el mismo píxel, sólo más
+ * cerca en profundidad.
+ */
+const LAKE_AHEAD = /* glsl */ `
+mvPosition.xyz -= normalize( mvPosition.xyz ) * ${LAKE_AHEAD_UNITS.toFixed(2)};
+gl_Position = projectionMatrix * mvPosition;
+`;
+
 // El mar, pintado en la cara de la bandeja (aSea = 1). Sin backticks dentro.
 const TRAY_VERTEX_PARS = /* glsl */ `
 attribute float aSea;
@@ -310,6 +327,20 @@ export function createSeaMaterials(palette: ScenePalette, clipping: Plane[]): Se
     rim: 0,
   });
   lake.clippingPlanes = clipping;
+  // El agua no sube con Shiga, pero de frente lo parecía: su orilla era el
+  // borde del agujero de la losa, que sube con ella. Se adelanta en
+  // profundidad —no en pantalla— para quedar por delante de la losa levantada
+  // y ser ella la orilla. No escribe profundidad: el pin, que se pinta después,
+  // queda encima.
+  lake.depthWrite = false;
+  const lakeBase = lake.onBeforeCompile;
+  lake.onBeforeCompile = (shader, renderer) => {
+    lakeBase.call(lake, shader, renderer);
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <project_vertex>',
+      `#include <project_vertex>\n${LAKE_AHEAD}`,
+    );
+  };
 
   const waveUniforms: WaveUniforms = {
     uWaveScale: { value: 1 },

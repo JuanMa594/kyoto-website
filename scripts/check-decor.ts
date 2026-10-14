@@ -10,13 +10,14 @@
  * Uso: bun run check:path (corre después de check-nav.ts)
  */
 
-import { PerspectiveCamera, Vector3 } from 'three';
+import { Group, Mesh, MeshBasicMaterial, PerspectiveCamera, Raycaster, Vector2, Vector3 } from 'three';
 
 import { cubicBezierEase } from '../src/animation/presets';
 import { travelDuration } from '../src/animation/travel';
 import { KANJI_STROKES } from '../src/components/kanji/strokes.generated';
 import { JOURNEY, PATH_LENGTH } from '../src/config/journey';
 import { mulberry32 } from '../src/lib/procedural';
+import { CAMERA_BASE } from '../src/scene/camera/framing';
 import { createRig, snapRig, stepRig, type RigState } from '../src/scene/camera/pathRig';
 import { CULM_TRIANGLES, culmLeaves, groveCulms, LEAF_TRIANGLES } from '../src/scene/decor/bamboo';
 import {
@@ -42,11 +43,24 @@ import { lanternGeometry } from '../src/scene/objects/toro/toroGeometry';
 import { MAQUETA_LIFT, MAQUETA_PLAN, MAQUETA_SIZE, MAQUETA_ZOOM } from '../src/scene/objects/maqueta/maqueta';
 import { PREFECTURE_NAMES } from '../src/scene/objects/maqueta/names.generated';
 import { KYOTO_CITY, LAKE_BIWA, PREFECTURES } from '../src/scene/objects/maqueta/prefectures.generated';
-import { cursorAnchor, cursorRect, layoutLabels, type LabelRect } from '../src/components/ubicacion/labelLayout';
+import {
+  cursorAnchor,
+  cursorRect,
+  layoutLabels,
+  frameExcess,
+  nearestOnRect,
+  ringLayout,
+  segmentHitsRect,
+  sameLevel,
+  segmentsCross,
+  type LabelFrame,
+  type LabelRect,
+  type RingItem,
+} from '../src/components/ubicacion/labelLayout';
 import { maquetaGeometry } from '../src/scene/objects/maqueta/maquetaGeometry';
 import { REGION_TONE } from '../src/scene/objects/maqueta/regions';
 import { WAVE_LIFT, waveStrokes } from '../src/scene/objects/maqueta/waves';
-import { contentToTray, faceCamera, KINKI, KYOTO_INDEX, slabTargets, trayPose, trayToObject } from '../src/scene/objects/maqueta/zoom';
+import { contentToTray, faceCamera, KINKI, KYOTO_INDEX, pickSlab, slabTargets, trayPose, trayToObject } from '../src/scene/objects/maqueta/zoom';
 import { kasagiProfile, RYOBU } from '../src/scene/objects/torii/ryobu';
 import { ryobuToriiGeometry } from '../src/scene/objects/torii/toriiGeometry';
 import { STATION_DEPTHS, stationIndex } from '../src/scene/path/journeyPath';
@@ -550,12 +564,92 @@ const face = faceCamera(ubiPlaced, ubiRig.camera);
   check('zoom: la bandeja girada queda a ≥ 1,5 u de la cámara', nearest >= 1.5, `${nearest.toFixed(2)} u`);
 }
 
-// La sombra de la bandeja sobre el suelo es una penumbra de contacto, suave;
-// ni la bandeja ni las losas proyectan sombra dura.
+// El cursor sobre el agua del lago Biwa, en el zoom, no elige Shiga (revisión
+// de la 5A): el rayo pasa por el hueco y no cuentan las paredes del agujero.
+// La maqueta montada como en `MaquetaJapon`, vista con la cámara real.
+{
+  const zoomed = trayPose(1, face);
+  const parts = maquetaGeometry();
+  const objectGroup = new Group();
+  objectGroup.position.set(ubiPlaced.x, ubiPlaced.y, ubiPlaced.z);
+  objectGroup.rotation.y = ubiPlaced.yaw + zoomed.yaw;
+  objectGroup.scale.setScalar(ubiPlaced.scale);
+  const trayGroup = new Group();
+  trayGroup.position.set(0, MAQUETA_SIZE.pivotY, zoomed.forward);
+  trayGroup.rotation.x = zoomed.tilt;
+  const contentGroup = new Group();
+  contentGroup.scale.set(zoomed.scale, zoomed.heightScale, zoomed.scale);
+  contentGroup.position.set(zoomed.offsetX, 0, zoomed.offsetZ);
+  const slabMesh = new Mesh(parts.slabs, [new MeshBasicMaterial(), new MeshBasicMaterial()]);
+  objectGroup.add(trayGroup);
+  trayGroup.add(contentGroup);
+  contentGroup.add(slabMesh);
+  objectGroup.updateMatrixWorld(true);
+
+  const half = (MAQUETA_SIZE.tray / 2) * MAQUETA_SIZE.clip;
+  const aPref = parts.slabs.getAttribute('aPref');
+  const raycaster = new Raycaster();
+  const local = new Vector3();
+  const lake = Array.from({ length: LAKE_BIWA.length / 2 }, (_, i) => [LAKE_BIWA[2 * i]!, LAKE_BIWA[2 * i + 1]!] as const);
+  const insideLake = (x: number, z: number) => {
+    let inside = false;
+    for (let i = 0, j = lake.length - 1; i < lake.length; j = i, i += 1) {
+      const [xi, zi] = lake[i]!;
+      const [xj, zj] = lake[j]!;
+      if (zi > z !== zj > z && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
+    }
+    return inside;
+  };
+  const xs = lake.map(([x]) => x);
+  const zs = lake.map(([, z]) => z);
+  let shiga = 0;
+  let before = 0;
+  let samples = 0;
+  for (const [width, height] of [
+    [1874, 977],
+    [1600, 900],
+    [1366, 657],
+  ] as const) {
+    const camera = new PerspectiveCamera(CAMERA_BASE.fov, width / height, 0.1, 400);
+    camera.position.set(ubiRig.camera.x, ubiRig.camera.y, ubiRig.camera.z);
+    camera.lookAt(ubiRig.focus.x, ubiRig.focus.y, ubiRig.focus.z);
+    camera.updateMatrixWorld(true);
+    for (let gx = 0; gx <= 12; gx += 1) {
+      for (let gz = 0; gz <= 24; gz += 1) {
+        const x = Math.min(...xs) + ((Math.max(...xs) - Math.min(...xs)) * gx) / 12;
+        const z = Math.min(...zs) + ((Math.max(...zs) - Math.min(...zs)) * gz) / 24;
+        if (!insideLake(x, z)) continue;
+        const point = contentGroup.localToWorld(new Vector3(x, 0.022, z)).project(camera);
+        raycaster.setFromCamera(new Vector2(point.x, point.y), camera);
+        const hits = raycaster.intersectObject(slabMesh, false).map((hit) => {
+          trayGroup.worldToLocal(local.copy(hit.point));
+          return {
+            pref: Math.round(aPref.getX(hit.face!.a)),
+            group: hit.face!.materialIndex,
+            inTray: Math.abs(local.x) <= half && Math.abs(local.z) <= half,
+          };
+        });
+        samples += 1;
+        if (pickSlab(hits, 1) >= 0) shiga += 1;
+        // Como era antes: cualquier cara, también los cantos.
+        if (pickSlab(hits.map((hit) => ({ ...hit, group: 0 })), 1) >= 0) before += 1;
+      }
+    }
+  }
+  check(
+    'zoom: el cursor sobre el lago Biwa no levanta Shiga',
+    samples > 30 && shiga === 0,
+    `${shiga} de ${samples} puntos (contando los cantos, ${before})`,
+  );
+}
+
+// La bandeja proyecta su propia sombra (revisión de la 5A): ya no lleva
+// debajo una penumbra ancha que la oscurecería dos veces. La columna, sí.
 const ubiContacts = stationContacts(UBI, false, 1);
+const atAtril = ubiContacts.filter((c) => Math.hypot(c.x - ubiPlaced.x, c.z - ubiPlaced.z) < 0.01);
 check(
-  'la bandeja deja una penumbra amplia y suave al pie del atril',
-  ubiContacts.some((c) => Math.hypot(c.x - ubiPlaced.x, c.z - ubiPlaced.z) < 0.01 && c.radius >= 2 && c.strength <= 0.6),
+  'el atril lleva su penumbra de contacto, y la bandeja ninguna aparte',
+  atAtril.length >= 1 && atAtril.every((c) => c.radius < 2),
 );
 
 // Las dos poses: la bandeja nunca toca el suelo, cabe en su huella y no pasa de su alto.
@@ -819,6 +913,159 @@ check(
 );
 const again = layoutLabels(crowd, [pinRect], laid.map((l) => l.slot));
 check('etiquetas: con la elección anterior libre, no saltan', again.every((l, i) => l.slot === laid[i]!.slot));
+// Las del zoom (revisión de la 5A): en corro alrededor de Kinki y dentro de
+// la bandeja. El grupo, como se ve a 1600×900: Hyōgo, Ōsaka, Shiga, Nara, Mie
+// y Wakayama, el pin sobre Kyoto y la cara de la bandeja. Con los retoques de
+// `PrefectureLabels`: Ōsaka algo más abajo y Wakayama junto a su prefectura.
+const kinki: RingItem[] = [
+  { ax: 232, ay: 386, w: 70, h: 44 },
+  { ax: 301, ay: 412, w: 64, h: 44, aim: Math.PI - 0.12 },
+  { ax: 362, ay: 345, w: 64, h: 44 },
+  { ax: 336, ay: 453, w: 64, h: 44 },
+  { ax: 386, ay: 432, w: 64, h: 44 },
+  { ax: 303, ay: 498, w: 94, h: 44, turn: 0.85, near: true },
+].map((item, seed) => ({ ...item, seed }));
+const kinkiPin: LabelRect = { x: 305, y: 298, w: 34, h: 62 };
+const kinkiTray: LabelFrame = [
+  [62, 192],
+  [520, 202],
+  [535, 615],
+  [74, 650],
+];
+const ringOf = (group: readonly RingItem[], obstacles: readonly LabelRect[], frame?: LabelFrame) => {
+  const ring = ringLayout(group, obstacles, frame);
+  const boxes = ring.map((l, i) => ({ x: l.x, y: l.y, w: group[i]!.w, h: group[i]!.h }));
+  const lines = boxes.map((b, i) => [group[i]!.ax, group[i]!.ay, ...nearestOnRect(b, group[i]!.ax, group[i]!.ay)] as const);
+  return { ring, boxes, lines };
+};
+const ringCases: [string, readonly RingItem[], readonly LabelRect[], LabelFrame | undefined][] = [
+  ['Kinki', kinki, [kinkiPin], kinkiTray],
+  ['un corro apretado', crowd.map((c, seed) => ({ ...c, seed })), [pinRect], undefined],
+];
+for (const [name, group, obstacles, frame] of ringCases) {
+  const { ring, boxes, lines } = ringOf(group, obstacles, frame);
+  const cx = group.reduce((s, g) => s + g.ax, 0) / group.length;
+  const cy = group.reduce((s, g) => s + g.ay, 0) / group.length;
+  const away = group.map((g) => Math.hypot(g.ax - cx, g.ay - cy));
+  const inner = lines.map(([, , ex, ey]) => Math.hypot(ex - cx, ey - cy));
+  check(`etiquetas del zoom (${name}): todas con línea`, ring.every((l) => l.leader));
+  check(
+    `etiquetas del zoom (${name}): ninguna se pisa ni tapa el pin`,
+    boxes.every((a, i) => obstacles.every((o) => !overlaps(a, o)) && boxes.every((b, j) => i === j || !overlaps(a, b))),
+  );
+  check(
+    `etiquetas del zoom (${name}): ninguna línea cruza otra etiqueta ni otra línea`,
+    lines.every(
+      (l, i) =>
+        boxes.every((b, j) => i === j || !segmentHitsRect(l[0], l[1], l[2], l[3], b)) &&
+        lines.every((m, j) => i === j || !segmentsCross(l, m)),
+    ),
+  );
+  check(
+    `etiquetas del zoom (${name}): cada una más allá de su punto, desde el centro del grupo`,
+    inner.every((r, i) => group[i]!.near || r > away[i]!),
+  );
+  check(
+    `etiquetas del zoom (${name}): unas más cerca y otras más lejos`,
+    Math.max(...inner) / Math.min(...inner) >= 1.08,
+    inner.map((r) => r.toFixed(0)).join(' · '),
+  );
+  if (frame) {
+    check(
+      `etiquetas del zoom (${name}): todas dentro de la bandeja`,
+      boxes.every((b) => frameExcess(b, frame) === 0),
+    );
+  }
+  const twice = ringLayout(group, obstacles, frame);
+  check(
+    `etiquetas del zoom (${name}): el mismo mapa da el mismo corro`,
+    twice.every((l, i) => l.x === ring[i]!.x && l.y === ring[i]!.y),
+  );
+}
+{
+  const { boxes } = ringOf(kinki, [kinkiPin], kinkiTray);
+  const osaka = boxes[1]!;
+  const nara = boxes[3]!;
+  const wakayama = boxes[5]!;
+  const plain = ringOf(
+    kinki.map(({ seed, ax, ay, w, h }) => ({ seed, ax, ay, w, h })),
+    [kinkiPin],
+    kinkiTray,
+  ).boxes;
+  check('etiquetas del zoom: Ōsaka, más abajo que sin su retoque', osaka.y > plain[1]!.y + 10, `${(osaka.y - plain[1]!.y).toFixed(0)} px`);
+  const [wx, wy] = nearestOnRect(wakayama, kinki[5]!.ax, kinki[5]!.ay);
+  check(
+    'etiquetas del zoom: Wakayama, junto a su prefectura (≤ 40 px)',
+    Math.hypot(wx - kinki[5]!.ax, wy - kinki[5]!.ay) <= 40,
+  );
+  check('etiquetas del zoom: Wakayama no queda a la altura de Nara', !sameLevel(wakayama, nara));
+}
+// En pantallas más pequeñas el mapa encoge y las etiquetas no: el corro tiene
+// que aguantar igual, y no depender del momento en que se fija (el pin flota).
+{
+  const around = (x: number, y: number, k: number) => [300 + (x - 300) * k, 430 + (y - 430) * k] as const;
+  const bad: string[] = [];
+  for (const k of [1, 0.85, 0.72]) {
+    for (const lift of [-3, 0, 3]) {
+      const group = kinki.map((item) => {
+        const [ax, ay] = around(item.ax, item.ay, k);
+        return { ...item, ax, ay };
+      });
+      const [px, py] = around(kinkiPin.x, kinkiPin.y + lift, k);
+      const pin = { x: px, y: py, w: kinkiPin.w, h: kinkiPin.h };
+      const frame = kinkiTray.map(([x, y]) => around(x, y, k));
+      const { boxes, lines } = ringOf(group, [pin], frame);
+      const tag = `×${k} pin ${lift >= 0 ? '+' : ''}${lift}`;
+      if (boxes.some((a, i) => overlaps(a, pin) || boxes.some((b, j) => i !== j && overlaps(a, b)))) bad.push(`${tag}: se pisan`);
+      if (
+        lines.some(
+          (l, i) =>
+            boxes.some((b, j) => i !== j && segmentHitsRect(l[0], l[1], l[2], l[3], b)) ||
+            lines.some((m, j) => i !== j && segmentsCross(l, m)),
+        )
+      ) {
+        bad.push(`${tag}: una línea cruza`);
+      }
+      if (boxes.some((b) => frameExcess(b, frame) > 0)) bad.push(`${tag}: sale de la bandeja`);
+      // Ōsaka siempre por encima de Wakayama: no se cambian el sitio.
+      if (boxes[1]!.y >= boxes[5]!.y) bad.push(`${tag}: Ōsaka y Wakayama se cambian el sitio`);
+    }
+  }
+  // Y el de verdad a 1366×657, tomado de la captura: ahí Ōsaka y Wakayama
+  // llegaron a cambiarse el sitio.
+  const small: RingItem[] = [
+    { ax: 265, ay: 260, w: 64, h: 44 },
+    { ax: 318, ay: 300, w: 63, h: 44, aim: Math.PI - 0.12 },
+    { ax: 362, ay: 232, w: 66, h: 44 },
+    { ax: 343, ay: 330, w: 63, h: 44 },
+    { ax: 378, ay: 316, w: 63, h: 44 },
+    { ax: 318, ay: 365, w: 92, h: 44, turn: 0.85, near: true },
+  ].map((item, seed) => ({ ...item, seed }));
+  const smallTray: LabelFrame = [
+    [140, 142],
+    [478, 150],
+    [490, 452],
+    [152, 476],
+  ];
+  for (const lift of [-3, 0, 3]) {
+    const pin = { x: 316, y: 222 + lift, w: 26, h: 44 };
+    const { boxes, lines } = ringOf(small, [pin], smallTray);
+    const tag = `1366 pin ${lift >= 0 ? '+' : ''}${lift}`;
+    if (boxes.some((a, i) => overlaps(a, pin) || boxes.some((b, j) => i !== j && overlaps(a, b)))) bad.push(`${tag}: se pisan`);
+    if (
+      lines.some(
+        (l, i) =>
+          boxes.some((b, j) => i !== j && segmentHitsRect(l[0], l[1], l[2], l[3], b)) ||
+          lines.some((m, j) => i !== j && segmentsCross(l, m)),
+      )
+    ) {
+      bad.push(`${tag}: una línea cruza`);
+    }
+    if (boxes.some((b) => frameExcess(b, smallTray) > 0)) bad.push(`${tag}: sale de la bandeja`);
+    if (boxes[1]!.y >= boxes[5]!.y) bad.push(`${tag}: Ōsaka y Wakayama se cambian el sitio`);
+  }
+  check('etiquetas del zoom: el corro aguanta con el mapa más pequeño y el pin flotando', bad.length === 0, bad.join(' · '));
+}
 
 // Los textos del cartel, en los dos idiomas.
 for (const messages of [messagesEs, messagesEn] as const) {

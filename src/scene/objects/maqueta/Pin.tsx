@@ -40,9 +40,10 @@ export const Pin = forwardRef<Group, PinProps>(function Pin({ palette }, ref) {
 
   return (
     <group ref={ref}>
-      {/* Sin sombra: sobre la bandeja de pie del zoom era una banda oscura que la cruzaba. */}
-      <mesh geometry={parts.pinFace} material={[materials.face, materials.rim]} />
-      <mesh geometry={parts.pinDisc} material={materials.rim} />
+      {/* Sin sombra: sobre la bandeja de pie del zoom era una banda oscura que la cruzaba.
+          Después del agua del lago, que se adelanta y no escribe profundidad. */}
+      <mesh geometry={parts.pinFace} material={[materials.face, materials.rim]} renderOrder={2} />
+      <mesh geometry={parts.pinDisc} material={materials.rim} renderOrder={2} />
     </group>
   );
 });

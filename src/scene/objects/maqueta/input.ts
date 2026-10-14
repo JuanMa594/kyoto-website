@@ -47,8 +47,22 @@ export const MAQUETA = {
    * lo esquivan.
    */
   pin: { x: 0, top: 0, bottom: 0, on: false },
-  /** Dónde cae el nombre de cada prefectura, en px de la ventana, y si se ve. */
+  /**
+   * La cara visible de la bandeja en la ventana, en px: sus cuatro esquinas en
+   * orden. Los nombres del zoom no salen de ella.
+   */
+  frame: [
+    [0, 0],
+    [0, 0],
+    [0, 0],
+    [0, 0],
+  ] as [number, number][],
+  /** Dónde cae el nombre de cada prefectura, en px de la ventana. */
   labelX: new Float32Array(COUNT),
   labelY: new Float32Array(COUNT),
+  /**
+   * Si se ve: 0 no; 1, el de la prefectura bajo el cursor; 2, uno de los de
+   * Kinki en el zoom, que se quedan quietos y con su línea.
+   */
   labelOn: new Uint8Array(COUNT),
 };

@@ -21,7 +21,7 @@ import { maquetaGeometry, PIN_HEIGHT } from './maquetaGeometry';
 import { Pin } from './Pin';
 import { KYOTO_CITY, PREFECTURES } from './prefectures.generated';
 import { createMapMaterials, createSeaMaterials, createSlabUniforms, fillLandColors } from './slabMaterial';
-import { faceCamera, KYOTO_INDEX, slabTargets, trayPose } from './zoom';
+import { faceCamera, KYOTO_INDEX, pickSlab, slabTargets, trayPose } from './zoom';
 
 interface MaquetaProps {
   placed: PlacedObject;
@@ -40,6 +40,13 @@ const SLAB_SPRING: Spring = { omega: 10, zeta: 0.55, gain: 0, delay: 0 };
 const TOUCH_LABEL = 2.5;
 /** Lo alto de la cara de una losa, en el espacio de la bandeja. */
 const SLAB_TOP = MAQUETA_SIZE.baseHeight + MAQUETA_SIZE.slabHeight;
+/** Las esquinas de la cara de la bandeja, en orden, en fracción de su medio lado. */
+const FRAME_CORNERS = [
+  [-1, -1],
+  [1, -1],
+  [1, 1],
+  [-1, 1],
+] as const;
 /** Lo que flota la punta del pin sobre la losa de Kyoto. */
 const PIN_FLOAT = 0.06;
 
@@ -199,15 +206,13 @@ export default function Maqueta({ placed, palette, profile }: MaquetaProps) {
     const pick = (x: number, y: number): number => {
       state.raycaster.setFromCamera(state.ndc.set(x, y), camera);
       const aPref = slabMesh.geometry.getAttribute('aPref');
-      for (const hit of state.raycaster.intersectObject(slabMesh, false)) {
+      const hits = state.raycaster.intersectObject(slabMesh, false).flatMap((hit) => {
+        if (!hit.face) return [];
         trayGroup.worldToLocal(state.point.copy(hit.point));
-        if (Math.abs(state.point.x) > half || Math.abs(state.point.z) > half) continue;
-        if (!hit.face) continue;
-        const index = Math.round(aPref.getX(hit.face.a));
-        if (t > 0.5 && !IS_KINKI[index]) continue;
-        return index;
-      }
-      return -1;
+        const inTray = Math.abs(state.point.x) <= half && Math.abs(state.point.z) <= half;
+        return [{ pref: Math.round(aPref.getX(hit.face.a)), group: hit.face.materialIndex, inTray }];
+      });
+      return pickSlab(hits, t);
     };
 
     const pointer = MAQUETA.pointer;
@@ -245,23 +250,37 @@ export default function Maqueta({ placed, palette, profile }: MaquetaProps) {
     }
     state.settled = true;
 
+    // La cara visible de la bandeja, en la ventana: el marco de los nombres.
+    FRAME_CORNERS.forEach(([sx, sz], k) => {
+      state.point.set(sx * half, 0, sz * half);
+      trayGroup.localToWorld(state.point);
+      state.point.project(camera);
+      const corner = MAQUETA.frame[k]!;
+      corner[0] = ((state.point.x + 1) / 2) * size.width;
+      corner[1] = ((1 - state.point.y) / 2) * size.height;
+    });
+
     // Las etiquetas: el centro de cada losa visible, proyectado a la ventana.
     const wide = size.width > size.height;
     for (let i = 0; i < COUNT; i += 1) {
-      // En el zoom, los nombres de Kinki; el de Kyoto no: lo marca el pin. En
-      // vertical la maqueta es pequeña y se amontonarían: sólo el que se toca.
-      const on = active && (i === hover || (wide && t > 0.6 && IS_KINKI[i] && i !== KYOTO_INDEX));
-      if (!on) {
+      // En el zoom, los nombres de Kinki, en corro; el de Kyoto, sólo al
+      // tocarlo (lo marca el pin). En vertical la maqueta es pequeña y se
+      // amontonarían: sólo el que se toca.
+      const ring = active && wide && t > 0.6;
+      const zoomed = ring && IS_KINKI[i] && i !== KYOTO_INDEX;
+      const hovered = active && i === hover;
+      if (!zoomed && !hovered) {
         MAQUETA.labelOn[i] = 0;
         continue;
       }
       const [cx, cz] = PREFECTURES[i]!.center;
-      state.point.set(cx, SLAB_TOP + state.springs[i]!.x, cz);
+      // Las del zoom no suben con su losa: el hover no las mueve.
+      state.point.set(cx, SLAB_TOP + (ring ? 0 : state.springs[i]!.x), cz);
       contentGroup.localToWorld(state.point);
       state.point.project(camera);
       MAQUETA.labelX[i] = ((state.point.x + 1) / 2) * size.width;
       MAQUETA.labelY[i] = ((1 - state.point.y) / 2) * size.height;
-      MAQUETA.labelOn[i] = state.point.z < 1 ? 1 : 0;
+      MAQUETA.labelOn[i] = state.point.z >= 1 ? 0 : zoomed ? 2 : 1;
     }
 
     // El pin: sobre la losa de Kyoto, de frente a la cámara.
@@ -296,13 +315,20 @@ export default function Maqueta({ placed, palette, profile }: MaquetaProps) {
           receiveShadow={profile.shadows}
         />
         <group ref={tray} position={[0, MAQUETA_SIZE.pivotY, 0]}>
-          {/* Ni la bandeja ni las losas proyectan sombra: en el suelo su sombra
-              era un bloque duro. La pone una penumbra de contacto (contact.ts). */}
-          <mesh geometry={parts.tray} material={materials.tray} receiveShadow={profile.shadows} />
+          {/* La bandeja proyecta su sombra (la de las losas cae dentro de la
+              suya); la columna, la suya y su penumbra de contacto. */}
+          <mesh
+            geometry={parts.tray}
+            material={materials.tray}
+            castShadow={profile.shadows}
+            receiveShadow={profile.shadows}
+          />
           {/* Las olas siguen al mapa en el shader y se desvanecen con el zoom. */}
           <mesh geometry={parts.waves} material={materials.waves} renderOrder={1} />
           <group ref={content}>
-            <mesh geometry={parts.lake} material={materials.lake} receiveShadow={profile.shadows} />
+            {/* Después de las losas y antes del pin: el agua se adelanta para
+                ser ella la orilla (slabMaterial.ts). */}
+            <mesh geometry={parts.lake} material={materials.lake} receiveShadow={profile.shadows} renderOrder={1} />
             <mesh
               geometry={parts.base}
               material={[materials.baseFace, materials.baseSide]}

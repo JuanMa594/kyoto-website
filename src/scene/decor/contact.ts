@@ -30,9 +30,6 @@ export interface ContactShadow {
 const SPREAD = { torii: 1.6, farol: 1.9, arbusto: 1.75, maqueta: 1.7 } as const;
 const STRENGTH = { torii: 0.7, farol: 0.85, arbusto: 0.95, maqueta: 0.85 } as const;
 
-/** La penumbra que deja la bandeja de la maqueta: el ancho de la bandeja, a media fuerza. */
-const TRAY_SHADOW = { radius: 2.6, strength: 0.45 } as const;
-
 /** Por debajo del musgo: se dibuja antes y él la cubre. */
 const CONTACT_LIFT = 0.008;
 
@@ -49,9 +46,6 @@ export function stationContacts(index: number, portrait: boolean, densityScale: 
 
   for (const o of layout.objects) {
     for (const base of objectBases(o)) add(base.x, base.z, base.foot * SPREAD[o.item.kind], STRENGTH[o.item.kind]);
-    // La bandeja de la maqueta no proyecta sombra (era un bloque duro en el
-    // suelo): la sustituye esta penumbra, ancha y suave, bajo ella.
-    if (o.item.kind === 'maqueta') add(o.x, o.z, TRAY_SHADOW.radius * o.scale, TRAY_SHADOW.strength);
   }
   for (const grove of layout.groves) {
     for (const culm of groveCulms(grove, densityScale)) add(culm.x, culm.z, 0.22 + culm.radius * 2.5, 0.55);

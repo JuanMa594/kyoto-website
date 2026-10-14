@@ -22,6 +22,31 @@ export const KINKI: readonly number[] = PREFECTURES.flatMap((p, i) => (p.kinki ?
 
 const IS_KINKI = PREFECTURES.map((p) => p.kinki);
 
+/** Lo que cruza el rayo del cursor, de cerca a lejos. */
+export interface SlabHit {
+  /** De qué prefectura es la cara (`aPref`). */
+  readonly pref: number;
+  /** El grupo de la geometría de las losas: 0, las caras; 1, los cantos. */
+  readonly group: number;
+  /** Si cae dentro de la bandeja (lo de fuera, recortado, no se ve). */
+  readonly inTray: boolean;
+}
+
+/**
+ * La prefectura que elige el cursor (−1 si ninguna): la primera **cara** de
+ * losa que cruza su rayo dentro de la bandeja; en el zoom (`t` > 0,5), sólo de
+ * Kinki. Los cantos no cuentan: por el hueco del lago Biwa el rayo daba con
+ * las paredes del agujero de Shiga, y el cursor sobre el agua levantaba Shiga.
+ */
+export function pickSlab(hits: Iterable<SlabHit>, t: number): number {
+  for (const hit of hits) {
+    if (!hit.inTray || hit.group !== 0) continue;
+    if (t > 0.5 && !IS_KINKI[hit.pref]) continue;
+    return hit.pref;
+  }
+  return -1;
+}
+
 /**
  * Cómo queda de frente a la cámara la maqueta en el zoom: el giro extra sobre
  * su rumbo (`yaw`) y la inclinación de la bandeja (`tilt`). Salen de dónde
