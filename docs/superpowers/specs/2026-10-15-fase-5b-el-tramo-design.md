@@ -498,3 +498,37 @@ intención no cambia, cambian los números.
   (también a 1440×900)**; y en cualquier pantalla donde el cuerpo bajaría de
   **14 px**, o la tabla no cabe, o la pantalla es vertical o táctil, el texto
   vuelve a la tarjeta de papel. Se decide cada frame.
+
+## 16. Desviaciones al implementar
+
+- **Los lados de las tarjetas, al revés**: `capital` a la derecha, `heian` a la
+  izquierda, `kyoto` a la derecha; y **la roca a la izquierda** (d 30, u −5,2).
+  Desde la vista inicial, todo lo que queda a la derecha del camino a menos de
+  60 u cae bajo el título (la misma regla de la Home), y el único hueco libre —entre
+  la maqueta y el título— es para la roca, que es lo que se pidió ver desde allí.
+  **Coste, a revisar**: el primer kōsatsu se ve, a ~55 u, detrás de 位置. La
+  alternativa es la del diseño (lados izquierda/derecha/izquierda) con la roca
+  escondida detrás del primer tablón: entonces la roca no se ve desde el cartel.
+- **Medidas del kōsatsu**: tabla de 6,6 u (la de sin mapa, más estrecha), postes
+  detrás de la tabla y metidos 1 u (la tabla vuela hacia el camino), la esquina del
+  tejadillo a |u| ≥ 2 y los postes apartados de las piedras reales; el kakejiku de
+  1,75 u, con los mapas en formato de rollo (900 × 1750); el bloque de texto, de
+  19 rem. Paralelo al plano de la imagen de su parada, no girado hacia la cámara.
+  Resultado: cuerpo de 17–18 px a 1600×900 y la tabla entera en su mitad también a
+  1440×900.
+- **El encaje** escala por ancho y por alto (el alto del bloque medido en el DOM)
+  y centra: la tabla sin mapa daba 26 px y podía desbordar.
+- **La escala** para 1366×657 no se exige: cae a la tarjeta de papel por la regla
+  de §15 (cuerpo < 14 px).
+- **Fauna (3B)**: el apartarse del ancla deslizante tiene ahora un tope de 4 u/s
+  (`SLIDE_RESTORE_MAX_SPEED`): con la decoración nueva, el reparto con semilla de
+  `check:path` sacó un gorrión que se apartaba a 10 u/s.
+- **Susuki**: sin sombra (cintas finas: ni se leería ni compensa) y sin la mancha
+  cercana a la derecha (caía bajo el texto del cartel).
+- **Cerezo**: las flores no proyectan sombra (el tronco sí, con el mismo viento),
+  sin filo de tinta y con un poco de brillo propio (de canto, la copa salía parda).
+  Copa de 8,9–9,5 u de diámetro (la del somei-yoshino es ~1,5 veces su alto).
+- **Rendimiento**: medido por CDP, de 41 a 59–81 draw calls en las paradas y de 62 a
+  94 en el cartel: por encima del presupuesto de +10. Cada kōsatsu son seis mallas
+  más su sombra; instanciarlos como los faroles ahorraría ~18. Queda propuesto para
+  si la revisión nota caída de fps (el headless no lo mide: va a 30 fps fijos).
