@@ -3,7 +3,12 @@
 > Documento de referencia del proyecto. Consolida las decisiones tomadas en la fase de
 > definición. Si algo cambia, se actualiza aquí y no en la memoria de nadie.
 >
-> Estado: **Fase 1 implementada** — pendiente de revisión.
+> Estado: **Fase 5A implementada, en revisión** (Ubicación 位置: la maqueta de Japón, el
+> zoom a Kinki y *Ichi* / 位置). Después viene la 5B, el tramo hacia Eventos. La Fase 4 está
+> completa (Home 京都: el cartel de `1.png`, la entrada, el tramo hacia Ubicación, los
+> faroles y el musgo).
+> La Fase 3 está completa — 3A (el mundo), 3B (la
+> fauna en el camino) y 3C (la navegación). La Fase 2 está completa (2A motor, 2B ambiente, 2C vida).
 > El estado vivo de las fases y las convenciones del repo están en `CLAUDE.md`.
 
 ---
@@ -70,7 +75,7 @@ del sitio, no un adorno. Y los 6 círculos de `13.png` mapean 1:1 con las seccio
 | Render 3D | Three JS principalmente y WebGL, React Three Fiber sobre una **escena persistente** en el layout |
 | Nivel 3D | 3D real en el cuadro cercano, billboards 2.5D al fondo |
 | Cámara | **Observadora en perspectiva**, no primera persona |
-| Animación | **GSAP + ScrollTrigger + MotionPath** como orquestador único |
+| Animación | **GSAP + ScrollTrigger** como orquestador único (`MotionPath` no hizo falta: la curva del camino vive en 3D, ver §5.3) |
 | Scroll | Lenis (smooth scroll) integrado con ScrollTrigger |
 | Estilos | Tailwind v4 + design tokens en CSS custom properties |
 | Estado | Zustand |
@@ -94,7 +99,9 @@ un canvas vivo entre navegaciones es notablemente más difícil.
 | **PIXI.js** | Acotado | Sólo para páginas 2D puras (candidata: gastronomía). **Regla dura: nunca dos contextos WebGL vivos a la vez** |
 | **Motion** (ex Framer Motion) | Acotado | Sólo UI en DOM (sidebar, cards, enter/exit). GSAP manda en scroll y escena |
 | **canvas-confetti** | Sí | Para estallidos de pétalos al click vía `confetti.shapeFromPath()` |
-| **Lottie** | Sí, puntual | Para fauna vectorial animada (garzas), donde la geometría procedural no compensa |
+| **Lottie** | **Descartada en Fase 2** | Era la propuesta para la fauna. Un clip cerrado no puede caminar, posarse, detenerse ni perseguir a otro individuo — y eso es justo lo que pide §5.5. Además obliga a subir un `CanvasTexture` por individuo y por frame, y no existen animaciones libres de garza + ardilla + milano en un mismo estilo. La fauna se genera con geometría procedural (§7) |
+| **Howler** | **Descartada** | No tenemos ni un archivo de audio y la regla de assets aplica también al sonido: el ambiente se **sintetiza con la Web Audio API** (§7). Sin descargas, sin licencias, y reactivo — la ráfaga que mueve los pétalos es literalmente la que se oye |
+| **maath** | No entra | `damp()` y el PRNG ya viven en `src/lib/procedural.ts`, y el ruido de los pétalos se calcula en GLSL. Una dependencia menos |
 
 ---
 
@@ -105,22 +112,23 @@ Next.js 16 (App Router, static export) + React 19.2 + TypeScript 5.9
 Tailwind v4 + design tokens (CSS vars)
 next-intl                              → rutas /es y /en
 
-Lenis                                  → smooth scroll
-GSAP + ScrollTrigger + MotionPath      → camino, cámara, animaciones de scroll
+lenis 1.3                              → smooth scroll
+gsap 3.15 (ScrollTrigger)              → scroll del camino, viaje de cámara, animaciones
 Motion                                 → UI en DOM únicamente
 
 Three JS                               → Animaciones, interacciones 3D
 @react-three/fiber + @react-three/drei → escena persistente
 @react-three/postprocessing            → bloom, profundidad de campo, god rays
 @react-three/rapier                    → física puntual (faroles que se balancean)
-maath                                  → ruido simplex, utilidades matemáticas
 three (SVGLoader, ExtrudeGeometry)     → mapa extruido, geometría desde paths
 
 Zustand                                → estado del viaje, calidad, audio, a11y
-Howler / PositionalAudio de three      → ambiente sonoro
+Web Audio API (nativa, sin librería)   → ambiente sonoro sintetizado por código
 canvas-confetti                        → micro-celebraciones
-lottie-react                           → fauna vectorial (puntual)
 ```
+
+> `postprocessing@6.39` exige `three >= 0.168 < 0.187`. Es la segunda razón —
+> junto a `@types/three` — por la que `three` está clavado en 0.185.1.
 
 ---
 
@@ -146,19 +154,45 @@ Debe ser **sutil**. Es lo que separa "elegante" de "efecto barato":
 - **Damping ≈ 0.06** — la cámara persigue al cursor con inercia, nunca 1:1
 - Rotación máxima **≈ 2°**, con `lookAt` fijo al centro de interés → se siente como un
   reencuadre suave, no como girar la cabeza
-- En móvil: giroscopio, con la misma amortiguación
+- En móvil: giroscopio, con la misma amortiguación (sólo Android: en iOS pide un permiso del sistema y se descartó, ver §11)
 - Se desactiva con `prefers-reduced-motion`
 
 ### 5.3 El camino
 
 El scroll mueve la cámara como un **travelling de cine que sigue el sendero** — un dolly
-lateral/diagonal sobre un spline. `ScrollTrigger` ata el scroll al recorrido; `MotionPath`
-define la curva.
+lateral/diagonal sobre el sendero. `ScrollTrigger` ata el scroll al recorrido; la curva la
+define `scene/path/journeyPath.ts` a partir de `journey.ts`.
 
 Cambiar de sección **no** es un fundido: la cámara viaja por el camino hasta la siguiente
 estación. La escena nunca se desmonta. En el camino se van encontrado cosas relacionadas con la sección, y algunos mensajes, información o datos curiosos sobre ello.
 
 La idea del camino no es que siempre de la impresión de ir siempre adelante, también hacer cambios de dirección, o como en la imagen `5.png`, dar la impresión que se esta subiendo por escaleras rodeadas de Toris, hasta llegar al Fushimi Inari Taisha.
+
+**Cómo está hecho (Fase 3A).** El camino es un mundo continuo de 786 unidades que avanza
+siempre hacia el fondo, con medio tramo (64 u) de la Home a Ubicación, unas 128–144 entre las demás y 50 de llano entre los cerezos al salir de Eventos, antes de la subida (`tramo.flat`): sitio para caminar y para leer lo que
+hay a los lados. Entre estaciones tiene curvas laterales (`lateral`) y sube o baja hacia la
+altura de la siguiente (`altitude`): `scene/path/journeyPath.ts`. En cada estación el camino es
+recto y llano,
+así que su vista sigue siendo frontal, de cartel; las curvas y las cuestas —la subida a Fushimi
+Inari, la bajada a Gion— ocurren en los tramos. La cámara está en *objetivo del scroll + desfase
+de viaje*: cada página termina en un **tramo** cuyo scroll lleva la cámara a la siguiente
+estación, y al terminarlo se llega sola (`PathTramo`). **El tramo se camina y se lee**: mide
+un caminar proporcional a su distancia (~3,3vh por unidad: 211vh el de la Home, unos 420–475vh los demás) más 80vh por cada tarjeta que declare la estación (`tramo.cards` en
+`journey.ts`); la cámara anda entre tarjeta y tarjeta con la curva `power2.inOut` (arranca con
+peso y frena), casi se detiene en cada una mientras aparece a su lado del camino, y al final se
+ve la siguiente estación. **Estilo de las tarjetas de texto**, para todas las páginas: el marco
+es un poco translúcido —lo justo para que el texto se lea bien y la tarjeta se mezcle con el
+ambiente— y la letra de lectura es algo más grande que el texto base. Una sección puede pedir
+otra forma (los mapas de Ubicación serán carteles de madera en el camino, Fase 5). Los saltos —enlaces, «atrás»— se absorben en el desfase y GSAP lo lleva a cero con la
+curva `piedra` (1,8 s por estación, nunca más de 160 u/s de media: 4,9 s el camino entero). Contra el
+mareo, el rumbo está acotado a ±15° y 12°/s, y en los viajes rápidos el encuadre recorta las
+curvas sin perder el camino de vista. El ambiente —niebla, cielo, viento, pétalos, sonido y
+elenco de fauna— lo decide la posición de la cámara, no la ruta: al viajar se ven pasar los
+paisajes intermedios. Con modo 静 o movimiento reducido no hay viaje ni llegada automática: la
+cámara salta y el tramo se reduce a su contenido.
+
+**`MotionPath` no se usa**: la curva vive en 3D y la de three da tangentes y longitudes. GSAP
+sigue siendo el orquestador de las transiciones del viaje y de ScrollTrigger.
 
 ### 5.4 Navegación (basada en `13.png`)
 
@@ -166,14 +200,307 @@ Panel lateral con los 6 íconos circulares, que se despliega al acercar el curso
 Al hover, cada círculo hace un pulso *spring* y revela su kanji. En móvil se convierte en
 una barra inferior o un gesto.
 
+**Cómo está hecho (Fase 3C).** En escritorio, un **riel de piedras** en el borde
+derecho: siete paradas —京都 y las seis estaciones— equiespaciadas sobre un arco.
+Plegado es un camino de piedrecitas con la marca «tú», que sigue a la cámara
+(lee `PATH.d` desde `gsap.ticker`, fuera de React): en un salto se la ve
+recorrer el riel y cada estación por la que pasa destella. Al acercar el cursor
+al borde, o con el foco de teclado, se despliega en los seis círculos de
+`13.png`, con un pulso *spring*, el kanji y una microanimación por ícono. Los
+íconos son **geometría calculada** (`components/nav/icons/`): Japón sale de
+Natural Earth (`bun run geo`), la sakura del mismo pétalo que cae en la escena,
+y el torii, la pagoda, el farol y el naruto, de sus proporciones. En móvil, y
+en cualquier pantalla táctil sin hover, una **barra flotante** con el riel en
+horizontal y los mandos; al tocarla, un **abanico** modal que se cierra al
+elegir, con el velo, Escape o «atrás». Cada estación tiene su `<title>`
+(«Ubicación · Kyoto»). Detalle: `docs/superpowers/specs/2026-10-05-fase-3c-la-navegacion-design.md`.
+
+### 5.4b La Home (Fase 4)
+
+El cartel de `1.png` con volumen: KYOTO / 京都 a la izquierda (DOM real) y, en la
+escena, un **torii ryōbu** a la derecha del camino, cortado por el borde, con su
+pilar de apoyo y su tejadillo; un **arbusto** podado en nube al pie; **bambú** en la
+esquina inferior izquierda, detrás del texto y detrás del torii. En vertical el
+torii se va más al fondo y el texto sube (`portrait` en la decoración).
+
+- **La decoración se declara en `journey.ts`** (`environment.decor`): objetos
+  sueltos y macizos, en coordenadas del camino, incluido el tramo de salida. Al
+  salir de la Home el bosquecillo se aclara hasta abrirse al valle de Ubicación.
+  Huellas para las piedras, la cámara (≥ 1,5 u, también en los viajes) y la fauna
+  (que cruza entre caña y caña): `scripts/check-decor.ts`.
+- **El bambú y los arbustos son muelles amortiguados** (`scene/systems/sway.ts`):
+  se arquean al arreciar, se pasan un poco, rebotan al amainar y se quedan
+  arqueados si el viento es parejo. Siete muelles —tres rigideces con dos
+  retardos, y el de los arbustos—, integrados en la CPU y aplicados en el shader.
+- **La entrada** (sólo la primera carga de la pestaña, con movimiento): la bruma se
+  abre, KYOTO se empapa de izquierda a derecha —un gesto, no un deletreo—, 京都 se
+  dibuja trazo a trazo con KanjiVG como máscara del glifo de Zen Old Mincho y, al
+  posarse el último trazo, una ráfaga real. Cualquier gesto la completa. Un script
+  en línea evita el parpadeo y una animación CSS de respaldo muestra el cartel si
+  el JS no llega.
+- **La tarjeta de bienvenida** del tramo explica cómo se recorre el sitio.
+- **El riel lleva una bruma de papel** detrás de las piedrecitas, para leerse
+  sobre las vigas del torii. El texto del cartel lleva la misma idea en sus
+  letras (`.paper-halo`): un halo washi, no una sombra oscura. **Los títulos de
+  las otras páginas la usarán en sus fases.**
+- **Faroles de piedra** (revisión de la Fase 4), ya fuera del cartel: un
+  *yukimi-dōrō* entre el musgo al empezar a caminar y un par de *kasuga-dōrō*
+  flanqueando el camino donde el bambú se abre a Ubicación. Por código (tornos
+  hexagonales), con musgo en el tejado y el pie húmedo; las ventanas son de
+  papel con un tibio kohaku. **Se usarán los dos tipos a lo largo de todo el
+  camino**, porque el modo noche los encenderá para alumbrar el sendero.
+- **Musgo** (`scene/decor/moss.ts`, `MossPatches`): corros planos al pie de lo
+  plantado y de las cañas (también las del fondo), en el borde de los macizos,
+  por el terreno abierto entre el camino y el bambú —en la revisión se veía
+  vacío— y a trechos junto a las piedras. Los parches se agrupan en corros y
+  tienen tres verdes, para leerse como musgo y no como manchas. Su borde se
+  funde con el suelo, más cuanto más lejos (de lejos parecían calcomanías), y
+  lo rodea un halo de tierra húmeda que lo ancla.
+- **Sombras de contacto** (`scene/decor/contact.ts`, `ContactShadows`): una
+  penumbra radial al pie de cada pilar, farol, arbusto y caña. Una draw call; en
+  los tiers sin sombras es lo único que pega lo plantado al suelo.
+- **Fondo de bambú** en los dos costados (|u| 12–23), más alto y de alturas más
+  dispares, ralo y con 16 hojas por caña: la niebla lo vuelve sombra y rellena
+  los laterales. Va en bosquetes con claros para que la garza que vadea pueda
+  entrar al cuadro (`backdropBamboo`). Una draw
+  call; el contorno, los cojines y su relieve salen del shader, sin texturas.
+  Cuánto, `environment.moss`.
+- **Las hojas del bambú planean, no aletean**: giran enteras sobre su peciolo y
+  se tienden hacia sotavento; las que caen se mecen como un péndulo en vez de
+  dar vueltas. La primera versión «parecían mariposas».
+
+Rendimiento medido (tier alto, GPU integrada): +11 draw calls y ~100 k triángulos
+por frame con sombras, a 60 fps; con faroles, musgo, sombras de contacto y fondo
+de bambú, 61–62 draw calls en el cartel (antes 55), aún a 60 fps. Detalle:
+`docs/superpowers/specs/2026-10-08-fase-4-home-design.md`.
+
+### 5.4c Ubicación (Fase 5A)
+
+El cartel de `2.png` en espejo respecto de la Home: la **maqueta de Japón** a la
+izquierda del camino, *Ichi* / 位置 a la derecha (DOM real, en el verde koke-deep de
+la referencia, que es ahora el acento de la estación: el pin y Kyoto son lo único rojo).
+
+- **La maqueta** es un objeto más de `environment.decor` (`kind: 'maqueta'`): una
+  bandeja de piedra inclinada 48° hacia la cámara sobre un atril de tambores, con
+  Japón en dos capas —la base de costa (cara sumi, cantos koke) y las 46 losas de
+  las prefecturas (cara blanca), encogidas un pelo para que entre ellas asome la
+  base: las juntas de tinta—. Sin Okinawa, como `2.png` y `13.png`. El lago Biwa
+  es un agujero en Shiga. El dato sale de Natural Earth con **topología
+  compartida** (`bun run geo`) y se carga en diferido: pesa ~80 KB.
+- **Color, como los mapas de Edo** (revisión de la 5A): cada región en un tono
+  pálido de la paleta (`regions.ts`), Kinki en blanco; el mar, la piedra de la
+  bandeja con un velo de **índigo 藍** (`--color-ai`, nuevo); y unas pocas
+  **olas a pinceladas** —crestas que acaban en rizo, con el borde de pincel seco
+  hecho en el shader— en los claros del mar (`waves.ts`; `check:path` comprueba
+  que no tocan tierra).
+- **Las etiquetas no se pisan**: cada una prueba sitios alrededor de su punto y,
+  si queda lejos, una línea de tinta la une a su prefectura (`labelLayout.ts`).
+- **El pin**, como el de `2.png`: gota blanca con contorno shu y el disco rojo,
+  2.5D, siempre de frente a la cámara.
+- **Hover**: la prefectura bajo el cursor sube con un muelle y dice su nombre
+  (romaji y kanji, en una etiqueta DOM). La mano aparece sólo sobre Kyoto. En
+  táctil, un toque muestra el nombre.
+- **Zoom** al tocar Kyoto (o con el botón, que es la vía del teclado): la bandeja
+  se gira y se endereza hasta quedar **de frente a la cámara** (`faceCamera`),
+  adelantándose para no cruzarse con la columna, y el contenido crece ×4,2
+  alrededor de Kyoto, recortado por la bandeja; lo de fuera de Kinki se hunde y
+  se funde con el mar. La cámara no se mueve: es la maqueta la que se vuelve
+  hacia ella. Se deshace con otro toque, Escape, el botón, al echar a andar o al
+  irse. Las olas siguen a su sitio del mapa: las de Japón se alejan y se
+  desvanecen, y aparecen las de Kinki. El lago Biwa es agua índigo propia, que no
+  sube con Shiga.
+- **Sombra**: ni la bandeja ni las losas proyectan sombra dura; bajo la maqueta
+  hay una penumbra de contacto ancha y suave.
+  En el zoom, la **ficha de Kyoto** ocupa el sitio del resumen.
+- **位置** se dibuja trazo a trazo al llegar a la estación (no en la primera carga
+  de la visita: ya está pintado en el HTML). El título es `CartelTitle`, que
+  usarán Eventos y los tres Lugares.
+- **Vertical**: el título arriba y el resto debajo de la maqueta, que queda más
+  lejos y algo menor (ver §11).
+
+Rendimiento medido (tier alto, GPU integrada): la maqueta suma 16 draw calls (48 →
+64 en el cartel, con su sombra) y ~24 k triángulos, a 60 fps. Detalle:
+`docs/superpowers/specs/2026-10-13-fase-5a-el-cartel-design.md`.
+
 ### 5.5 Ambiente
 
-- **Pétalos y hojas** en varias capas de profundidad, con viento direccional variable
-- **Fauna**: cada 20–40 s una silueta o varias de garzas cruzan el encuadre, pueden ser volando o inclusive caminando por donde se encuentra el usuario. No solamente tiene que ser una garza, también puede ser una ardilla, o que de un momento a otro una ardilla está persiguiendo (jugando) a otra (Estas animaciones de fauna también pueden ser con otros animales, y cada 20s de inactividad de scroll)
+- **Pétalos y hojas** en varias capas de profundidad, con viento direccional variable.
+  La densidad **no es la misma en todas las zonas ni constante en el tiempo**: en
+  reposo, la sakura de eventos está al 100 % del presupuesto —es el único momento
+  del año en que la ciudad está de verdad cubierta—, la home al 35 % y los tres
+  lugares al 20 %, que es un fondo pasivo para que el aire no esté muerto mientras
+  se lee. **Cada ráfaga de viento dobla esa densidad** y la devuelve despacio a la
+  calma: la zona respira en vez de mantener un goteo plano. El tope en el 100 %
+  hace que en eventos la ráfaga no cambie la cantidad, sólo la velocidad y la
+  dirección. En las zonas pasivas, además, la capa más cercana a la cámara lleva un
+  20 % menos, porque es la que se cruza con el título y el texto
+- **Fauna**: cada 20–40 s una silueta o varias de garzas cruzan el encuadre, pueden ser volando o inclusive caminando por donde se encuentra el usuario. No solamente tiene que ser una garza, también puede ser una ardilla, o que de un momento a otro una ardilla está persiguiendo (jugando) a otra (Estas animaciones de fauna también pueden ser con otros animales, y cada 20s de inactividad de scroll). **Cómo se construye eso: §5.6**
 - **Bambú** que se mece con shader de viento
 - **Sonido ambiental** con toggle discreto (nunca autoplay): viento, agua, *fūrin*, un arroyo corriendo.
   Panning posicional según dónde esté el objeto en pantalla
 - **Modo 静 (quieto)**: reduce el ambiente al mínimo para quien lo prefiera
+
+### 5.6 La fauna: criatura y conducta son cosas separadas
+
+La fauna **no son clips**. Una especie aporta su cuerpo; el repertorio de
+conductas es común y se combina con cualquiera que lo admita. Por eso una garza
+no hace *una* cosa: el director puede encadenarle
+`cruzarVolando → posarse → caminar → picotear → alzarElVuelo` en un solo acto de
+quince segundos, y por eso dos ardillas pueden **perseguirse jugando** — la
+persecución no es una animación, es una ardilla siguiendo a otra con retardo y
+error.
+
+**Los cuerpos son modelos reales; el movimiento, código.** La primera versión
+ensamblaba cada animal con primitivas de three.js (esferas, conos, cilindros) y
+se descartó en la revisión: se veía «rústico, poligonal y abstracto». Ahora cada
+especie es un `.glb` de verdad, preparado por `bun run models` (ver §7), y hay
+tres maneras de darle vida:
+
+| Cuerpo | Cómo se mueve | Especies |
+|---|---|---|
+| `modelo` | Malla sin esqueleto. **El shader dobla regiones** —cola desde la grupa, cada pata desde la cadera, cuello desde el pecho, alas desde el hombro— con los ángulos que ya calcula la conducta | garza, milano, gorrión, ardilla, gato, tanuki, libélula |
+| `animado` | Esqueleto y vuelo propios del modelo; la conducta marca el ritmo del aleteo | mariposa |
+| `luz` | Un punto que late con halo: a ocho píxeles, la forma no se ve | luciérnaga |
+
+Casi ningún modelo traía esqueleto, así que la opción de «vincular alas, cola y
+patas a los nodos» no existía: no hay nodos. La deformación por regiones es la
+técnica estándar para animar mallas sin huesos, y las regiones de cada especie se
+calibraron sobre una rejilla del modelo normalizado (`bestiary.ts`).
+
+**Cada especie tiene su marcha**, porque a veinte píxeles lo que distingue a un
+animal de otro es cómo mueve las patas:
+
+| Marcha | Cómo se mueven las patas | Cuerpo | Especies |
+|---|---|---|---|
+| `paso` | Izquierda y derecha alternas | Leve sube y baja | garza |
+| `trote` | Diagonales a la vez (delantera izquierda con trasera derecha) | Firme | gato, tanuki |
+| `galope` | Las dos delanteras juntas, las dos traseras juntas, a contratiempo | **Despega** media zancada y cabecea | ardilla |
+| `brinco` | Todas a la vez | Saltito a cada zancada | gorrión |
+
+La zancada se integra con la velocidad (`fase += velocidad · dt / largo de
+zancada`), así que los pies no patinan: acelera la conducta y aceleran las
+patas. Y la amplitud es grande a propósito —hasta ±50° en la ardilla—: con
+ángulos realistas, un gato a veinte píxeles no mueve las patas a ojos de nadie.
+
+**La cola de la ardilla cambia de forma, no sólo de ángulo.** Parada la lleva
+enroscada en «?» sobre el lomo; corriendo, estirada detrás, ondeando con cada
+salto. Girarla entera desde la base no la estira nunca —sólo la sube o la
+baja—, así que tiene una segunda articulación a media cola (`tail.curl`): la
+base va hacia atrás y la mitad final se dobla al revés. Se estira al arrancar y
+se enrosca en cada frenazo.
+
+**El galope de la ardilla es bajo y continuo.** El salto se quedó en un 62 %
+de su altura inicial —la parábola era alta para lo que avanzaba y se leía como
+rebote—, la zancada se acorta un 15 % a velocidad de persecución (más saltos
+por segundo, más pegados al suelo), el vuelo es medio seno con la cúspide suave,
+el cabeceo es un balanceo de peso de 0,07 rad y, al aterrizar, el cuerpo se
+aplasta un 9 % sobre los pies antes de volver a impulsarse.
+
+**El gato tiene cuatro planes**, que salen de la duración del acto
+(`callejear`): dos gatos jugando a perseguirse (19–25 s), el paseo de siempre
+(32–42 s), sentarse a mirar y desperezarse (44–52 s) o echarse la siesta
+(54–62 s). En la siesta se echa, duerme con la cabeza sobre las manos y
+respirando, despierta, se levanta, se despereza en dos tiempos —manos al frente
+con el pecho al suelo, luego las patas atrás— y se va. Es una sola conducta a
+propósito: el reparto pesa cada conducta por separado, y cuatro le habrían
+dado al gato el cuádruple de apariciones.
+
+Jugando, los gatos **dan vueltas de verdad**: el recorrido se define por su
+curvatura —dos bucles completos, uno que se aleja de la cámara y otro que se le
+acerca, con radio mínimo de un gato y medio— y nunca se paran, así que cada
+giro se ve entero: de costado, de espaldas, del otro costado, de frente. El
+perseguidor es el mismo recorrido 0,75 s antes. Al paso trotan; corriendo
+galopan, y el cambio desliza el desfase de las patas en unos pasos, sin salto. Las posturas viven en el perfil
+(`deform.postures`) y se calibraron con pies y grupa a ras de suelo.
+
+**El milano monta el viento.** Planea casi siempre, pero el aire no es parejo:
+gana y pierde altura en oleajes de 7 y 15 s —con el pico arriba al subir y
+abajo al bajar, que sale solo de la trayectoria—, y **la misma ráfaga que
+arrastra los pétalos lo levanta** (`ridesWind`) y lo mece de ala a ala. Cada
+nueve segundos y medio da una tanda de tres o cuatro aletazos lentos y vuelve a
+planear. Todo cabe en el tercio superior: entre el 3 y el 22 % desde arriba en
+el peor caso.
+
+**La libélula bate con el shader, no con su clip.** El modelo traía esqueleto y
+una animación, pero la animación sólo desplazaba el esqueleto entero: las alas no
+se movían nunca y el insecto cruzaba la pantalla «como una foto». Ahora es un
+modelo estático; sus cuatro alas baten en V rígida desde el hombro a 14 ciclos
+por segundo, y el cuerpo se pinta con el rojo de la paleta (akatombo) y las alas
+con un washi translúcido.
+
+**La garza no vuela: vadea.** El modelo está de pie y con las alas plegadas. En
+vez de un vuelo que no puede hacer, entra andando por la orilla, se para dos
+veces a pescar —espera con el cuello tenso y golpea— y sigue su camino, que es lo
+que hace una garza casi todo el día. El vuelo se lo queda el milano, cuyo modelo
+viene con las alas abiertas. Queda previsto el hueco para una garza en vuelo
+(`flightModel` en el bestiario).
+
+**Bestiario.** El criterio es geográfico, no «japonés genérico»: el ciervo, por
+ejemplo, queda fuera porque es de Nara.
+
+| Especie | Por qué es de Kyoto | Dónde vive en el cuadro |
+|---|---|---|
+| **Garza** (aosagi) | Las del río Kamo, quietas en la orilla | Tercio inferior: **vadea y pesca**. Sin vuelo hasta que haya modelo en vuelo |
+| **Milano** (tobi) | Planean en círculo sobre las colinas del este | Sólo tercio superior, lejos; no aterriza nunca |
+| **Gorrión** (suzume) | En bandadas por los tejados | Bandada de 5–9, o de 3 a 5 bajando juntos a picotear |
+| **Ardilla japonesa** (*Sciurus lis*) | Bosques de Higashiyama y Arashiyama | Suelo del tercio inferior; **es la que persigue a otra** |
+| **Gato** | Callejones de Gion y Pontochō. Es un bobtail calicó, el del maneki-neko | Suelo. Pasea con pausas; o se sienta a mirar la calle y se despereza; o se echa la siesta, despierta, se despereza y se va; o **son dos, persiguiéndose en círculos** |
+| **Luciérnaga** (Genji-botaru) | Junio en el Shirakawa y el Kamo | Sólo en Gion, al anochecer |
+| **Mariposa / libélula** (ageha *Papilio xuthus* / akatombo) | Jardines y campo abierto | Capa delantera, cruzan cerca de la cámara |
+| **Tanuki** | Nocturno, en las colinas | Raro, sólo Gion |
+| **Uguisu** (ruiseñor japonés) | *El* sonido de la primavera en Kyoto | **No se ve: sólo existe como capa de audio** |
+| **Kitsune** | Mensajero de Inari | Aplazado a la **Fase 6**, entre los toriis |
+| **Carpa koi** | Estanques de templo | Aplazada hasta que haya **agua** en escena |
+
+**El director de fauna** (`scene/systems/fauna/FaunaDirector.tsx`) trabaja como
+un director de casting, no como un reproductor:
+
+- elige entre las especies que declara `station.ambient.fauna` en `journey.ts`
+  — la estación dice **qué especies**, nunca qué hacen;
+- lanza un acto cada **20–40 s** (`--fauna-min-gap` / `--fauna-max-gap`) y uno
+  extra a los **20 s sin scroll** (`--idle-before-fauna`);
+- mantiene como mucho **un acto aéreo y uno terrestre a la vez** en tier alto,
+  uno en medio, cero o uno en bajo, y nunca repite especie dos veces seguidas;
+- **respeta la regla de tercios**: lo aéreo arriba, lo terrestre abajo, y el
+  tercio medio sólo se cruza por detrás del sujeto (z < −8) para no tapar el
+  texto;
+- todo lo que pisa el suelo muestrea `terrainHeight()` — la misma función pura
+  que dibuja el terreno y apoya las piedras —, así que nada flota ni se hunde y
+  en Fushimi Inari los animales suben la cuesta de verdad;
+- las aves **derivan con la ráfaga** del `WindField`, y cada acto puede disparar
+  su capa de sonido (el graznido de la garza al cruzar);
+- con modo 静 o `prefers-reduced-motion`: **cero actos**.
+
+**En el camino (Fase 3B).** La fauna vive en el mundo, como las piedras
+(`scene/systems/fauna/anchoring.ts`; diseño en
+`docs/superpowers/specs/2026-10-01-fase-3b-la-fauna-en-el-camino-design.md`):
+
+- cada acto nace con un **ancla**, una copia del encuadre de la cámara: al
+  avanzar, uno se acerca a los animales, los ve crecer y los deja atrás (lo que
+  anda sale por abajo a ~10 u);
+- **lo que vuela se adelanta**: su ancla se deja alcanzar hasta un mínimo
+  (mariposas 8 u, bandadas 10, milano 22) y después avanza con la cámara; los
+  gorriones que bajan a posarse, sólo mientras están en el aire;
+- al caminar, los actos **nacen por delante**, con una ventaja según la
+  velocidad; caminando rápido o retrocediendo no nace nada, y dejar atrás un
+  acto adelanta el siguiente;
+- cada estación declara su **cercanía** (`ambient.faunaDistance`): Gion íntimo,
+  Ubicación lejano;
+- **ningún animal se retira a la vista**: sólo fuera de cuadro, comprobado cada
+  frame con la cámara real. Si se le acaba el tiempo a la vista, sigue su
+  camino hasta salir; el milano llega bajando en espiral desde arriba y se va
+  subiendo en la térmica hasta perderse (nunca pasa de ~3 u/s), y las
+  luciérnagas se encienden y se apagan;
+- **lo que cruza el camino pasa por encima de las piedras**: el suelo de la
+  fauna es lo más alto entre el terreno y las piedras
+  (`scene/path/stoneSurface.ts`), ensanchado por la pisada y suavizado en una
+  rampa para que subir a una piedra no sea un salto.
+
+> **Para las fases 4–8:** todo objeto sólido que se plante donde anda la fauna
+> (troncos, pies de torii, faroles, linternas de piedra) tiene que entrar en ese
+> suelo o quedar fuera de las trayectorias; si no, un animal lo atravesará como
+> atravesaba las piedras. `check:path` tiene ya la sonda (rayo vertical contra
+> la geometría real) que habría que extender a cada objeto nuevo.
 
 ---
 
@@ -195,7 +522,9 @@ valores ya no son estimaciones: son medidas.
 | Rubor | `--color-sakura-blush` | `#FFCCBC` | Círculos 2 y 4 de `13.png` |
 | Ámbar | `--color-kohaku` | `#FFD699` | Círculo del farol, `13.png` |
 | Matcha suave | `--color-matcha-soft` | `#B4CCAD` | Círculo de gastronomía, `13.png` |
+| Índigo 藍 | `--color-ai` | `#165E83` | No se midió: es el *aiiro* tradicional, el azul de las olas de Hokusai. Sólo para el mar de la maqueta de Ubicación (decidido con el usuario en la revisión de la 5A) |
 | Bambú | `--color-bambu` | `#A3B58E` | Hojas de bambú de `1.png` |
+| Musgo | `--color-koke` · `-mid` · `-deep` | `#78B848` · `#509030` · `#306828` | El arbusto de `1.png`, medido aparte (no llega al 0,1 % del cuadro) |
 | Piedra | `--color-ishi` | `#EDE6DD` | Círculo del torii, `13.png` |
 
 Las tres estimaciones del documento original estaban cerca pero ninguna era
@@ -209,12 +538,14 @@ ahí en tiempo de ejecución para que no exista una segunda copia en TypeScript.
 ### Tipografía
 
 - **One Jinja** → títulos
-- **Gaze Nozarashi** → pinceladas y frases sueltas
+- **Gaze Nozarashi** → párrafos, texto de lectura, pinceladas y frases sueltas
 - **Zen Old Mincho** → kanji decorativo *(propuesta; alternativa: Yuji Syuku)*
-- **M PLUS Rounded 1c** → texto de lectura *(propuesta; alternativas: Rubik, Baloo 2)*
 
-Las cuatro se comparan lado a lado en `/es/tipografia/` con "KYOTO · Sakura ·
-Kiyomizu-dera", tal como estaba previsto.
+Titulares y lectura eran las dos familias de partida, no había nada que comparar
+ahí: One Jinja para títulos y Gaze Nozarashi para todo lo demás, negrita incluida
+vía `font-weight` en CSS si algún texto la necesita (no hay un archivo Bold que
+subsetear). Lo único que se compara en `/es/tipografia/` con "KYOTO · Sakura ·
+Kiyomizu-dera" es el kanji decorativo, entre Zen Old Mincho y Yuji Syuku.
 
 **Hallazgo de la Fase 1:** leyendo la tabla `cmap` de los dos archivos que aportó el
 usuario resultó que **ninguno de los dos tiene un solo carácter japonés**. One Jinja
@@ -260,14 +591,18 @@ instancia miles de veces y reacciona al input. Un dibujo estático no.
 | Elemento | Cómo se genera | Librería |
 |---|---|---|
 | **Piedras del camino** | Icosaedro deformado con ruido simplex + flat shading. Cada piedra con seed distinto = todas únicas | R3F + `maath` |
-| **Torii** | Cajas para los pilares + `ExtrudeGeometry` sobre `CatmullRomCurve3` para el *kasagi* curvado | three / R3F |
-| **Bambú** | `CylinderGeometry` instanciado + vertex shader de viento (seno + ruido) | R3F `<Instances>` + GLSL |
+| **Torii** | Generador paramétrico (`scene/objects/torii/`): pilares cónicos con *uchikorobi*, cajas de aristas redondeadas, *kasagi* y *shimaki* lofteados con las puntas levantadas, placa, *sode-bashira* con tejadillo. Tres geometrías, una por material. Hoy `ryobu`; la Fase 6 añade `inari` | three |
+| **Bambú** | Cañas con nudos y hojas (la misma hoja que cae) en dos `InstancedMesh` por estación; se doblan con un muelle amortiguado integrado en CPU (`sway.ts` → `windSway`), con sombra en el mismo viento | three + GLSL |
+| **Arbusto** | *O-karikomi*: esferas deformadas con ruido de masa + cientos de hojas instanciadas sobre su superficie, con su muelle | three + GLSL |
+| **Kanji dibujado** | Trazos de KanjiVG (CC BY-SA 3.0, `bun run kanji`) como máscara SVG del glifo real, animando `stroke-dashoffset` (`<InkKanji>`) | SVG + GSAP |
 | **Pétalos / hojas** | `InstancedMesh` con posición calculada **en el shader** → coste CPU ≈ 0, miles de partículas a 60 fps | R3F + shader |
 | **Faroles** | `LatheGeometry` para la acanaladura + material emisivo + bloom. Se balancean con física | R3F + postprocessing + rapier |
-| **Garzas** | Lottie sobre un `<Billboard>` que vuela por un `MotionPath` de GSAP | `lottie-react` + drei |
-| **Otros animales**| Lo dejo a consideración de la IA, pero que sea algo como lo explicado anteriormente.
+| **Fauna** | Modelos `.glb` reales pasados por `bun run models`: el color de la textura se **hornea en los vértices** y la textura se tira (el 80 % del peso, y un realismo fotográfico que chocaba con el cartel), la malla se simplifica y se normaliza (morro a +X, pies en y = 0, largo 1). De 177 MB a ~1 MB. Se animan deformando regiones en el vertex shader, con un 20 % más de saturación (sin tocar el brillo), un 5 % de washi y un filo de tinta en la silueta (§5.6) | gltf-transform + meshoptimizer + sharp; R3F + GLSL |
+| **Luciérnagas** | Puntos con material emisivo y pulso propio | R3F |
+| **Ambiente sonoro** | Sintetizado con la Web Audio API: ruido rosa filtrado para el viento (la frecuencia sigue al `WindField`), parciales con decaimiento para el *fūrin*, ráfagas cortas para los grillos, envolvente sobre oscilador ruidoso para el graznido | Web Audio nativa |
+| **Pétalos y hojas** | Densidad por zona con pico en cada ráfaga. Contorno paramétrico triangulado en abanico (pétalo de cerezo con su muesca, arce de cinco lóbulos por el valor absoluto de cos(2.5θ), hoja lanceolada de bambú) + `InstancedMesh` con la posición calculada **en el vertex shader** | R3F + GLSL |
 | **Estallido de pétalos al click** | `confetti.shapeFromPath()` con la silueta de un pétalo | canvas-confetti |
-| **Mapa de Japón** | GeoJSON de prefecturas → `SVGLoader` → `ExtrudeGeometry` = mapa 3D extruido, Kyoto se eleva al hover | three + `d3-geo` |
+| **Mapa de Japón** | Prefecturas de Natural Earth simplificadas con topología compartida y encogidas (juntas de tinta) por `bun run geo` → `ExtrudeGeometry` en dos capas fundidas con un id por prefectura (`aPref`) → la elevación y el fundido, en el shader. El zoom escala el contenido dentro de la bandeja con planos de recorte | three + topojson + clipper-lib (sólo desarrollo) |
 | **Agua / estanque** | `MeshReflectorMaterial` con distorsión | drei |
 | **Niebla y atmósfera** | `fog` + `<Cloud>` + god rays | drei + postprocessing |
 | **Títulos kanji 3D** | `Text3D` con la fuente subseteada, extruido con luz rasante | drei |
@@ -288,8 +623,16 @@ ninguno sirve, se consulta antes de dibujar.
 
 ```ts
 // una estación = un punto del camino
-{ slug, kanji, romaji, icon, pathT: 0.34, palette, ambient: { … } }
+{ slug, kanji, romaji, icon, pathT: 0.34, palette, ambient: { … },
+  environment: { hills, hillSides, altitude, lateral, skyTint },
+  tramo: { cards: [{ id, side, kind }] } }
 ```
+
+Su profundidad en el mundo es `pathT × PATH_LENGTH` (400 unidades). El avance fino de la
+cámara no vive en el store: cambia a 60 fps y está en el objeto de módulo `PATH`
+(`scene/path/journeyPath.ts`), con un único escritor, el rig de cámara. El store guarda sólo
+`zone`, la estación en cuyo tramo está la cámara, que es lo que leen el ambiente, el audio y
+la fauna.
 
 De ese único array se derivan **al mismo tiempo**:
 
@@ -387,13 +730,21 @@ fase** para revisión antes de seguir.
 |---|---|---|---|
 | **0** | Definiciones | Este documento | ✅ |
 | **1** | Fundación | Scaffold Next+TS+Tailwind · tokens de diseño · pipeline de fuentes · `journey.ts` · Zustand + tiers + reduced-motion · i18n `/es` `/en` · `<SceneRoot>` con cámara en perspectiva y niebla | ✅ |
-| **2** | Motor de movimiento y ambiente | Lenis + GSAP · sistema de pétalos por capas de profundidad · viento · garzas · parallax de cursor · profundidad de campo · toggle de audio y modo quieto | ⏸ |
-| **3** | **El Camino** | Piedras procedurales · spline + MotionPath · cámara scroll-driven · sidebar radial (`13.png`) · transiciones entre rutas · nav móvil | ⏸ |
-| **4** | Home 京都 | Torii 3D, bambú, título tipográfico, composición del hero | ⏸ |
-| **5** | Ubicación 位置 | Mapa de Japón extruido e interactivo, zoom a Kyoto | ⏸ |
-| **6** | Lugares | Plantilla + Fushimi Inari, Kiyomizu-dera, Gion | ⏸ |
-| **7** | Eventos | Sakura + rueda de estaciones / calendario del año | ⏸ |
-| **8** | Gastronomía 京料理 | Platos interactivos | ⏸ |
+| **2** | Motor de movimiento y ambiente | Se parte en tres bloques con parada propia, ver abajo | ✅ |
+| **2A** | · Motor | Lenis + GSAP en un solo RAF · easings leídos de `tokens.css` · `WindField` con ráfagas · parallax de cursor · lectura en `/diagnostico` | ✅ |
+| **2B** | · Ambiente | `PetalSystem` en `InstancedMesh` con la posición calculada en el shader, en tres capas de profundidad · profundidad de campo en tier alto | ✅ |
+| **2C** | · Vida | Los tres rigs de fauna · repertorio de conductas · `FaunaDirector` · motor de audio sintetizado · controles de sonido y modo 静 | ✅ |
+| **3** | **El Camino** | Se parte en tres bloques con parada propia, ver abajo | ✅ |
+| **3A** | · El mundo | Sendero desde `journey.ts` · terreno continuo · piedras en todo el recorrido · cámara sobre el camino con scroll · tramo y llegada automática · viaje entre estaciones | ✅ |
+| **3B** | · La fauna en el camino | Actos anclados al mundo · lo que vuela se adelanta (ancla que se desliza) · nace por delante al caminar · cercanía por estación · márgenes con la cámara real · nunca desaparece a la vista | ✅ |
+| **3C** | · La navegación | Sidebar radial (`13.png`) con íconos generados por código · progreso del camino · nav móvil · teclado · transiciones | ✅ |
+| **4** | Home 京都 | Torii 3D, bambú, arbusto, título tipográfico, composición del hero · decoración declarada en `journey.ts` · entrada «el cartel se compone» · tramo hacia Ubicación con tarjeta de bienvenida · faroles kasuga y yukimi, musgo y halo de papel en el texto (revisión) | ✅ |
+| **5** | Ubicación 位置 | Se parte en dos bloques con parada propia, ver abajo | ⏸ |
+| **5A** | · El cartel | Maqueta de Japón por prefecturas sobre un atril de piedra, inclinada hacia la cámara · hover que levanta cada prefectura con su nombre · zoom a Kyoto (Kinki y el lago Biwa) · pin blanco con contorno shu · *Ichi* y 位置 dibujado con `<InkKanji>` · ficha de Kyoto. Detalle: `docs/superpowers/specs/2026-10-13-fase-5a-el-cartel-design.md` | 🔎 |
+| **5B** | · El tramo hacia Eventos | Los dos mapas antiguos, desplegables, **no como tarjetas sino como carteles de madera insertados en el camino** (en 3A son tarjetas provisionales, con el hueco del mapa), junto a la reseña breve de Kyoto · **una roca pequeña vertical pintada** con la esquina de `2.png` (torii, Fuji y sol rojo), que se sacó del cartel para no sobrecargarlo · la decoración del valle · los textos del tramo cuentan la **historia** (la capital de mil años, Heian-kyō) para no repetir la geografía de la ficha de 5A | ⏸ |
+| **6** | Lugares | Plantilla + Fushimi Inari, Kiyomizu-dera, Gion · sus kanji dibujados con `<InkKanji>` · variante `inari` del torii · **tramos**: de Eventos a Fushimi, paso por los costados del santuario y subida escalonada —gradas en la malla del terreno— con toriis (`5.png`); de Fushimi a Kiyomizu-dera, un bosque denso de bambú y un puente de madera sobre una pequeña vaguada antes de la plataforma del templo; de Kiyomizu-dera a Gion, la bajada termina en calzadas tradicionales y faroles | ⏸ |
+| **7** | Eventos | Sakura + rueda de estaciones / calendario del año · 桜 dibujado con `<InkKanji>` · **tramo de llegada**: el bosque de cerezos al acercarse a la sakura (el aumento progresivo de pétalos ya lo hace 3A) | ⏸ |
+| **8** | Gastronomía 京料理 | Platos interactivos · 京料理 dibujado con `<InkKanji>` · **tramo final**: llano, culmina en el espacio gastronómico | ⏸ |
 | **9** | Pulido | Presupuesto de rendimiento · Lighthouse · auditoría a11y · móvil real · SEO/OG · deploy | ⏸ |
 
 **Las fases 1–3 son la inversión clave.** Si el camino queda bien, las páginas 4–8 son en
@@ -406,10 +757,25 @@ buena medida rellenar contenido sobre una plantilla que ya funciona.
 | Tema | Estado |
 |---|---|
 | Licencia de One Jinja y Gaze Nozarashi | ⚠️ Ambas son versiones **Demo** con "All Rights Reserved". `fsType = 0` permite incrustarlas técnicamente, pero si el sitio se publica con ánimo comercial hay que comprar licencia o sustituirlas. Detalle en `assets/fonts/LICENSES.md` |
-| Fuente de kanji | ⏳ Zen Old Mincho vs Yuji Syuku — comparar en `/es/tipografia/` |
-| Fuente de lectura | ⏳ M PLUS Rounded 1c vs Rubik vs Baloo 2 — misma página |
-| Slugs por idioma | ⏳ Hoy `/en/ubicacion` usa el slug español. Si se quieren traducidos, se resuelve en Fase 3 con `pathnames` de next-intl |
+| Fuente de kanji | ✅ Decidido al cerrar la Fase 4: **Zen Old Mincho**, la de `<InkKanji>`. Queda borrar el muestrario `/es/tipografia/` cuando se confirme |
+| Slugs por idioma | ✅ Decidido en la Fase 3: se quedan en español. El export estático no tiene middleware que reescriba `/en/location` → `ubicacion`; traducirlos obligaría a una ruta comodín generada desde `journey.ts`. Se reconsidera en la Fase 9 |
 | Pagoda, casas de Gion y platos | ⏳ Se resuelve en sus fases (ver §7) |
+| Kitsune | ⏳ Aplazado a la Fase 6, entre los toriis. El modelo está en `assets/models/source/` |
+| Carpa koi | ⏳ Aplazada hasta que haya agua: un estanque en alguno de los templos o en la home. El koi que había es un asset de Animal Crossing y **no se puede publicar**; se hará uno propio (los peces son el caso de libro de la deformación en el shader) |
+| **Créditos de los modelos** | ⚠️ Garza y gorrión son CC BY: **antes de publicar tiene que existir una sección de créditos visible**. Detalle en `assets/models/LICENSES.md` (Fase 9) |
+| **Créditos de KanjiVG** | ⚠️ Los trazos de los kanji son CC BY-SA 3.0 (© Ulrich Apel): entran en la misma sección de créditos. El «compartir igual» afecta sólo a `strokes.generated.ts`. Detalle en `assets/kanji/LICENSES.md` |
+| Faroles de piedra | ✅ En la revisión de la Fase 4: tres en el tramo de la Home (un yukimi y un par de kasuga), fuera del cartel. **Los dos tipos se reparten por el resto del camino en sus fases**, pensando en el modo noche |
+| Faroles encendidos | ⏳ **A la fase de la noche.** Las ventanas de papel ya son un material propio (`StoneLanterns`, `DAY_GLOW`); de noche subirá su brillo y se sumará la luz al sendero desde la cámara del fuego (`LANTERN_SIZE.fireY`), con presupuesto de luces: no una luz por farol |
+| Profundidad de campo en la Home | ✅ Se queda como está (decidido al cerrar la Fase 4): estrecharla desenfocaría también las piedras cercanas de todas las estaciones |
+| Compilación del shader de la fauna | ⏳ Fase 9. El primer animal que entra en cuadro compila su programa en ese frame: ~120 ms de tirón unos 10 s después de cargar (perfil de CPU: `getProgramInfoLog` dentro de `getUniforms`, el programa de la fauna con deformación). Arreglo: precompilar los materiales de la fauna al cargar (`renderer.compileAsync`, que usa `KHR_parallel_shader_compile`) |
+| Sin WebGL | ⏳ Fase 9. El sitio se lee entero (DOM real), pero el `<Canvas>` se monta igual y deja en la consola «Error creating WebGL context». `SceneRoot` debería no montarlo si no hay contexto |
+| Precargas RSC en el export | ⏳ Fase 9: con `serve`, las precargas de segmento de Next 16 dan 404 (piden `__next.$d$locale.__PAGE__.txt`, el export escribe `__next.$d$locale/__PAGE__.txt`). No rompe la navegación; el hosting tendrá que servirlas |
+| Peso de la fauna | ⏳ ~0,96 MB en total; cada estación sólo carga su elenco. La mariposa se lleva 620 KB (esqueleto de 192 huesos que el simplificador no consigue bajar de 16.000 triángulos), y las posiciones de los modelos estáticos van sin cuantizar para que el shader vea coordenadas reales. Las dos cosas son candidatas a recorte en la Fase 9 |
+| Bloom y luciérnagas | ⏳ **A la fase de la noche.** Sobre un fondo washi (`#FFFACD`, luminancia ~0,97) un bloom no tiene nada más brillante que el fondo que hacer brillar: o ilumina el fondo entero o no hace nada. Por lo mismo, las luciérnagas (`kohaku`, `#FFD699`) no se veían en Gion, cuyo cielo además se tiñe de ese mismo ámbar, y ocupaban un tercio de sus actos. Se sacaron del reparto de Gion (la especie, su rig y su conducta siguen, y `check:path` las sigue recorriendo); vuelven con la noche, junto con el bloom y los faroles encendidos |
+| La noche | ⏳ Fase posterior, sin número aún. Anochecer según la hora: la de Japón (GMT+9: «ahora mismo en Kyoto es de noche») o la de quien visita. Trae de vuelta las luciérnagas y el bloom |
+| Giroscopio en iOS | ❌ Descartado. Sólo daría el parallax al inclinar un iPhone (en Android ya funciona), y a cambio pediría un botón más en la barra móvil para el diálogo de permiso del sistema. No compensa |
 | Profundidad del contenido | ⏳ ¿Tarjetas cortas o artículos largos? Define si se usa MDX o datos en TS |
+| La maqueta en vertical | ⏳ A revisar con el usuario. En un teléfono (≈ 0,45 de aspecto) la maqueta no pasa de ~35 % del ancho: el camino ocupa el centro, a la derecha choca con la cámara al caminar y más cerca se sale del cuadro. Está entera y se puede tocar, pero se lee pequeña; en el zoom sólo se ve el nombre de lo que se toca. Alternativas: aceptarlo, abrir el zoom por defecto en vertical, o un mapa plano en el DOM sólo para móvil |
+| Fauna en vertical | ✅ Cerrado. **El milano**: sus círculos se estrechan con el aspecto real (`kiteFit`, nunca por debajo de la mitad) y en 9:16 se le ve el **75 %** de su acto (antes, 36 %). **La ardilla que corre y se para** (`correrYParar`) mide sus márgenes con el cuadro real: **65 %** en 9:16 (antes, 28 %); la duración no cambia, así que en vertical corre más despacio en unidades del mundo pero cruza la pantalla a un ritmo parecido. **El resto se queda así**, decidido con el usuario: en móvil ya hay mucho en pantalla y faltan las decoraciones y el contenido (9:16 frente a 16:9: bandada 30/75 %, revolotear 26/67 %, vadear 50/89 %, visitaAlSuelo 76/90 %, perseguir 72/86 %, callejear 58/86 %, deambular 50/81 %) |
 | Dominio y hosting | ⏳ Fase 9 |
 | Assets de Canva | ⚠️ Con marca de agua. Sólo referencia, nunca producción |

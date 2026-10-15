@@ -1,16 +1,29 @@
 'use client';
 
 import { Canvas } from '@react-three/fiber';
+import dynamic from 'next/dynamic';
 import { useMemo } from 'react';
 
 import { getStation } from '@/config/journey';
 import { scenePalette } from '@/lib/css-vars';
+import { CameraRig } from '@/scene/camera/CameraRig';
+import { CAMERA_BASE } from '@/scene/camera/framing';
 import { FoundationScene } from '@/scene/FoundationScene';
+import { WindDriver } from '@/scene/systems/WindDriver';
 import {
   selectMotionAllowed,
   selectProfile,
   useKyotoStore,
 } from '@/store/useKyotoStore';
+
+/**
+ * La profundidad de campo pesa unos cuantos kilobytes y sólo la usa el tier
+ * alto, así que viaja en su propio chunk: una máquina modesta ni la descarga.
+ */
+const PostProcessing = dynamic(() => import('@/scene/PostProcessing'), {
+  ssr: false,
+  loading: () => null,
+});
 
 /**
  * El único contexto WebGL del sitio. Regla dura del proyecto: nunca dos vivos a
@@ -19,14 +32,16 @@ import {
  *
  * La cámara es **observadora, en perspectiva**. Observadora porque la
  * composición es frontal, de cartel; en perspectiva porque es lo que permite
- * parallax real entre las capas en Z. Nunca primera persona.
+ * parallax real entre las capas en Z. Nunca primera persona. El encuadre
+ * concreto y el parallax de cursor viven en `<CameraRig>`.
  */
 export default function SceneCanvas() {
   const profile = useKyotoStore(selectProfile);
   const motionAllowed = useKyotoStore(selectMotionAllowed);
-  const activeStation = useKyotoStore((s) => s.activeStation);
+  // La zona en la que está la cámara —no la de la ruta— decide el ambiente.
+  const zone = useKyotoStore((s) => s.zone);
 
-  const station = getStation(activeStation);
+  const station = getStation(zone);
   const palette = useMemo(() => scenePalette(), []);
 
   return (
@@ -41,9 +56,17 @@ export default function SceneCanvas() {
         alpha: false,
         powerPreference: 'high-performance',
       }}
-      camera={{ fov: 34, near: 0.1, far: 400, position: [0, 1.1, 9.5] }}
+      camera={{ fov: CAMERA_BASE.fov, near: 0.1, far: 400, position: CAMERA_BASE.position }}
     >
+      <CameraRig />
+
+      {/* Un solo viento para toda la escena: lo que despeina el bambú es lo
+          mismo que arrastra los pétalos y lo que después se oirá. */}
+      <WindDriver enabled={motionAllowed} />
+
       <FoundationScene station={station} palette={palette} profile={profile} />
+
+      {profile.postprocessing && <PostProcessing />}
     </Canvas>
   );
 }

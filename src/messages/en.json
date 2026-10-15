@@ -67,10 +67,68 @@
     }
   },
   "home": {
-    "eyebrow": "One continuous experience",
     "title": "Kyoto",
-    "subtitle": "Follow the stone path.",
-    "enter": "Start the path"
+    "tagline": "A walk through the heart of Japan.",
+    "walk": "Scroll to walk"
+  },
+  "ubicacion": {
+    "romaji": "Ichi",
+    "srTitle": "Location — Ichi",
+    "tagline": "Location · where Kyoto is",
+    "summary": "In the heart of Honshū, in western Japan. Explore the map: each prefecture tells you its name. Tap Kyoto to zoom in.",
+    "zoomIn": "Zoom in on Kyoto",
+    "zoomOut": "See all of Japan",
+    "fichaLabel": "Kyoto at a glance",
+    "ficha": {
+      "prefectura": {
+        "label": "Prefecture",
+        "value": "Kyoto (京都府)"
+      },
+      "region": {
+        "label": "Region",
+        "value": "Kansai (Kinki)"
+      },
+      "coords": {
+        "label": "Coordinates",
+        "value": "35.0° N · 135.8° E"
+      },
+      "poblacion": {
+        "label": "Population",
+        "value": "~1.46 million people"
+      },
+      "distancias": {
+        "label": "Distances",
+        "value": "Ōsaka ~45 km · Nara ~35 km · Tokyo ~370 km (2 h 15 by shinkansen)"
+      }
+    }
+  },
+  "tramo": {
+    "label": "Path to {station}",
+    "continue": "Continue the path",
+    "hint": "Keep scrolling: the path goes on",
+    "mapPlaceholder": "Old map · coming in Phase 5"
+  },
+  "tramos": {
+    "inicio": {
+      "bienvenida": {
+        "title": "How to walk it",
+        "body": "This site is a path. As you scroll you move along it, and each place in Kyoto appears when you reach it. To jump to another section, use the stone rail on the right (on a phone, the bar at the bottom). 音 turns on the ambient sound and 静 quiets the scene."
+      }
+    },
+    "ubicacion": {
+      "japon": {
+        "title": "In the heart of Japan",
+        "body": "Kyoto lies on Honshū, the main island of the archipelago, about 370 km west of Tokyo. It was the imperial capital for more than a thousand years, from 794 to 1868."
+      },
+      "kansai": {
+        "title": "A basin among mountains",
+        "body": "It belongs to the Kansai region, alongside Osaka and Nara, each less than an hour away by train. Mountains enclose it to the north, east and west, and the Kamo River runs through it from north to south."
+      },
+      "resena": {
+        "title": "What Kyoto is like",
+        "body": "A city of nearly one and a half million people, laid out on a grid, with more than 1,600 Buddhist temples and some 400 Shinto shrines. Its historic monuments — seventeen sites across Kyoto, Uji and Ōtsu — have been a World Heritage Site since 1994: here the ancient and the everyday share the same street."
+      }
+    }
   },
   "scaffold": {
     "phase": "Phase 1 — Foundation",

@@ -64,7 +64,7 @@ const JOBS: Job[] = [
     input: 'GazeNozarashi-Demo.ttf',
     output: 'gaze-nozarashi',
     text: LATIN_SET,
-    note: 'Pincelada. Latín — no trae ni un kanji.',
+    note: 'Párrafos y pincelada. Latín — no trae ni un kanji.',
   },
   {
     input: 'ZenOldMincho-Regular.ttf',
@@ -77,18 +77,6 @@ const JOBS: Job[] = [
     output: 'yuji-syuku',
     text: KANJI_SET,
     note: 'Kanji decorativo, trazo de pincel (OFL). Alternativa a comparar.',
-  },
-  {
-    input: 'MPLUSRounded1c-Regular.ttf',
-    output: 'mplus-rounded-400',
-    text: LATIN_SET,
-    note: 'Texto de lectura, regular (OFL).',
-  },
-  {
-    input: 'MPLUSRounded1c-Bold.ttf',
-    output: 'mplus-rounded-700',
-    text: LATIN_SET,
-    note: 'Texto de lectura, negrita (OFL).',
   },
 ];
 

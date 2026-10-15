@@ -3,6 +3,19 @@
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
+import { getLenis } from '@/animation/gsap';
+import { audioReadout } from '@/audio/engine';
+import { getStation } from '@/config/journey';
+import { PARALLAX } from '@/scene/camera/CameraRig';
+import { PATH } from '@/scene/path/journeyPath';
+import {
+  petalBaseFraction,
+  petalCountsAt,
+  petalPeakFraction,
+  PETAL_SURGE,
+} from '@/scene/systems/petals';
+import { FAUNA_STAGE } from '@/scene/systems/fauna/casting';
+import { WIND } from '@/scene/systems/WindField';
 import type { QualitySetting } from '@/scene/quality/tiers';
 import {
   selectAudioAudible,
@@ -22,6 +35,108 @@ import {
 
 const SETTINGS: QualitySetting[] = ['auto', 'high', 'medium', 'low'];
 
+interface MotionReadout {
+  fps: number;
+  sceneClock: number;
+  windAngle: number;
+  windStrength: number;
+  windGust: number;
+  parallaxX: number;
+  parallaxY: number;
+  pointerX: number;
+  pointerY: number;
+  progress: number;
+  depth: number;
+  travelOffset: number;
+  smoothScroll: boolean;
+  surge: number;
+  petalsNow: number;
+  petalsByLayer: string;
+  faunaLive: string;
+  faunaTotal: number;
+  faunaNextIn: number;
+  audioRunning: boolean;
+  audioLayers: string;
+  audioLast: string;
+  audioLastAgo: number;
+}
+
+/**
+ * Lectura en vivo del motor. Se muestrea con `requestAnimationFrame` y sólo se
+ * vuelca a estado cuatro veces por segundo: el viento y el parallax cambian
+ * sesenta veces por segundo, y pintarlos a esa velocidad costaría más que la
+ * escena entera.
+ *
+ * El **reloj de escena** es la lectura importante: sólo avanza cuando el
+ * `<Canvas>` dibuja de verdad. Si se queda clavado mientras los FPS del
+ * navegador siguen en 60, es que el bucle está en `demand` — modo 静 o
+ * `prefers-reduced-motion` —, no que la escena se haya roto.
+ */
+function useMotionReadout(active: boolean): MotionReadout | null {
+  const [readout, setReadout] = useState<MotionReadout | null>(null);
+
+  useEffect(() => {
+    if (!active) return;
+
+    let raf = 0;
+    let frames = 0;
+    let last = performance.now();
+
+    const sample = (now: number) => {
+      frames += 1;
+
+      if (now - last >= 250) {
+        const state = useKyotoStore.getState();
+        const { pointer } = state;
+
+        // La densidad sube y baja con cada ráfaga, así que la cuenta de pétalos
+        // se muestrea aquí y no en el render: es un valor vivo, no un ajuste.
+        // Entre dos estaciones cuenta las dos lluvias, cada una con su peso.
+        const scale = selectParticleScale(state);
+        const surge = PETAL_SURGE.value;
+        const petals = petalCountsAt(PATH.d, scale, surge);
+        const audio = audioReadout();
+
+        setReadout({
+          fps: Math.round((frames * 1000) / (now - last)),
+          sceneClock: WIND.time,
+          windAngle: (((WIND.angle * 180) / Math.PI) % 360 + 360) % 360,
+          windStrength: WIND.strength,
+          windGust: WIND.gust,
+          parallaxX: PARALLAX.x,
+          parallaxY: PARALLAX.y,
+          pointerX: pointer.x,
+          pointerY: pointer.y,
+          progress: PATH.progress,
+          depth: PATH.d,
+          travelOffset: PATH.offset,
+          smoothScroll: getLenis() !== null,
+          surge,
+          petalsNow: petals.total,
+          petalsByLayer: petals.byLayer,
+          faunaLive: FAUNA_STAGE.live.join(' · ') || '—',
+          faunaTotal: FAUNA_STAGE.total,
+          faunaNextIn: FAUNA_STAGE.nextIn,
+          audioRunning: audio.running,
+          audioLayers: audio.layers,
+          audioLast: audio.lastEvent,
+          audioLastAgo: audio.secondsAgo,
+        });
+
+        frames = 0;
+        last = now;
+      }
+
+      raf = window.requestAnimationFrame(sample);
+    };
+
+    raf = window.requestAnimationFrame(sample);
+    return () => window.cancelAnimationFrame(raf);
+  }, [active]);
+
+  return readout;
+}
+
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-6 border-b border-[color:var(--border-hairline)] py-2">
@@ -40,6 +155,8 @@ export function DiagnosticsPanel() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
+  const motion = useMotionReadout(mounted);
+
   const detectedTier = useKyotoStore((s) => s.detectedTier);
   const qualitySetting = useKyotoStore((s) => s.qualitySetting);
   const setQualitySetting = useKyotoStore((s) => s.setQualitySetting);
@@ -55,17 +172,26 @@ export function DiagnosticsPanel() {
   const audible = useKyotoStore(selectAudioAudible);
   const particleScale = useKyotoStore(selectParticleScale);
   const activeStation = useKyotoStore((s) => s.activeStation);
+  const zone = useKyotoStore((s) => s.zone);
 
   if (!mounted) {
     return <p className="paper px-5 py-4 text-sm opacity-70">{t('loading')}</p>;
   }
+
+  // Las mismas funciones que usa el sistema de partículas: el panel no
+  // reimplementa la cuenta, la pregunta. Si dijeran cosas distintas, una de las
+  // dos estaría mintiendo.
+  const station = getStation(zone);
+  const petalBase = petalBaseFraction(station);
+  const petalPeak = petalPeakFraction(station);
 
   return (
     <div className="grid gap-6">
       <section className="paper px-5 py-4">
         <h2 className="mb-2 text-lg">Escena</h2>
         <dl>
-          <Row label="Estación activa" value={activeStation} />
+          <Row label="Estación de la ruta" value={activeStation} />
+          <Row label="Zona de la cámara" value={zone} />
           <Row label="Tier detectado" value={detectedTier ?? '—'} />
           <Row label="Tier efectivo" value={tier} />
           <Row label="DPR" value={`${profile.dpr[0]} – ${profile.dpr[1]}`} />
@@ -75,6 +201,71 @@ export function DiagnosticsPanel() {
           <Row label="Escala de partículas" value={particleScale.toFixed(2)} />
           <Row label="Bucle de render" value={motionAllowed ? 'always' : 'demand'} />
         </dl>
+      </section>
+
+      <section className="paper px-5 py-4">
+        <h2 className="mb-2 text-lg">Movimiento y ambiente</h2>
+        <dl>
+          <Row label="FPS (bucle del navegador)" value={motion ? String(motion.fps) : '—'} />
+          <Row
+            label="Reloj de escena"
+            value={motion ? `${motion.sceneClock.toFixed(1)} s` : '—'}
+          />
+          <Row label="Scroll suave (Lenis)" value={motion?.smoothScroll ? 'activo' : 'apagado'} />
+          <Row
+            label="Avance del camino"
+            value={motion ? `${(motion.progress * 100).toFixed(1)} %` : '—'}
+          />
+          <Row
+            label="Profundidad de la cámara"
+            value={motion ? `${motion.depth.toFixed(1)} u` : '—'}
+          />
+          <Row
+            label="Desfase de viaje"
+            value={motion ? `${motion.travelOffset.toFixed(1)} u` : '—'}
+          />
+          <Row
+            label="Viento · dirección"
+            value={motion ? `${motion.windAngle.toFixed(0)}°` : '—'}
+          />
+          <Row
+            label="Viento · intensidad"
+            value={motion ? motion.windStrength.toFixed(3) : '—'}
+          />
+          <Row label="Viento · ráfaga" value={motion ? motion.windGust.toFixed(3) : '—'} />
+          <Row
+            label="Puntero"
+            value={motion ? `${motion.pointerX.toFixed(2)} · ${motion.pointerY.toFixed(2)}` : '—'}
+          />
+          <Row
+            label="Parallax (unidades)"
+            value={motion ? `${motion.parallaxX.toFixed(3)} · ${motion.parallaxY.toFixed(3)}` : '—'}
+          />
+          <Row label="Hoja que cae" value={station.ambient.petalKind} />
+          <Row
+            label="Densidad de la zona"
+            value={`${Math.round(petalBase * 100)} % en calma → ${Math.round(petalPeak * 100)} % en ráfaga`}
+          />
+          <Row
+            label="Avance de la ráfaga"
+            value={motion ? `${Math.round(motion.surge * 100)} %` : '—'}
+          />
+          <Row
+            label="Pétalos en el aire"
+            value={motion && motion.petalsNow > 0 ? `${motion.petalsNow} · ${motion.petalsByLayer}` : '0'}
+          />
+          <Row label="Fauna en escena" value={motion?.faunaLive ?? '—'} />
+          <Row
+            label="Próximo acto"
+            value={motion ? `en ${Math.round(motion.faunaNextIn)} s · ${motion.faunaTotal} en total` : '—'}
+          />
+        </dl>
+        <p className="mt-3 text-xs opacity-55">
+          El reloj de escena sólo corre cuando el canvas dibuja: si se detiene con los FPS
+          altos, el bucle está en «demand» (modo 静 o reduced-motion), no roto. La ráfaga
+          llega sola cada 8–20 s: mira subir la intensidad del viento y, detrás, la cuenta
+          de pétalos.
+        </p>
       </section>
 
       <section className="paper px-5 py-4">
@@ -106,6 +297,19 @@ export function DiagnosticsPanel() {
           <Row label="prefers-reduced-motion" value={String(systemReducedMotion)} />
           <Row label="Audio desbloqueado (gesto)" value={String(audioUnlocked)} />
           <Row label="Suena ahora mismo" value={String(audible)} />
+        </dl>
+
+        <dl className="mt-3">
+          <Row label="Motor de audio" value={motion?.audioRunning ? 'sonando' : 'en silencio'} />
+          <Row label="Capas de la zona" value={motion?.audioLayers ?? '—'} />
+          <Row
+            label="Último sonido"
+            value={
+              motion && motion.audioLast !== '—'
+                ? `${motion.audioLast} · hace ${Math.round(motion.audioLastAgo)} s`
+                : '—'
+            }
+          />
         </dl>
 
         <div className="mt-4 flex flex-wrap gap-3">

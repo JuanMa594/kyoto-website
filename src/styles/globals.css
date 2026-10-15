@@ -1,6 +1,14 @@
 @import 'tailwindcss';
 @import './tokens.css';
 
+/* `--ink` del cartel de la Home (Fase 4): registrada como número para que la
+   animación CSS de respaldo la interpole en vez de saltar de 0 a 1. */
+@property --ink {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 1;
+}
+
 /* El canvas 3D vive detrás de todo el DOM y nunca se desmonta. El contenido
    real (texto, enlaces, encabezados) existe siempre como DOM de verdad encima:
    es lo que leen Google y los lectores de pantalla. */
@@ -12,10 +20,41 @@
     text-rendering: optimizeLegibility;
   }
 
+  /* Gaze Nozarashi es de pincel y a 16 px se lee pequeña: todo el texto que
+     va en ella parte de 1,2rem. En las páginas no se le fuerzan tamaños
+     menores (`text-sm`, `text-lg`); sólo crece lo que tiene que ser más
+     grande. */
   body {
     font-family: var(--font-body);
+    font-size: 1.2rem;
     min-height: 100dvh;
     overscroll-behavior-y: none;
+  }
+
+  /* Lenis. El scroll suave se aplica sobre el scroll real del documento —no
+     sobre un contenedor traspuesto—, así que basta con desactivar el
+     `scroll-behavior` nativo mientras está vivo para que los dos no peleen. Las
+     clases las pone y las quita el propio Lenis: si el modo 静 apaga el motor,
+     desaparecen solas y vuelve el scroll de siempre. */
+  html.lenis,
+  html.lenis body {
+    height: auto;
+  }
+
+  .lenis.lenis-smooth {
+    scroll-behavior: auto !important;
+  }
+
+  .lenis.lenis-smooth [data-lenis-prevent] {
+    overscroll-behavior: contain;
+  }
+
+  .lenis.lenis-stopped {
+    overflow: hidden;
+  }
+
+  .lenis.lenis-smooth iframe {
+    pointer-events: none;
   }
 
   ::selection {
@@ -27,6 +66,13 @@
     outline: 2px solid var(--color-shu);
     outline-offset: 3px;
     border-radius: 2px;
+  }
+
+  /* El contenido recibe el foco por programa —el «saltar al contenido», el
+     Escape del riel—, pero no es un control: sin anillo alrededor de toda la
+     página. */
+  main[tabindex='-1']:focus {
+    outline: none;
   }
 
   h1,
@@ -48,8 +94,48 @@
     letter-spacing: 0.04em;
   }
 
+  /* Un kanji que se puede dibujar (`InkKanji`): cada carácter es un SVG de
+     1em con el glifo de Zen Old Mincho. Los trazos de la máscara son blancos
+     (lo que dejan ver) y van enteros por defecto. */
+  .ink-kanji {
+    display: inline-flex;
+    gap: 0.04em;
+    font-size: var(--text-kanji);
+    line-height: 1;
+  }
+
+  .ink-kanji__char {
+    width: 1em;
+    height: 1em;
+    overflow: visible;
+  }
+
+  .ink-kanji__glyph {
+    font-family: var(--font-kanji);
+    fill: currentColor;
+  }
+
+  .ink-kanji__stroke {
+    fill: none;
+    stroke: #fff;
+    stroke-width: 16;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 0;
+  }
+
   .brush {
     font-family: var(--font-brush);
+  }
+
+  /* Texto latino corto de la navegación (ES/EN): en la letra de titulares,
+     no en la de pincel, que por debajo de 1,2rem no se lee. */
+  .nav-latin {
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+    line-height: 1;
+    letter-spacing: 0.06em;
   }
 
   /* Superficie de papel washi para tarjetas y paneles de UI. */
@@ -75,6 +161,958 @@
 
   .skip-link:focus-visible {
     translate: 0 0;
+  }
+
+  /* El tramo: la parte de cada página que es camino (`PathTramo`). Su alto lo
+     pone el componente (caminar + una parada por tarjeta). Mientras se
+     recorre, lo que hay dentro queda fijo en pantalla: las tarjetas a los
+     costados, en el tercio medio, con la opacidad `--card` que escribe el
+     scroll; el cartel de la siguiente estación abajo, con `--llegada`. */
+  .path-tramo__stage {
+    position: sticky;
+    top: 0;
+    display: flex;
+    min-height: 100dvh;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0 1.5rem 16vh;
+  }
+
+  .path-tramo__arrival {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .path-tramo__sign {
+    opacity: var(--llegada, 0);
+  }
+
+  .tramo-card {
+    position: absolute;
+    top: 30vh;
+    width: min(26rem, 34vw);
+    padding: 1.25rem 1.5rem 1.4rem;
+    opacity: var(--card, 0);
+    translate: 0 calc((1 - var(--card, 0)) * 0.75rem);
+  }
+
+  /* Se lee caminando: la letra de pincel, un poco más grande que el texto
+     base. */
+  .tramo-card__body {
+    font-size: 1.2rem;
+    line-height: 1.6;
+  }
+
+  /* Las tarjetas de texto dejan ver un poco el paisaje: lo justo para que el
+     texto se lea bien y la tarjeta se mezcle con el ambiente en vez de tapar
+     la escena. Es el estilo de todas las que vengan en las otras páginas. Las
+     de mapa de Ubicación se quedan opacas: en la Fase 5 serán carteles de
+     madera insertados en el camino. */
+  .tramo-card[data-kind='texto'] {
+    background: color-mix(in srgb, var(--surface-paper) 78%, transparent);
+    backdrop-filter: blur(6px);
+  }
+
+  .tramo-card[data-side='izquierda'] {
+    left: 6vw;
+  }
+
+  /* Nunca debajo del riel plegado de la navegación (Fase 3C): 6vw son 61 px a
+     1024 px de ancho. */
+  .tramo-card[data-side='derecha'] {
+    right: max(6vw, 4.5rem);
+  }
+
+  /* El hueco del mapa antiguo desplegable, que llega en la Fase 5. */
+  .tramo-card__map {
+    display: grid;
+    aspect-ratio: 4 / 3;
+    margin-bottom: 1rem;
+    place-items: center;
+    border: 1px dashed var(--color-sumi-faint);
+    border-radius: 0.5rem;
+    background: color-mix(in srgb, var(--color-ishi) 55%, transparent);
+    opacity: 0.75;
+  }
+
+  /* En un móvil no hay costados: la tarjeta va centrada, por encima del
+     camino. */
+  @media (max-width: 767px) {
+    .tramo-card {
+      top: 12vh;
+      right: 1.25rem;
+      left: 1.25rem;
+      width: auto;
+    }
+  }
+
+  /* Sin movimiento no hay recorrido: el tramo se reduce a su contenido, y las
+     tarjetas se leen como una lista. */
+  .path-tramo[data-motion='off'] {
+    padding-block: 12vh;
+  }
+
+  .path-tramo[data-motion='off'] .path-tramo__stage {
+    position: static;
+    min-height: 0;
+    padding-bottom: 0;
+  }
+
+  .path-tramo[data-motion='off'] .tramo-card {
+    position: static;
+    width: min(40rem, 100%);
+    margin-bottom: 1.5rem;
+    opacity: 1;
+    translate: none;
+  }
+
+  .path-tramo[data-motion='off'] .path-tramo__sign {
+    opacity: 1;
+  }
+
+  /* La entrada del contenido de una estación (`ContentArrival`). */
+  .content-arrival {
+    transition:
+      opacity var(--dur-largo) var(--ease-washi),
+      translate var(--dur-largo) var(--ease-washi);
+  }
+
+  .content-arrival[data-arrival='pending'] {
+    opacity: 0;
+    translate: 0 0.75rem;
+  }
+
+  /* ── El cartel de la Home (Fase 4) ─────────────────────────────────────
+     El bloque de texto se centra en el 28 % del ancho y en el tercio medio,
+     como KYOTO / 京都 en 1.png; el torii está a la derecha, en la escena. */
+  .home-cartel {
+    display: grid;
+    min-height: 100dvh;
+    align-items: center;
+  }
+
+  .home-cartel__text {
+    width: min(40vw, 38rem);
+    margin-left: 8vw;
+    text-align: center;
+  }
+
+  .home-cartel__title {
+    margin: 0;
+  }
+
+  /* Bruma de papel alrededor de las letras: la misma idea que la del riel. Un
+     halo washi, no una sombra oscura —sobre el cartel crema, la sombra
+     ensuciaría el shu y se leería como efecto de web—: aclara lo que pasa por
+     detrás (una caña, el terreno) justo donde está el trazo, y sobre el crema
+     no se ve. Dos capas: una ceñida al glifo y otra difusa. En `em`, así que
+     escala con cada texto. Las páginas de las otras fases la usarán en sus
+     títulos. El kanji es SVG: ahí va como `drop-shadow`. */
+  .paper-halo {
+    --paper-halo-near: color-mix(in srgb, var(--color-washi) 85%, transparent);
+    --paper-halo-far: color-mix(in srgb, var(--color-washi) 60%, transparent);
+    text-shadow:
+      0 0 0.08em var(--paper-halo-near),
+      0 0 0.4em var(--paper-halo-far);
+  }
+
+  .paper-halo .ink-kanji__char {
+    filter: drop-shadow(0 0 0.03em var(--paper-halo-near)) drop-shadow(0 0 0.12em var(--paper-halo-far));
+  }
+
+  /* --ink va de 0 a 1 en la entrada: la palabra se empapa de izquierda a
+     derecha y el interletrado se cierra. En reposo vale 1. */
+  .home-cartel__word {
+    --ink: 1;
+    display: block;
+    font-size: var(--text-cartel);
+    line-height: var(--text-cartel--line-height);
+    letter-spacing: calc((1 - var(--ink)) * 0.12em);
+    text-transform: uppercase;
+    color: var(--color-shu);
+    mask-image: linear-gradient(90deg, #000 calc(var(--ink) * 140% - 40%), transparent calc(var(--ink) * 140%));
+  }
+
+  .home-cartel__letter {
+    display: inline-block;
+  }
+
+  .home-cartel__kanji {
+    margin-top: 0.35em;
+    color: var(--color-shu);
+  }
+
+  .home-cartel__tagline {
+    margin-top: 1.5rem;
+    font-size: 1.35rem;
+  }
+
+  /* En vertical el bloque sube a la parte alta del tercio medio y deja libre
+     la derecha, donde está el torii. */
+  @media (orientation: portrait) {
+    .home-cartel {
+      align-items: start;
+      padding-top: 28dvh;
+    }
+
+    .home-cartel__text {
+      width: min(68vw, 30rem);
+      margin-left: 6vw;
+    }
+  }
+
+  /* La invitación a caminar. */
+  .walk-hint {
+    display: inline-flex;
+    margin-top: 2.5rem;
+    align-items: center;
+    gap: 0.9rem;
+    opacity: 0.8;
+    transition: opacity var(--dur-largo) var(--ease-washi);
+  }
+
+  .walk-hint[data-walking] {
+    opacity: 0;
+  }
+
+  .walk-hint__stones {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .walk-hint__stone {
+    width: 0.7rem;
+    height: 0.55rem;
+    fill: var(--color-sumi-faint);
+    animation: walk-step 1.8s var(--ease-washi) infinite both;
+  }
+
+  .walk-hint[data-motion='off'] .walk-hint__stone {
+    animation: none;
+    opacity: 0.7;
+  }
+
+  @keyframes walk-step {
+    0%,
+    100% {
+      opacity: 0.15;
+    }
+    35% {
+      opacity: 0.9;
+    }
+  }
+
+  /* ── El cartel de Ubicación (Fase 5A) ─────────────────────────────────
+     2.png en espejo respecto de la Home: la maqueta a la izquierda, en la
+     escena; Ichi / 位置 y lo que se lee, a la derecha. En vertical el título
+     va arriba y el resto debajo de la maqueta, que cae entre el 35 y el 50 %
+     del alto (check:path, «El cartel de Ubicación»). */
+  /* Anclado arriba, no centrado: al aparecer la ficha el título no se mueve. */
+  .ubicacion-cartel {
+    display: grid;
+    min-height: 100dvh;
+    align-items: start;
+    justify-items: end;
+    padding-top: 20dvh;
+  }
+
+  /* Con el zoom, la ficha ocupa el sitio del resumen: dice lo mismo, en datos. */
+  .ubicacion-cartel__details:has(.kyoto-ficha) .ubicacion-cartel__summary {
+    display: none;
+  }
+
+  /* Y el título se recoge para que la ficha quepa entera: con el navegador al
+     90 % (su zoom de fábrica en muchos equipos) o en un portátil bajo, la
+     ficha se salía por abajo. Se mide en alto de pantalla (dvh), no en ancho. */
+  .ubicacion-cartel {
+    transition: padding-top var(--dur-largo) var(--ease-washi);
+  }
+
+  .ubicacion-cartel .cartel-title__word,
+  .ubicacion-cartel .cartel-title__kanji {
+    transition: font-size var(--dur-largo) var(--ease-washi);
+  }
+
+  @media (orientation: landscape) {
+    .ubicacion-cartel:has(.kyoto-ficha) {
+      padding-top: 9dvh;
+    }
+
+    .ubicacion-cartel:has(.kyoto-ficha) .cartel-title__word {
+      font-size: min(var(--text-cartel), 11dvh);
+    }
+
+    .ubicacion-cartel:has(.kyoto-ficha) .cartel-title__kanji {
+      font-size: min(var(--text-kanji), 8dvh);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ubicacion-cartel,
+    .ubicacion-cartel .cartel-title__word,
+    .ubicacion-cartel .cartel-title__kanji {
+      transition: none;
+    }
+  }
+
+  .ubicacion-cartel__text {
+    width: min(34vw, 32rem);
+    margin-right: 10vw;
+  }
+
+  .ubicacion-cartel__tagline {
+    margin-top: 1.25rem;
+    font-size: 1.35rem;
+  }
+
+  .ubicacion-cartel__summary {
+    margin-top: 1.5rem;
+    max-width: 30rem;
+  }
+
+  /* El título de cartel de una estación (`CartelTitle`): el romaji grande y,
+     debajo, el kanji dibujado. Ambos con el color de la estación. */
+  .cartel-title {
+    margin: 0;
+    color: var(--cartel-accent, var(--color-sumi));
+  }
+
+  .cartel-title__word {
+    display: block;
+    font-size: var(--text-cartel);
+    line-height: var(--text-cartel--line-height);
+  }
+
+  .cartel-title__kanji {
+    margin-top: 0.3em;
+  }
+
+  .cartel-button {
+    display: inline-flex;
+    margin-top: 1.5rem;
+    padding: 0.55rem 1.1rem;
+    border-left: 3px solid var(--color-koke-deep);
+    transition: translate var(--dur-rapido) var(--ease-washi);
+  }
+
+  .cartel-button:hover {
+    translate: 0 -2px;
+  }
+
+  .cartel-button:focus-visible {
+    outline: 2px solid var(--color-koke-deep);
+    outline-offset: 3px;
+  }
+
+  .kyoto-ficha {
+    display: grid;
+    gap: 0.35rem;
+    margin: 1.25rem 0 0;
+    padding: 1rem 1.25rem;
+    animation: ficha-in var(--dur-medio) var(--ease-washi) both;
+  }
+
+  .kyoto-ficha__row {
+    display: grid;
+    grid-template-columns: 7.5rem 1fr;
+    gap: 0.75rem;
+  }
+
+  .kyoto-ficha dt {
+    opacity: 0.65;
+  }
+
+  .kyoto-ficha dd {
+    margin: 0;
+  }
+
+  @keyframes ficha-in {
+    from {
+      opacity: 0;
+      translate: 0 0.5rem;
+    }
+  }
+
+  /* Los nombres sobre la maqueta: papel translúcido, colocados desde la
+     escena (PrefectureLabels). */
+  .pref-labels {
+    position: fixed;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .pref-label {
+    position: absolute;
+    top: 0;
+    left: 0;
+    padding: 0.1rem 0.55rem 0.2rem;
+    font-size: 1.2rem;
+    line-height: 1.15;
+    text-align: center;
+    white-space: nowrap;
+    background: color-mix(in srgb, var(--surface-paper) 82%, transparent);
+    border: 1px solid var(--border-hairline);
+    border-radius: 0.5rem;
+    opacity: 0;
+    transition: opacity var(--dur-rapido) var(--ease-washi);
+  }
+
+  /* La línea de tinta de las etiquetas que quedan lejos de su prefectura. */
+  .pref-labels__leaders {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .pref-labels__leaders line {
+    stroke: var(--color-sumi-soft);
+    stroke-width: 1.2;
+    stroke-linecap: round;
+    opacity: 0.7;
+  }
+
+  /* El punto de la prefectura a la que señala la línea. */
+  .pref-labels__leaders circle {
+    fill: var(--color-sumi-soft);
+    opacity: 0.85;
+  }
+
+  .pref-label__ja {
+    display: block;
+    font-family: var(--font-kanji);
+    font-size: 0.95rem;
+    opacity: 0.8;
+  }
+
+  .pref-label[data-on='true'] {
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .kyoto-ficha {
+      animation: none;
+    }
+  }
+
+  @media (orientation: portrait) {
+    .ubicacion-cartel {
+      justify-items: start;
+      align-items: stretch;
+      padding-top: 0;
+    }
+
+    .ubicacion-cartel__text {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      width: min(86vw, 30rem);
+      margin: 0 0 0 6vw;
+      padding: 9dvh 0 10dvh;
+    }
+
+    .ubicacion-cartel__title .cartel-title__word {
+      display: inline;
+      font-size: clamp(3rem, 14vw, 4.5rem);
+    }
+
+    .ubicacion-cartel__title .cartel-title__kanji {
+      margin: 0 0 0 0.35em;
+      font-size: clamp(2.5rem, 12vw, 3.75rem);
+      vertical-align: -0.1em;
+    }
+
+    .ubicacion-cartel__tagline {
+      margin-top: 0.5rem;
+    }
+
+    .ubicacion-cartel__summary {
+      margin-top: 0;
+    }
+
+    .kyoto-ficha {
+      padding: 0.75rem 1rem;
+    }
+
+    .kyoto-ficha__row {
+      grid-template-columns: 6rem 1fr;
+      gap: 0.5rem;
+    }
+  }
+
+  /* ── La entrada (Fase 4) ──────────────────────────────────────────────
+     Con `data-intro` el cartel empieza escondido; HomeIntro lo compone y
+     quita la marca. `on` es el estado antes de que hidrate el JS: si el JS
+     no llega, el cartel aparece solo a los 4 s. */
+  html[data-intro] [data-cartel-word] {
+    --ink: 0;
+  }
+
+  html[data-intro] .home-cartel .ink-kanji,
+  html[data-intro] [data-cartel-late] {
+    opacity: 0;
+  }
+
+  html[data-intro='on'] [data-cartel-word],
+  html[data-intro='on'] .home-cartel .ink-kanji,
+  html[data-intro='on'] [data-cartel-late] {
+    animation: cartel-fallback 0.6s var(--ease-washi) 4s forwards;
+  }
+
+  @keyframes cartel-fallback {
+    to {
+      --ink: 1;
+      opacity: 1;
+    }
+  }
+
+  /* ── La navegación (Fase 3C) ───────────────────────────────────────────
+     El riel de escritorio: siete paradas sobre un arco pegado al borde
+     derecho. Aquí vive la geometría en reposo —plegado—; el despliegue
+     (`--bulge`, la escala de los círculos) lo anima `RadialSidebar`. Las
+     paradas están en `top: t · 100 %` y se separan del borde `bulge · bend`. */
+  .rail {
+    --bulge: 8px;
+    --circle: clamp(44px, 7vh, 56px);
+    position: fixed;
+    top: 50%;
+    right: 2.25rem;
+    z-index: 40;
+    width: 0;
+    height: min(64vh, 560px);
+    translate: 0 -50%;
+  }
+
+  /* Bruma de papel detrás del riel plegado (Fase 4). Sobre el crema apenas se
+     nota; delante del kasagi y del nuki del torii de la Home, aclara el rojo
+     lo justo para que se lean las piedrecitas y la marca «tú». Desplegado, los
+     círculos tienen su propia cara y la bruma se va. */
+  .rail::before {
+    position: absolute;
+    top: -8%;
+    right: -1.75rem;
+    bottom: -8%;
+    width: 3.5rem;
+    content: '';
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--color-washi) 58%, transparent) 30%,
+      color-mix(in srgb, var(--color-washi) 58%, transparent) 70%,
+      transparent
+    );
+    mask-image: linear-gradient(180deg, transparent, #000 12%, #000 88%, transparent);
+    pointer-events: none;
+    transition: opacity var(--dur-medio) var(--ease-washi);
+  }
+
+  .rail[data-open]::before {
+    opacity: 0;
+  }
+
+  .rail__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .rail__stop {
+    --glow: 0;
+    position: absolute;
+    top: calc(var(--t) * 100%);
+    right: 0;
+    translate: calc(var(--bulge) * var(--bend) * -1) 0;
+  }
+
+  .rail__link {
+    position: absolute;
+    top: calc(var(--circle) / -2);
+    left: calc(var(--circle) / -2);
+    display: grid;
+    width: var(--circle);
+    height: var(--circle);
+    place-items: center;
+    border-radius: 9999px;
+  }
+
+  .rail__link:focus-visible {
+    outline-offset: 3px;
+    border-radius: 9999px;
+  }
+
+  .rail__circle {
+    position: absolute;
+    inset: 0;
+    transform: scale(0.2);
+  }
+
+  .rail__stone {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    filter: drop-shadow(0 0 calc(var(--glow) * 30px) var(--accent));
+  }
+
+  .rail__stone path {
+    fill: transparent;
+    stroke: var(--color-sumi-faint);
+    stroke-width: 0.22;
+  }
+
+  .rail__stop[data-walked] .rail__stone path {
+    fill: var(--accent);
+    stroke: var(--accent);
+  }
+
+  .rail__face {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    border: 1px solid color-mix(in srgb, var(--color-sumi) 22%, transparent);
+    border-radius: 9999px;
+    background: var(--halo);
+    box-shadow: var(--shadow-paper);
+    opacity: 0;
+  }
+
+  .rail__link[aria-current='page'] .rail__face {
+    box-shadow:
+      0 0 0 2px var(--accent),
+      var(--shadow-paper);
+  }
+
+  .rail__icon {
+    width: 76%;
+    height: 76%;
+    overflow: visible;
+  }
+
+  .rail__home {
+    font-family: var(--font-kanji);
+    font-size: 1rem;
+    line-height: 1;
+    letter-spacing: 0.1em;
+    color: var(--color-shu);
+    writing-mode: vertical-rl;
+    filter: drop-shadow(0 0 calc(var(--glow) * 8px) var(--accent));
+  }
+
+  .rail__label {
+    position: absolute;
+    top: 50%;
+    right: calc(100% + 0.75rem);
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.35rem 0.8rem;
+    white-space: nowrap;
+    border: 1px solid var(--border-hairline);
+    border-radius: 0.6rem;
+    background: color-mix(in srgb, var(--surface-paper) 78%, transparent);
+    backdrop-filter: blur(6px);
+    box-shadow: var(--shadow-paper);
+    opacity: 0;
+    pointer-events: none;
+    translate: 0.5rem -50%;
+    transition:
+      opacity var(--dur-rapido) var(--ease-washi),
+      translate var(--dur-rapido) var(--ease-washi);
+  }
+
+  .rail[data-open] .rail__link:hover .rail__label,
+  .rail[data-open] .rail__link:focus-visible .rail__label {
+    opacity: 1;
+    translate: 0 -50%;
+  }
+
+  .rail__label-kanji {
+    font-family: var(--font-kanji);
+    font-size: 1.1rem;
+    color: var(--accent);
+  }
+
+  .rail__label-name {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+  }
+
+  .rail__line {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 0;
+    height: 0;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .rail__line path {
+    fill: none;
+    stroke: var(--color-sumi-faint);
+    stroke-width: 1;
+    stroke-dasharray: 2 5;
+    opacity: 0.7;
+  }
+
+  .rail__marker {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    width: 10px;
+    height: 10px;
+    border: 2px solid var(--color-shu);
+    border-radius: 9999px;
+    background: var(--color-washi);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-shu) 18%, transparent);
+    pointer-events: none;
+    will-change: transform;
+  }
+
+  /* Antes de que el ticker arranque, la marca está en la estación del HTML. */
+  .rail__marker:not([data-live]) {
+    top: calc(var(--s0) / 6 * 100% - 5px);
+  }
+
+  /* La navegación móvil: una píldora flotante con el riel en horizontal y los
+     mandos; al tocarla, el abanico. Fuera del corte de móvil no se ve. */
+  .mnav {
+    display: none;
+  }
+
+  .mnav__bar {
+    position: fixed;
+    right: 0.75rem;
+    bottom: calc(0.75rem + env(safe-area-inset-bottom));
+    left: 0.75rem;
+    z-index: 40;
+    display: flex;
+    height: 52px;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 0.25rem 0 0.75rem;
+    border: 1px solid var(--border-hairline);
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--surface-paper) 78%, transparent);
+    backdrop-filter: blur(6px);
+    box-shadow: var(--shadow-paper);
+  }
+
+  .mnav__toggle {
+    display: flex;
+    height: 44px;
+    min-width: 0;
+    flex: 1;
+    align-items: center;
+    padding: 0 0.6rem;
+    border-radius: 9999px;
+  }
+
+  .mnav__track {
+    position: relative;
+    height: 100%;
+    flex: 1;
+  }
+
+  .mnav__track::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: 0;
+    left: 0;
+    border-top: 1px dashed var(--color-sumi-faint);
+    opacity: 0.7;
+  }
+
+  .mnav__stone {
+    position: absolute;
+    top: 50%;
+    left: calc(var(--t) * 100%);
+    width: 12px;
+    height: 12px;
+    translate: -50% -50%;
+  }
+
+  .mnav__stone svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .mnav__stone path {
+    fill: var(--color-washi);
+    stroke: var(--color-sumi-faint);
+    stroke-width: 0.22;
+  }
+
+  .mnav__stone[data-walked] path {
+    fill: var(--accent);
+    stroke: var(--accent);
+  }
+
+  .mnav__stone--home {
+    width: auto;
+    height: auto;
+    padding: 0 0.15rem;
+    font-family: var(--font-kanji);
+    font-size: 1rem;
+    line-height: 1;
+    color: var(--color-shu);
+    background: color-mix(in srgb, var(--surface-paper) 78%, transparent);
+  }
+
+  .mnav__marker {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 10px;
+    height: 10px;
+    margin: -5px 0 0 -5px;
+    border: 2px solid var(--color-shu);
+    border-radius: 9999px;
+    background: var(--color-washi);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-shu) 18%, transparent);
+    pointer-events: none;
+    will-change: transform;
+  }
+
+  .mnav__marker:not([data-live]) {
+    left: calc(var(--s0) / 6 * 100%);
+  }
+
+  .mnav__fan {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+  }
+
+  .mnav__fan[hidden] {
+    display: none;
+  }
+
+  .mnav__veil {
+    position: absolute;
+    inset: 0;
+    background: color-mix(in srgb, var(--color-washi) 60%, transparent);
+    backdrop-filter: blur(3px);
+  }
+
+  .mnav__arc {
+    position: absolute;
+    bottom: calc(6rem + env(safe-area-inset-bottom));
+    left: 50%;
+    width: 0;
+    height: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .mnav__item {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+
+  .mnav__link {
+    position: absolute;
+    top: -26px;
+    left: -26px;
+    display: flex;
+    width: 52px;
+    flex-direction: column;
+    align-items: center;
+    border-radius: 1rem;
+  }
+
+  .mnav__face,
+  .mnav__hub {
+    position: relative;
+    display: grid;
+    width: 52px;
+    height: 52px;
+    place-items: center;
+    border-radius: 9999px;
+  }
+
+  .mnav__face {
+    border: 1px solid color-mix(in srgb, var(--color-sumi) 22%, transparent);
+    background: var(--halo);
+    box-shadow: var(--shadow-paper);
+  }
+
+  .mnav__hub {
+    font-family: var(--font-kanji);
+    font-size: 1.3rem;
+    color: var(--color-shu);
+  }
+
+  .mnav__link[aria-current='page'] .mnav__face {
+    box-shadow:
+      0 0 0 2px var(--accent),
+      var(--shadow-paper);
+  }
+
+  .mnav__icon {
+    width: 76%;
+    height: 76%;
+    overflow: visible;
+  }
+
+  .mnav__name {
+    max-width: 5.5rem;
+    margin-top: 0.3rem;
+    font-family: var(--font-display);
+    font-size: 0.8rem;
+    line-height: 1.1;
+    text-align: center;
+  }
+
+  .mnav__kanji {
+    position: absolute;
+    bottom: calc(100% + 0.3rem);
+    font-family: var(--font-kanji);
+    font-size: 1.1rem;
+    white-space: nowrap;
+    color: var(--accent);
+    opacity: 0;
+    transition: opacity var(--dur-rapido) var(--ease-washi);
+  }
+
+  .mnav__kanji[data-shown] {
+    opacity: 1;
+  }
+
+  /* Con el abanico abierto la página no se mueve debajo. */
+  .nav-locked {
+    overflow: hidden;
+  }
+}
+
+/* Navegación móvil: pantallas estrechas y táctiles sin hover. El mismo corte
+   vive en `components/nav/navQuery.ts`: si cambia aquí, cambia allí. */
+@media (max-width: 767px), (hover: none) and (pointer: coarse) {
+  .rail,
+  .ambient-corner {
+    display: none;
+  }
+
+  .mnav {
+    display: block;
+  }
+
+  /* Que lo último de la página nunca quede debajo de la barra flotante. */
+  body {
+    padding-bottom: calc(52px + 2.25rem + env(safe-area-inset-bottom));
   }
 }
 

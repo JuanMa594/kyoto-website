@@ -67,10 +67,68 @@
     }
   },
   "home": {
-    "eyebrow": "Una experiencia continua",
     "title": "Kyoto",
-    "subtitle": "Sigue el camino de piedras.",
-    "enter": "Empezar el camino"
+    "tagline": "Caminata por el corazón de Japón.",
+    "walk": "Desliza para caminar"
+  },
+  "ubicacion": {
+    "romaji": "Ichi",
+    "srTitle": "Ubicación — Ichi",
+    "tagline": "Ubicación · dónde queda Kyoto",
+    "summary": "En el corazón de Honshū, al oeste de Japón. Recorre el mapa: cada prefectura dice su nombre. Toca Kyoto para acercarte.",
+    "zoomIn": "Acercarse a Kyoto",
+    "zoomOut": "Ver todo Japón",
+    "fichaLabel": "Kyoto en datos",
+    "ficha": {
+      "prefectura": {
+        "label": "Prefectura",
+        "value": "Kyoto (京都府)"
+      },
+      "region": {
+        "label": "Región",
+        "value": "Kansai (Kinki)"
+      },
+      "coords": {
+        "label": "Coordenadas",
+        "value": "35,0° N · 135,8° E"
+      },
+      "poblacion": {
+        "label": "Población",
+        "value": "~1,46 millones de habitantes"
+      },
+      "distancias": {
+        "label": "Distancias",
+        "value": "Ōsaka ~45 km · Nara ~35 km · Tokio ~370 km (2 h 15 en shinkansen)"
+      }
+    }
+  },
+  "tramo": {
+    "label": "Camino hacia {station}",
+    "continue": "Seguir el camino",
+    "hint": "Sigue bajando: el camino continúa",
+    "mapPlaceholder": "Mapa antiguo · llega en la Fase 5"
+  },
+  "tramos": {
+    "inicio": {
+      "bienvenida": {
+        "title": "Cómo se recorre",
+        "body": "Este sitio es un camino. Al bajar avanzas por él, y cada lugar de Kyoto aparece cuando llegas. Para saltar a otra sección usa el riel de piedras de la derecha (en el móvil, la barra de abajo). 音 enciende el sonido del ambiente y 静 aquieta la escena."
+      }
+    },
+    "ubicacion": {
+      "japon": {
+        "title": "En el corazón de Japón",
+        "body": "Kyoto está en Honshū, la isla principal del archipiélago, a unos 370 km al oeste de Tokio. Fue la capital imperial durante más de mil años, del 794 al 1868."
+      },
+      "kansai": {
+        "title": "Una cuenca entre montañas",
+        "body": "Pertenece a la región de Kansai, junto a Osaka y Nara, a menos de una hora en tren de cada una. Las montañas la rodean por el norte, el este y el oeste, y el río Kamo la cruza de norte a sur."
+      },
+      "resena": {
+        "title": "Cómo es Kyoto",
+        "body": "Una ciudad de casi un millón y medio de habitantes, trazada en cuadrícula, con más de 1.600 templos budistas y unos 400 santuarios sintoístas. Sus monumentos históricos —diecisiete lugares entre Kyoto, Uji y Ōtsu— son Patrimonio de la Humanidad desde 1994: aquí lo milenario y lo cotidiano comparten la misma calle."
+      }
+    }
   },
   "scaffold": {
     "phase": "Fase 1 — Fundación",

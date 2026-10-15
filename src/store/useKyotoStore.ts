@@ -21,11 +21,21 @@ import {
 
 interface KyotoState {
   /* ── Viaje ─────────────────────────────────────────────────────────── */
+  /** La estación de la ruta: adónde va la cámara. La declara cada página. */
   activeStation: StationSlug;
-  /** Avance sobre el spline del camino, 0–1. Lo escribe ScrollTrigger (Fase 3). */
-  pathProgress: number;
+  /**
+   * La estación en cuyo tramo está la cámara: lo que se ve y se oye. Cambia a
+   * ritmo humano, así que sí vive aquí; el avance fino vive en `PATH`
+   * (`scene/path/journeyPath.ts`), que cambia a 60 fps.
+   */
+  zone: StationSlug;
+  /**
+   * Cuántas veces una página ha declarado su estación. La primera es el
+   * aterrizaje —la cámara aparece allí, sin viaje—; las demás son viajes.
+   */
+  arrivals: number;
   setActiveStation: (slug: StationSlug) => void;
-  setPathProgress: (t: number) => void;
+  setZone: (slug: StationSlug) => void;
 
   /* ── Calidad ───────────────────────────────────────────────────────── */
   detectedTier: QualityTier | null;
@@ -59,6 +69,14 @@ interface KyotoState {
   /** Marca de tiempo del último scroll: el director de fauna la usa para el modo inactivo. */
   lastScrollAt: number;
   markScroll: () => void;
+
+  /* ── Ubicación ─────────────────────────────────────────────────────── */
+  /**
+   * El zoom de la maqueta de Japón (Fase 5A): todo Japón o Kinki. La pose
+   * intermedia, que cambia a 60 fps, vive en `MAQUETA.zoomT`.
+   */
+  mapZoom: 'japon' | 'kyoto';
+  setMapZoom: (zoom: 'japon' | 'kyoto') => void;
 }
 
 type PersistedPrefs = Pick<
@@ -70,9 +88,17 @@ export const useKyotoStore = create<KyotoState>()(
   persist(
     (set) => ({
       activeStation: 'inicio',
-      pathProgress: 0,
-      setActiveStation: (slug) => set({ activeStation: slug }),
-      setPathProgress: (t) => set({ pathProgress: Math.min(1, Math.max(0, t)) }),
+      zone: 'inicio',
+      arrivals: 0,
+      // La primera estación de la visita también fija la zona: así el ambiente
+      // es el correcto antes incluso de que el canvas haya cargado.
+      setActiveStation: (slug) =>
+        set((s) => ({
+          activeStation: slug,
+          arrivals: s.arrivals + 1,
+          zone: s.arrivals === 0 ? slug : s.zone,
+        })),
+      setZone: (slug) => set({ zone: slug }),
 
       detectedTier: null,
       qualitySetting: 'auto',
@@ -98,6 +124,9 @@ export const useKyotoStore = create<KyotoState>()(
       setPointer: (x, y) => set({ pointer: { x, y } }),
       lastScrollAt: 0,
       markScroll: () => set({ lastScrollAt: Date.now() }),
+
+      mapZoom: 'japon',
+      setMapZoom: (zoom) => set({ mapZoom: zoom }),
     }),
     {
       name: 'kyoto:prefs',

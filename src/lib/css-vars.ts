@@ -27,6 +27,18 @@ export function readCssNumber(name: string, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+/**
+ * Duraciones en **segundos**, que es la unidad de GSAP y la del bucle de la
+ * escena. El CSS puede escribirlas en `s` o en `ms` sin que nadie tenga que
+ * acordarse de convertirlas a mano.
+ */
+export function readCssSeconds(name: string, fallback: number): number {
+  const raw = readCssVar(name, `${fallback}s`).trim();
+  const parsed = Number.parseFloat(raw);
+  if (!Number.isFinite(parsed)) return fallback;
+  return raw.endsWith('ms') ? parsed / 1000 : parsed;
+}
+
 /** Vacía la caché. Sólo hace falta si algún día la paleta cambia en caliente. */
 export function clearCssVarCache(): void {
   cache.clear();
@@ -39,13 +51,26 @@ export function clearCssVarCache(): void {
 export function scenePalette() {
   return {
     washi: readCssVar('--color-washi', '#fffacd'),
+    kami: readCssVar('--color-kami', '#ffffff'),
+    washiDeep: readCssVar('--color-washi-deep', '#f6efbe'),
+    sakuraBlush: readCssVar('--color-sakura-blush', '#ffccbc'),
+    matchaSoft: readCssVar('--color-matcha-soft', '#b4ccad'),
+    ai: readCssVar('--color-ai', '#165e83'),
     washiFog: readCssVar('--color-washi-fog', '#fdf7d4'),
     shu: readCssVar('--color-shu', '#d82609'),
     sumi: readCssVar('--color-sumi', '#300500'),
+    sumiSoft: readCssVar('--color-sumi-soft', '#6f3300'),
+    sumiFaint: readCssVar('--color-sumi-faint', '#96725a'),
     ishi: readCssVar('--color-ishi', '#ede6dd'),
     ishiDeep: readCssVar('--color-ishi-deep', '#c8bfaf'),
     bambu: readCssVar('--color-bambu', '#a3b58e'),
+    bambuPale: readCssVar('--color-bambu-pale', '#b9d0a3'),
+    koke: readCssVar('--color-koke', '#78b848'),
+    kokeMid: readCssVar('--color-koke-mid', '#509030'),
+    kokeDeep: readCssVar('--color-koke-deep', '#306828'),
     sakura: readCssVar('--color-sakura', '#eb81a5'),
+    sakuraPale: readCssVar('--color-sakura-pale', '#ffdde8'),
+    kohaku: readCssVar('--color-kohaku', '#ffd699'),
   };
 }
 
