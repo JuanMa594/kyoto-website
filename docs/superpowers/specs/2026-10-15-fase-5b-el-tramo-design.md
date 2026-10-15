@@ -472,3 +472,29 @@ Para el plan; cada bloque se puede revisar por separado:
 | Tamaño de la roca | Con 3,8 u de ancho es un hito: que en la vista inicial siga siendo fondo |
 | Coste del cerezo | Miles de flores instanciadas: medir en tier alto y bajo; la Fase 7 multiplicará los árboles |
 | Susuki y fauna | Que las manchas no le cierren el paso a la garza (es blanda, pero el reparto debe seguir encontrando líneas) |
+
+## 15. Correcciones al planificar
+
+Al leer el código para el plan salieron dos errores de cálculo del diseño; la
+intención no cambia, cambian los números.
+
+- **La cámara va 22 u por detrás de su punto de interés** (`CAMERA_BACK`), no
+  13. Las paradas (puntos de interés) caen a **d ≈ 35, 66 y 97** de Ubicación,
+  y la cámara de cada una, 22 u antes. Con eso:
+  - Los kōsatsu se plantan a **~20 u por delante de la cámara de su parada**
+    (d ≈ 33, 64 y 95), con su canto interior a |u| ≈ 2: para que el texto se
+    lea a buen tamaño, la tabla tiene que ocupar en pantalla lo que ocupaba la
+    tarjeta, y a esa distancia mide **~8 × 4 u** (con el tejadillo, ~5,3 u de
+    alto). Es un tablón grande, del tamaño del torii de la Home.
+  - **La roca**, a ~50 u de la cámara inicial, cae a **d ≈ 28–34**: a la
+    altura del primer kōsatsu, del otro lado del camino, y no después. En la
+    primera parada enmarcan el cuadro juntos, tabla a un lado y roca al otro.
+- **La legibilidad no se mide en escala, sino en el cuerpo de letra que
+  resulta.** En la escena el campo de visión vertical es fijo, así que lo que
+  mide la tabla en px crece y decrece con el alto de la ventana: un umbral de
+  escala fijo en 1366×657 era imposible sin una tabla enorme. La regla queda:
+  el bloque DOM mide 22 rem con el cuerpo a 1,1 rem; **a 1600×900 el cuerpo
+  resultante es ≥ 16 px y la tabla cabe entera en su mitad de la pantalla
+  (también a 1440×900)**; y en cualquier pantalla donde el cuerpo bajaría de
+  **14 px**, o la tabla no cabe, o la pantalla es vertical o táctil, el texto
+  vuelve a la tarjeta de papel. Se decide cada frame.
