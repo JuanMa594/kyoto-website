@@ -592,6 +592,13 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   con la ventana, y la proyección de cada frame sólo coloca el bloque. El alto
   del bloque se mide antes de ponerlo, en una copia invisible: medirlo en el
   primer frame sobre la tabla también lo hacía saltar.
+- **`gsap.ticker` corre antes que el frame de la escena.** Los dos son
+  `requestAnimationFrame`, y el de GSAP se pidió antes: lo que el ticker lee de
+  la escena (una proyección, `PATH`) es del frame anterior. Para la marca del
+  riel da igual; para el texto encajado sobre una tabla en movimiento no: iba
+  un frame por detrás y con la cámara en marcha se le veía llegar a la madera.
+  Lo que tiene que moverse pegado a algo 3D se coloca desde el `useFrame` que
+  lo proyecta (`KOSATSU.place`), después de `CameraRig` (prioridad −1).
 - **El reset de Tailwind descentra los `<dialog>`.** Un dialog modal se centra
   con el `margin: auto` de la hoja del navegador, y el preflight lo pone a 0:
   la tarjeta de lectura salía pegada arriba a la izquierda. Todo `<dialog>`

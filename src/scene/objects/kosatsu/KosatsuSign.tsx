@@ -71,6 +71,7 @@ export default function Kosatsu({ placed, palette, profile }: KosatsuProps) {
     return () => {
       KOSATSU.rects[card]!.on = false;
       KOSATSU.rects[card]!.stop.on = false;
+      KOSATSU.place?.(card);
       KOSATSU.wake = () => {};
     };
   }, [card, invalidate]);
@@ -149,6 +150,7 @@ export default function Kosatsu({ placed, palette, profile }: KosatsuProps) {
     }
     out.boardY = boardTop;
     out.boardH = boardBottom - boardTop;
+    out.distance = camera.position.distanceTo(corner.set(cx, cy, cz));
     out.on = !behind;
   };
 
@@ -165,6 +167,8 @@ export default function Kosatsu({ placed, palette, profile }: KosatsuProps) {
       stopCamera.updateProjectionMatrix();
     }
     project(stopCamera, size.width, size.height, rect.stop);
+    // El texto DOM, en este mismo frame (ver KOSATSU.place).
+    KOSATSU.place?.(card);
   });
 
   return (

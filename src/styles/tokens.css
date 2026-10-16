@@ -124,6 +124,12 @@
 
   /* ── Superficies de UI ───────────────────────────────────────────────  */
   --surface-paper: color-mix(in srgb, var(--color-kami) 78%, var(--color-washi));
+  /* Los botones (5B): blanco gofun —el blanco de concha de la pintura japonesa—,
+     el papel con un poco del gris de la piedra. No es el blanco puro de kami ni
+     el crema del washi del fondo, con el que se confundiría. */
+  --surface-boton: color-mix(in srgb, var(--color-kami) 50%, var(--color-ishi));
+  /* La tinta diluida (usuzumi) que empapa un botón al pasar por encima. */
+  --ink-boton: color-mix(in srgb, var(--color-sumi) 16%, var(--surface-boton));
   --surface-veil: color-mix(in srgb, var(--color-washi) 88%, transparent);
   --border-hairline: color-mix(in srgb, var(--color-sumi) 14%, transparent);
   --shadow-paper: 0 1px 2px color-mix(in srgb, var(--color-sumi) 10%, transparent),

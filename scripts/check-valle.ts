@@ -17,7 +17,7 @@ import { getStation, JOURNEY } from '../src/config/journey';
 import { createRig, snapRig } from '../src/scene/camera/pathRig';
 import { decorFootprints, insideFootprint, objectBases } from '../src/scene/decor/footprints';
 import { objectToWorld, stationDecorLayout, type PlacedObject } from '../src/scene/decor/placement';
-import { BLOCK_PX, BODY_PX, boardFit, boardVisible } from '../src/components/sections/kosatsuFit';
+import { BLOCK_PX, BODY_PX, boardFit, boardInk, boardVisible } from '../src/components/sections/kosatsuFit';
 import { boardWidth, KOSATSU, KOSATSU_BOARD_TOP, KOSATSU_HEIGHT, KOSATSU_SIZE, kosatsuWriting, MAP_SIZE, unrollOf } from '../src/scene/objects/kosatsu/kosatsu';
 import { kosatsuGeometry } from '../src/scene/objects/kosatsu/kosatsuGeometry';
 import { blossomCount, CEREZO_SIZE, growCerezo } from '../src/scene/objects/cerezo/cerezo';
@@ -259,6 +259,26 @@ for (const [width, height, strict] of [
     leaving !== null && Math.abs(leaving.scale - 0.6) < 1e-9,
   );
   check('sin la tabla delante de la cámara, al papel', boardFit({ ...base, stop: board(1), rect: { ...board(1), on: false } }) === null);
+}
+
+{
+  // La letra de una tabla se ve según lo cerca que esté, no según el scroll:
+  // entera en su parada, nada la de la tabla siguiente vista desde ella.
+  const kosatsu = signs.filter((o) => o.item.kind === 'kosatsu');
+  kosatsu.forEach((o, k) => {
+    const camera = cameraAt(cardStopD(UBI_SLUG, k), 16 / 9);
+    const center = new Vector3(...kosatsuWriting(o).center);
+    const here = camera.position.distanceTo(center);
+    check(`«${cards[k]!.id}»: en su parada, la letra entera`, boardInk(here) === 1, `${here.toFixed(1)} u`);
+    const next = kosatsu[k + 1];
+    if (next) {
+      const ahead = camera.position.distanceTo(new Vector3(...kosatsuWriting(next).center));
+      check(`«${cards[k]!.id}»: desde su parada, la letra de la tabla siguiente no se ve`, boardInk(ahead) === 0, `${ahead.toFixed(1)} u`);
+    }
+  });
+  let falling = true;
+  for (let d = 10; d < 60; d += 0.5) if (boardInk(d + 0.5) > boardInk(d)) falling = false;
+  check('cuanto más lejos, menos se lee', falling);
 }
 
 /* ── 3. Los mapas antiguos ─────────────────────────────────────────────── */

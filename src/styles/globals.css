@@ -9,6 +9,14 @@
   initial-value: 1;
 }
 
+/* `--soak` de los botones del camino (5B): cuánto los ha empapado la tinta.
+   Registrada como número para que la transición la interpole. */
+@property --soak {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 0;
+}
+
 /* El canvas 3D vive detrás de todo el DOM y nunca se desmonta. El contenido
    real (texto, enlaces, encabezados) existe siempre como DOM de verdad encima:
    es lo que leen Google y los lectores de pantalla. */
@@ -171,6 +179,9 @@
   .path-tramo__stage {
     position: sticky;
     top: 0;
+    /* El texto sigue a su tabla también cuando ésta sale por un lado al pasar
+       junto a ella: se recorta en el borde, la página no se ensancha. */
+    overflow: clip;
     display: flex;
     min-height: 100dvh;
     flex-direction: column;
@@ -266,6 +277,10 @@
     transform-origin: 0 0;
     translate: none;
     backdrop-filter: none;
+    /* Se ve según lo cerca que esté la tabla (useKosatsuFit): de lejos, entre
+       la niebla, la letra se pierde y se desdibuja; al acercarse, aparece. */
+    opacity: var(--legible, 0);
+    filter: blur(calc((1 - var(--legible, 0)) * 1.6px));
   }
 
   .tramo-card[data-board='on'] h2 {
@@ -323,14 +338,14 @@
     font-family: var(--font-brush);
     font-size: 0.95rem;
     white-space: nowrap;
-    opacity: calc(var(--card, 0) * 0.8);
+    opacity: calc(var(--legible, 0) * 0.8);
     translate: -50% 0.6rem;
     transition: translate var(--dur-rapido) var(--ease-washi);
   }
 
   .kosatsu-hit:hover .kosatsu-hit__hint,
   .kosatsu-hit:focus-visible .kosatsu-hit__hint {
-    opacity: var(--card, 0);
+    opacity: var(--legible, 0);
     translate: -50% 0.35rem;
   }
 
@@ -405,6 +420,7 @@
     padding: 0.25rem 0.8rem;
     border-radius: 999px;
     font-family: var(--font-brush);
+    cursor: pointer;
     transition: background-color var(--dur-rapido) var(--ease-washi);
   }
 
@@ -699,19 +715,39 @@
 
   /* Los botones del camino (`CaminoButton`, 5B): el ícono de la estación a la
      izquierda; al pasar por encima se desliza al centro, crece y hace su
-     microanimación mientras el texto se desvanece, y al pulsar el botón se
-     hunde. El ícono va en absoluto para poder llevarlo al 50 % del botón sin
-     medirlo. Sin movimiento, se queda donde está. */
+     microanimación mientras el texto se desvanece, una tinta diluida empapa el
+     botón de izquierda a derecha con el borde difuminado (como la palabra del
+     cartel de la Home) y al pulsar el botón se hunde. El ícono va en absoluto
+     para poder llevarlo al 50 % del botón sin medirlo. Sin movimiento, el
+     ícono se queda donde está y la tinta llega sin recorrido. */
   .camino-button {
+    --soak: 0;
     position: relative;
     display: inline-flex;
     align-items: center;
     padding: 0.6rem 1.15rem 0.6rem 2.9rem;
     overflow: hidden;
     color: var(--color-sumi);
+    cursor: pointer;
+    background:
+      linear-gradient(
+        90deg,
+        var(--ink-boton) calc(var(--soak) * 160% - 60%),
+        transparent calc(var(--soak) * 160%)
+      ),
+      var(--surface-boton);
     transition:
-      scale 0.15s var(--ease-washi),
-      background-color var(--dur-rapido) var(--ease-washi);
+      --soak 0.7s var(--ease-washi),
+      scale 0.15s var(--ease-washi);
+  }
+
+  .camino-button:hover,
+  .camino-button:focus-visible {
+    --soak: 1;
+  }
+
+  .camino-button[data-motion='off'] {
+    transition: none;
   }
 
   .camino-button__icon {
@@ -746,10 +782,6 @@
   .camino-button[data-motion='on']:hover .camino-button__label,
   .camino-button[data-motion='on']:focus-visible .camino-button__label {
     opacity: 0;
-  }
-
-  .camino-button:hover {
-    background-color: color-mix(in srgb, var(--surface-paper) 88%, var(--color-washi-deep));
   }
 
   .camino-button[data-motion='on']:active {

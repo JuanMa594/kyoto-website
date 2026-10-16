@@ -11,7 +11,13 @@
  * texto va sobre la tabla siempre que en la parada se vea entera. Si no —la
  * tabla cortada por un borde o bajo el riel, la pantalla vertical, sin
  * escena—, no hay tabla que tocar y vuelve a la tarjeta de papel.
+ *
+ * Sobre la tabla, el texto no entra ni sale con el scroll: **se ve según lo
+ * cerca que esté la tabla** (`boardInk`), como si estuviera pintado en ella.
+ * De lejos, entre la niebla, la letra no se distingue; al acercarse aparece.
  */
+
+import { smoothstep } from '@/lib/procedural';
 
 /** Ancho del bloque de texto sobre la tabla, en rem y en px (a 16 px/rem). */
 export const BLOCK_REM = 19;
@@ -20,6 +26,13 @@ export const BLOCK_PX = BLOCK_REM * 16;
 export const BODY_PX = 17.6;
 /** Lo que ocupa a la derecha el riel de la navegación (4,5 rem): la tabla no se mete debajo. */
 export const RAIL_PX = 72;
+/**
+ * Entre qué distancias de la cámara se aclara la letra de una tabla, en
+ * unidades: entera a 28 u o menos (en la parada está a ~21) y nada a 44 o más
+ * (la tabla siguiente, vista desde una parada, está a ~51).
+ */
+export const INK_NEAR = 28;
+export const INK_FAR = 44;
 
 /** Una tabla proyectada en la ventana, en px (`KosatsuProjection`). */
 export interface BoardRect {
@@ -70,6 +83,11 @@ function blockScale(rect: BoardRect, blockHeight: number): number {
 export function boardVisible({ stop, viewportWidth, live, portrait }: BoardFitInput): boolean {
   if (!live || portrait || !stop.on || stop.w <= 0 || stop.h <= 0) return false;
   return stop.boardX >= 0 && stop.boardX + stop.boardW <= viewportWidth - RAIL_PX;
+}
+
+/** Lo legible que está la letra de una tabla a `distance` u de la cámara (0–1). */
+export function boardInk(distance: number): number {
+  return Number.isFinite(distance) ? 1 - smoothstep(INK_NEAR, INK_FAR, distance) : 0;
 }
 
 /** El cuerpo de letra que tendría el texto sobre la tabla en la parada, en px: para las comprobaciones. */

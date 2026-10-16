@@ -173,6 +173,8 @@ export interface KosatsuProjection {
   /** Y de arriba abajo, con el marco: el botón que abre la lectura la cubre entera. */
   boardY: number;
   boardH: number;
+  /** De la cámara al centro de lo escrito, en unidades: de ella sale lo legible que está. */
+  distance: number;
   /** Si la escena la está proyectando (el kōsatsu montado y delante de la cámara). */
   on: boolean;
 }
@@ -187,7 +189,18 @@ export interface KosatsuRect extends KosatsuProjection {
   stop: KosatsuProjection;
 }
 
-const emptyProjection = (): KosatsuProjection => ({ x: 0, y: 0, w: 0, h: 0, boardX: 0, boardW: 0, boardY: 0, boardH: 0, on: false });
+const emptyProjection = (): KosatsuProjection => ({
+  x: 0,
+  y: 0,
+  w: 0,
+  h: 0,
+  boardX: 0,
+  boardW: 0,
+  boardY: 0,
+  boardH: 0,
+  distance: Number.POSITIVE_INFINITY,
+  on: false,
+});
 
 /**
  * El puente entre el tramo (DOM) y los kōsatsu (escena). Cambia a 60 fps: por
@@ -209,4 +222,12 @@ export const KOSATSU = {
   unrollFor: null as StationSlug | 'todas' | null,
   /** Pide un frame (con movimiento reducido el canvas pinta a demanda). */
   wake: () => {},
+  /**
+   * Coloca el texto de la tarjeta `card` sobre su tabla. Lo pone
+   * `useKosatsuFit` y lo llama cada kōsatsu justo después de proyectarse, en
+   * el mismo frame: desde `gsap.ticker`, que corre antes que la escena, el
+   * texto iba un frame por detrás de la tabla y con la cámara en marcha se le
+   * veía llegar a la madera.
+   */
+  place: null as ((card: number) => void) | null,
 };

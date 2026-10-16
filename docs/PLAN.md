@@ -334,7 +334,9 @@ geografía ya la dice la ficha de 5A): la capital de mil años, Heian-kyō y el 
   uno se planta a 20 u por delante de la cámara de su parada (`cardStopD`), en su lado,
   **paralelo al plano de la imagen**. El **texto es DOM** encajado cada frame sobre la zona
   de escritura proyectada (`KOSATSU.rects` → `useKosatsuFit`, translate + scale), a
-  17–18 px a 1600×900 (más pequeño en pantallas bajas). **Tocando la tabla** se abre la
+  17–18 px a 1600×900 (más pequeño en pantallas bajas). La letra no entra con el scroll:
+  **se ve según lo cerca que esté la tabla** (`boardInk`: entera a ≤ 28 u, nada a ≥ 44 u, con
+  un poco de desenfoque entre medias), como si de lejos la niebla no dejara leerla. **Tocando la tabla** se abre la
   **tarjeta de lectura** (`KosatsuReader`, un `<dialog>`), con el texto y el mapa en grande:
   la persona decide si la abre. Sólo si **en la parada** la tabla no se ve entera, la pantalla
   es vertical o no hay escena, el texto vuelve a la **tarjeta de papel** (`boardFit`). Se
@@ -365,7 +367,10 @@ geografía ya la dice la ficha de 5A): la capital de mil años, Heian-kyō y el 
   iluminar, el pétalo conserva el brillo y recupera su tono.
 - **Los botones del camino** («Seguir el camino», el zoom de la maqueta) ya no llevan el filo
   de color: llevan el ícono de su estación, que al pasar por encima se desliza al centro, crece
-  y hace su microanimación mientras el texto se desvanece (`CaminoButton`).
+  y hace su microanimación mientras el texto se desvanece (`CaminoButton`). Fondo **gofun**
+  (`--surface-boton`, ni blanco puro ni el washi del fondo), la mano al pasar y una **tinta
+  diluida que empapa** el botón de izquierda a derecha (`--soak`). Los demás botones del sitio
+  pasarán a este patrón más adelante, en otra tanda.
 
 Medido por CDP (tier alto): de 41 a 59–81 draw calls en las paradas y de 62 a 94 en el
 cartel (por encima del presupuesto de +10 del spec: cada kōsatsu son seis mallas más su
