@@ -334,9 +334,10 @@ geografía ya la dice la ficha de 5A): la capital de mil años, Heian-kyō y el 
   uno se planta a 20 u por delante de la cámara de su parada (`cardStopD`), en su lado,
   **paralelo al plano de la imagen**. El **texto es DOM** encajado cada frame sobre la zona
   de escritura proyectada (`KOSATSU.rects` → `useKosatsuFit`, translate + scale), a
-  17–18 px a 1600×900. Si la tabla no se ve entera, la letra bajaría de 14 px, la
-  pantalla es vertical o táctil, o no hay escena, el texto vuelve a la **tarjeta de papel**
-  (`boardFit`). Los postes van detrás de la tabla y metidos 1 u: la tabla vuela hacia el
+  17–18 px a 1600×900. Si **en la parada** la tabla no se ve entera, la letra bajaría de
+  14 px, la pantalla es vertical o táctil, o no hay escena, el texto vuelve a la **tarjeta de
+  papel** (`boardFit`). Se decide con la cámara de la parada, no con la de cada frame: así
+  una tarjeta se lee entera en un solo sitio, sin saltar entre la tabla y el papel. Los postes van detrás de la tabla y metidos 1 u: la tabla vuela hacia el
   camino sin que los postes pisen las piedras.
 - **Dos mapas antiguos** (`bun run maps`): Japón a la manera de Edo (Natural Earth, los
   tonos de región de la maqueta, olas, el sello de Kyoto) y el plano de Heian-kyō en 794
@@ -353,6 +354,12 @@ geografía ya la dice la ficha de 5A): la capital de mil años, Heian-kyō y el 
   arbusto y un yukimi suelto, y **tres cerezos** en los últimos 25 u (`scene/objects/cerezo/`,
   el árbol base de la Fase 7: crecimiento por semilla, copa de flores instanciadas, se mece
   entero con un muelle lento).
+- **Los pétalos caídos**: el suelo se va cubriendo de rosa al acercarse a Eventos
+  (`environment.petalCarpet` en Eventos). Empiezan sueltos hacia el segundo kōsatsu, son
+  la mitad del suelo en el tercero y bajo los cerezos, en Eventos y su llano casi todo, y se
+  acaban en la subida a Fushimi. Sin geometría ni draw calls: los pinta el shader del
+  terreno y de lo alto de las piedras (`scene/shaders/petalCarpet.ts`), pétalo a pétalo de
+  cerca y fundidos en su color a lo lejos.
 
 Medido por CDP (tier alto): de 41 a 59–81 draw calls en las paradas y de 62 a 94 en el
 cartel (por encima del presupuesto de +10 del spec: cada kōsatsu son seis mallas más su

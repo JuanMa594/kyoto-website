@@ -12,8 +12,8 @@ import { boardFit } from './kosatsuFit';
 /**
  * El texto de cada tarjeta con cartel, encajado sobre la tabla de su kōsatsu
  * (Fase 5B). Un callback de `gsap.ticker` (fuera de React) lee lo que la escena
- * proyecta en `KOSATSU.rects` y, si la tabla se ve entera y la letra sale a un
- * tamaño legible (`boardFit`), lleva el bloque encima con `translate` + `scale`
+ * proyecta en `KOSATSU.rects` y, si con la cámara de su parada la tabla se ve
+ * entera y la letra sale a un tamaño legible (`boardFit`), lleva el bloque encima con `translate` + `scale`
  * y lo marca `data-board="on"`; si no, `off`, y el CSS lo deja como la tarjeta
  * de papel de siempre. La opacidad la sigue llevando el tramo (`--card`).
  *
@@ -39,22 +39,41 @@ export function useKosatsuFit(section: RefObject<HTMLElement | null>, enabled: b
 
     const compactQuery = window.matchMedia(NAV_MOBILE_QUERY);
     const last = nodes.map(() => '');
+    // El alto de cada bloque tal como va sobre la tabla, medido antes de
+    // ponerlo: con el alto sin medir, el primer frame se escalaba sólo por el
+    // ancho, el siguiente lo medía, la letra bajaba del mínimo y el texto
+    // saltaba de la tabla al papel y vuelta. Se mide en una copia invisible,
+    // con los estilos de la tabla (el ancho fijo de BLOCK_REM).
     const heights = nodes.map(() => 0);
-    // Al cambiar el tamaño de la ventana (o las fuentes), se vuelve a medir.
-    const remeasure = () => heights.fill(0);
-    window.addEventListener('resize', remeasure);
-    void document.fonts?.ready.then(remeasure);
+    const measure = () => {
+      nodes.forEach((node, k) => {
+        const probe = node.cloneNode(true) as HTMLElement;
+        probe.dataset.board = 'on';
+        probe.removeAttribute('data-tramo-card');
+        probe.removeAttribute('data-sign');
+        probe.setAttribute('aria-hidden', 'true');
+        probe.style.cssText = 'visibility: hidden; transform: none;';
+        node.parentElement?.appendChild(probe);
+        heights[k] = probe.offsetHeight;
+        probe.remove();
+      });
+      last.fill('');
+    };
+    measure();
+    // Al cambiar el tamaño de la ventana (o al llegar las fuentes), se vuelve a medir.
+    window.addEventListener('resize', measure);
+    void document.fonts?.ready.then(measure);
 
     const tick = () => {
       const compact = compactQuery.matches || window.innerHeight >= window.innerWidth;
       nodes.forEach((node, k) => {
         const index = Number(node.dataset.sign);
         const rect = KOSATSU.rects[index];
-        // El alto del bloque sin escalar: sólo se mide sobre la tabla (en la
-        // tarjeta de papel tiene otro ancho), y una vez.
-        if (node.dataset.board === 'on' && heights[k] === 0) heights[k] = node.offsetHeight;
-        const place = rect
-          ? boardFit({ rect, viewportWidth: window.innerWidth, blockHeight: heights[k]!, live: PATH.live, compact })
+        // Mientras no se ve, en su sitio de papel: si siguiera a una tabla que
+        // queda fuera de la ventana, la página podría desbordar de lado.
+        const shown = Number.parseFloat(node.style.getPropertyValue('--card')) > 0.001;
+        const place = rect && shown
+          ? boardFit({ rect, stop: rect.stop, viewportWidth: window.innerWidth, blockHeight: heights[k]!, live: PATH.live, compact })
           : null;
         const next = place ? `${place.x.toFixed(1)},${place.y.toFixed(1)},${place.scale.toFixed(4)}` : 'off';
         if (next === last[k]) return;
@@ -72,7 +91,7 @@ export function useKosatsuFit(section: RefObject<HTMLElement | null>, enabled: b
     gsap.ticker.add(tick);
     return () => {
       gsap.ticker.remove(tick);
-      window.removeEventListener('resize', remeasure);
+      window.removeEventListener('resize', measure);
       clear();
     };
   }, [section, enabled]);

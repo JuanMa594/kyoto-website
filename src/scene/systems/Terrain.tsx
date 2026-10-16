@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useMemo } from 'react';
-import { Color, Float32BufferAttribute, PlaneGeometry, type BufferAttribute } from 'three';
+import { Color, Float32BufferAttribute, MeshStandardMaterial, PlaneGeometry, type BufferAttribute } from 'three';
 
 import { JOURNEY, PATH_LENGTH } from '@/config/journey';
 import type { ScenePalette } from '@/lib/css-vars';
 import type { QualityProfile } from '@/scene/quality/tiers';
 import { zoneBlend } from '@/scene/path/journeyPath';
+import { CARPET_LAYERS, withPetalCarpet } from '@/scene/shaders/petalCarpet';
 
 import { GROUND_Y, terrainHeight } from './elevation';
 
@@ -83,14 +84,23 @@ export function Terrain({ palette, profile }: TerrainProps) {
 
   useEffect(() => () => geometry.dispose(), [geometry]);
 
+  // Con los pétalos caídos de la estación que los declare (cerca de Eventos).
+  const material = useMemo(
+    () =>
+      withPetalCarpet(new MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 }), palette, {
+        layers: CARPET_LAYERS[profile.tier],
+      }),
+    [palette, profile.tier],
+  );
+  useEffect(() => () => material.dispose(), [material]);
+
   return (
     <mesh
       geometry={geometry}
+      material={material}
       rotation={[-Math.PI / 2, 0, 0]}
       position={[0, GROUND_Y, CENTER_Z]}
       receiveShadow
-    >
-      <meshStandardMaterial vertexColors roughness={1} metalness={0} />
-    </mesh>
+    />
   );
 }

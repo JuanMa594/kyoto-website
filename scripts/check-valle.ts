@@ -1,7 +1,7 @@
 /**
  * Comprobaciones puras del tramo de Ubicación (Fase 5B): los kōsatsu y el
  * texto sobre su tabla, la roca pintada, la susuki, los cerezos y el reparto
- * del valle. Las de la decoración en general (piedras, cámara, fauna) siguen en
+ * del valle, y la alfombra de pétalos que lleva a Eventos. Las de la decoración en general (piedras, cámara, fauna) siguen en
  * check-decor.ts y cubren también lo de aquí.
  *
  * Uso: bun run check:path (corre después de check-decor.ts)
@@ -13,11 +13,11 @@ import sharp from 'sharp';
 import { PerspectiveCamera, Vector3, type BufferGeometry } from 'three';
 
 import { cardStopD } from '../src/animation/journeyScroll';
-import { getStation } from '../src/config/journey';
+import { getStation, JOURNEY } from '../src/config/journey';
 import { createRig, snapRig } from '../src/scene/camera/pathRig';
 import { decorFootprints, insideFootprint, objectBases } from '../src/scene/decor/footprints';
 import { objectToWorld, stationDecorLayout, type PlacedObject } from '../src/scene/decor/placement';
-import { BLOCK_PX, BODY_PX, boardFit } from '../src/components/sections/kosatsuFit';
+import { BLOCK_PX, BODY_PX, boardFit, boardReadable } from '../src/components/sections/kosatsuFit';
 import { boardWidth, KOSATSU, KOSATSU_BOARD_TOP, KOSATSU_HEIGHT, KOSATSU_SIZE, kosatsuWriting, MAP_SIZE, unrollOf } from '../src/scene/objects/kosatsu/kosatsu';
 import { kosatsuGeometry } from '../src/scene/objects/kosatsu/kosatsuGeometry';
 import { blossomCount, CEREZO_SIZE, growCerezo } from '../src/scene/objects/cerezo/cerezo';
@@ -28,6 +28,7 @@ import { stoneLayout } from '../src/scene/path/stones';
 import { rocaGeometry } from '../src/scene/objects/roca/rocaGeometry';
 import { pathX, STATION_DEPTHS, stationIndex } from '../src/scene/path/journeyPath';
 import { mulberry32 } from '../src/lib/procedural';
+import { PETAL_CARPET, petalCarpetAt } from '../src/scene/systems/petalCarpet';
 import { speciesSpec } from '../src/scene/systems/fauna/bestiary';
 import { clearOfDecor, createAct, DECOR_RETRIES, type CameraState } from '../src/scene/systems/fauna/casting';
 import { check, finish, section } from './check-kit';
@@ -190,6 +191,7 @@ function writingCorners(o: PlacedObject): [number, number, number][] {
 for (const [width, height, strict] of [
   [1600, 900, true],
   [1440, 900, false],
+  [1536, 730, false],
   [1366, 657, false],
 ] as const) {
   const tag = `${width}×${height}`;
@@ -220,10 +222,28 @@ for (const [width, height, strict] of [
         boardW: (board.x1 - board.x0) * width,
         on: true,
       };
-      const onBoard = boardFit({ rect, viewportWidth: width, blockHeight: 0, live: true, compact: false }) !== null;
+      const onBoard = boardReadable({ rect, stop: rect, viewportWidth: width, blockHeight: 0, live: true, compact: false });
       check(`${label}: ${onBoard ? 'sobre la tabla' : 'en la tarjeta de papel'}`, true, `cuerpo ${body.toFixed(1)} px, x ${(board.x0 * 100).toFixed(0)}–${(board.x1 * 100).toFixed(0)} %`);
     }
   }
+}
+
+{
+  // Tabla o papel se decide en la parada, no con la cámara de cada frame: al
+  // pasar junto a la tabla, ésta crece y el texto saltaba a ella a mitad del
+  // fundido de salida.
+  const board = (scale: number) => ({ x: 900, y: 300, w: BLOCK_PX * scale, h: 400 * scale, boardX: 850, boardW: 500 * scale, on: true });
+  const base = { viewportWidth: 1600, blockHeight: 260, live: true, compact: false };
+  check(
+    'si en la parada no se lee, el texto sigue en el papel aunque la tabla crezca al pasar',
+    boardFit({ ...base, stop: board(0.6), rect: board(1.2) }) === null,
+  );
+  const leaving = boardFit({ ...base, stop: board(1), rect: board(0.6) });
+  check(
+    'si en la parada se lee, sigue sobre la tabla al alejarse, a su escala',
+    leaving !== null && Math.abs(leaving.scale - 0.6) < 1e-9,
+  );
+  check('sin la tabla delante de la cámara, al papel', boardFit({ ...base, stop: board(1), rect: { ...board(1), on: false } }) === null);
 }
 
 /* ── 3. Los mapas antiguos ─────────────────────────────────────────────── */
@@ -507,6 +527,30 @@ section('El rollo de cada kōsatsu');
   KOSATSU.unroll.fill(1);
   check('sin movimiento, todos desplegados', unrollOf('ubicacion', 1) === 1);
   KOSATSU.unrollFor = null;
+}
+
+/* ── 9. Los pétalos caídos ─────────────────────────────────────────────── */
+
+section('Los pétalos caídos');
+
+{
+  const carpets = JOURNEY.filter((station) => station.environment.petalCarpet);
+  check('una sola estación declara alfombra (el shader recibe un único tramo)', carpets.length <= 1, `${carpets.length}`);
+  const span = PETAL_CARPET;
+  check('la declara Eventos', span !== null && carpets[0]?.slug === 'eventos');
+  if (span) {
+    check('cubre entre 0 y 1', span.cover > 0 && span.cover <= 1, `${span.cover}`);
+    const eventos = STATION_DEPTHS[stationIndex('eventos')]!;
+    const kosatsu = stationDecorLayout(UBI, false).objects.filter((o) => o.item.kind === 'kosatsu');
+    check('nada en Ubicación ni en su primer kōsatsu', petalCarpetAt(STATION_DEPTHS[UBI]!) === 0 && petalCarpetAt(-kosatsu[0]!.z) === 0);
+    const third = petalCarpetAt(-kosatsu[2]!.z);
+    check('en el tercer kōsatsu ya hay pétalos sueltos (30–70 %)', third >= 0.3 && third <= 0.7, `${Math.round(third * 100)} %`);
+    let rising = true;
+    for (let d = span.start; d < span.full; d += 1) if (petalCarpetAt(d + 1) < petalCarpetAt(d)) rising = false;
+    check('crece sin retroceder al acercarse a Eventos', rising);
+    check('en Eventos y su llano, casi todo el suelo (≥ 90 %)', petalCarpetAt(eventos) >= 0.9 && petalCarpetAt(eventos + (getStation('eventos').tramo.flat ?? 0)) >= 0.9);
+    check('nada en Fushimi Inari', petalCarpetAt(STATION_DEPTHS[stationIndex('fushimi-inari')]!) === 0);
+  }
 }
 
 finish('El valle de Ubicación, en orden.');

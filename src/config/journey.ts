@@ -278,6 +278,24 @@ export interface StationEnvironment {
    * (`scene/decor/moss.ts`). Sin él, ninguno.
    */
   readonly moss?: number;
+  /**
+   * La alfombra de pétalos caídos alrededor de la estación (5B): el suelo y lo
+   * alto de las piedras se van cubriendo de rosa. La pinta el shader del
+   * terreno y del camino, sin geometría (`scene/systems/petalCarpet.ts`).
+   */
+  readonly petalCarpet?: PetalCarpet;
+}
+
+/**
+ * Cuánto cubren los pétalos caídos (0–1) en la estación, desde cuántas
+ * unidades antes empiezan a aparecer, cuántas después siguen igual de densos y
+ * en cuántas más se acaban.
+ */
+export interface PetalCarpet {
+  readonly cover: number;
+  readonly before: number;
+  readonly hold: number;
+  readonly fade: number;
 }
 
 /**
@@ -638,6 +656,11 @@ export const JOURNEY: readonly Station[] = [
       lateral: 4,
       skyTint: { color: '#EB81A5', amount: 0.1 },
       decor: [],
+      // Los pétalos caídos: empiezan sueltos a la altura del segundo kōsatsu
+      // del tramo de Ubicación, son ya la mitad del suelo en el tercero y bajo
+      // los cerezos, y en Eventos el suelo es casi todo rosa.
+      // Siguen así por el llano de los cerezos y se acaban en la subida a Fushimi.
+      petalCarpet: { cover: 0.95, before: 70, hold: TRAMO_EVENTOS.flat ?? 0, fade: 60 },
     },
     tramo: TRAMO_EVENTOS,
     ambient: {

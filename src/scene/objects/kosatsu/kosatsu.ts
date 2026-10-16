@@ -160,8 +160,9 @@ export function unrollOf(station: StationSlug, card: number): number {
 /** Cuántos kōsatsu puede haber a la vez: uno por tarjeta del tramo. */
 const MAX_SIGNS = 8;
 
-export interface KosatsuRect {
-  /** Esquina superior izquierda y medidas, en px de la ventana. */
+/** Una tabla proyectada en la ventana. */
+export interface KosatsuProjection {
+  /** La zona de escritura: esquina superior izquierda y medidas, en px de la ventana. */
   x: number;
   y: number;
   w: number;
@@ -174,6 +175,18 @@ export interface KosatsuRect {
 }
 
 /**
+ * La tabla con la cámara de ahora y con la de su parada. Tabla o papel se
+ * decide con la de la parada, que sólo cambia con la ventana: con la de ahora,
+ * la tabla crece al pasar a su lado y el texto saltaba del papel a la tabla a
+ * mitad del fundido de salida.
+ */
+export interface KosatsuRect extends KosatsuProjection {
+  stop: KosatsuProjection;
+}
+
+const emptyProjection = (): KosatsuProjection => ({ x: 0, y: 0, w: 0, h: 0, boardX: 0, boardW: 0, on: false });
+
+/**
  * El puente entre el tramo (DOM) y los kōsatsu (escena). Cambia a 60 fps: por
  * eso no vive en Zustand. Indexado por la tarjeta del tramo.
  *
@@ -182,7 +195,7 @@ export interface KosatsuRect {
  */
 export const KOSATSU = {
   /** La zona de escritura de cada tablón en la ventana. */
-  rects: Array.from({ length: MAX_SIGNS }, (): KosatsuRect => ({ x: 0, y: 0, w: 0, h: 0, boardX: 0, boardW: 0, on: false })),
+  rects: Array.from({ length: MAX_SIGNS }, (): KosatsuRect => ({ ...emptyProjection(), stop: emptyProjection() })),
   /** Cuánto está desenrollado cada mapa, 0–1 (`tramoUnroll`), por tarjeta… */
   unroll: new Float32Array(MAX_SIGNS),
   /**

@@ -2,16 +2,26 @@
 
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useMemo } from 'react';
-import { Color, Vector3, type MeshStandardMaterial } from 'three';
+import { Color, PerspectiveCamera, Vector3, type Camera, type MeshStandardMaterial } from 'three';
 
+import { cardStopD } from '@/animation/journeyScroll';
 import type { ScenePalette } from '@/lib/css-vars';
+import { createRig, snapRig } from '@/scene/camera/pathRig';
 import { createDecorMaterial } from '@/scene/decor/materials';
 import type { PlacedObject } from '@/scene/decor/placement';
 import type { QualityProfile } from '@/scene/quality/tiers';
 
-import { boardWidth, KOSATSU, KOSATSU_SIZE, kosatsuWriting } from './kosatsu';
+import { boardWidth, KOSATSU, KOSATSU_SIZE, kosatsuWriting, type KosatsuProjection } from './kosatsu';
 import { kosatsuGeometry } from './kosatsuGeometry';
 import { KosatsuScroll } from './KosatsuScroll';
+
+/** Las esquinas de la zona de escritura, en el orden en que se proyectan. */
+const CORNERS = [
+  [-1, 1],
+  [1, 1],
+  [1, -1],
+  [-1, -1],
+] as const;
 
 interface KosatsuProps {
   placed: PlacedObject;
@@ -23,9 +33,9 @@ interface KosatsuProps {
  * Un kōsatsu del tramo de Ubicación (Fase 5B), colocado por `StationDecor`
  * delante de la parada de su tarjeta. No se mueve con el viento.
  *
- * Cada frame proyecta su zona de escritura con la cámara real y la deja en
- * `KOSATSU.rects`: de ahí la lee `useKosatsuFit`, que encaja encima el texto
- * DOM de la tarjeta. Si lleva mapa, cuelga su kakejiku (`KosatsuScroll`).
+ * Cada frame proyecta su zona de escritura con la cámara real y con la de
+ * su parada, y las deja en `KOSATSU.rects`: de ahí las lee `useKosatsuFit`,
+ * que encaja encima el texto DOM de la tarjeta. Si lleva mapa, cuelga su kakejiku (`KosatsuScroll`).
  */
 export default function Kosatsu({ placed, palette, profile }: KosatsuProps) {
   const item = placed.item;
@@ -60,6 +70,7 @@ export default function Kosatsu({ placed, palette, profile }: KosatsuProps) {
     KOSATSU.wake = () => invalidate();
     return () => {
       KOSATSU.rects[card]!.on = false;
+      KOSATSU.rects[card]!.stop.on = false;
       KOSATSU.wake = () => {};
     };
   }, [card, invalidate]);
@@ -72,9 +83,21 @@ export default function Kosatsu({ placed, palette, profile }: KosatsuProps) {
   }, [writing, placed]);
   const corner = useMemo(() => new Vector3(), []);
 
-  useFrame(({ camera, size }) => {
-    const rect = KOSATSU.rects[card];
-    if (!rect) return;
+  // La cámara de la parada de su tarjeta, quieta: con ella se decide si el
+  // texto va sobre la tabla (`boardFit`). Sólo cambian su aspecto y su fov.
+  const stopCamera = useMemo(() => {
+    const rig = createRig();
+    const station = item.kind === 'kosatsu' ? item.station : null;
+    snapRig(rig, station ? cardStopD(station, card) : 0);
+    const camera = new PerspectiveCamera();
+    camera.position.set(rig.camera.x, rig.camera.y, rig.camera.z);
+    camera.lookAt(rig.focus.x, rig.focus.y, rig.focus.z);
+    camera.updateMatrixWorld();
+    return camera;
+  }, [item, card]);
+
+  /** Proyecta la zona de escritura y la tabla entera con `camera` en `out`. */
+  const project = (camera: Camera, width: number, height: number, out: KosatsuProjection) => {
     let minX = Number.POSITIVE_INFINITY;
     let maxX = Number.NEGATIVE_INFINITY;
     let minY = Number.POSITIVE_INFINITY;
@@ -82,26 +105,21 @@ export default function Kosatsu({ placed, palette, profile }: KosatsuProps) {
     let behind = false;
     const [cx, cy, cz] = writing.center;
     const [rx, , rz] = writing.right;
-    for (const [sx, sy] of [
-      [-1, 1],
-      [1, 1],
-      [1, -1],
-      [-1, -1],
-    ] as const) {
+    for (const [sx, sy] of CORNERS) {
       corner.set(cx + (rx * sx * writing.w) / 2, cy + (sy * writing.h) / 2, cz + (rz * sx * writing.w) / 2);
       corner.project(camera);
       if (corner.z >= 1 || corner.z <= -1) behind = true;
-      const px = ((corner.x + 1) / 2) * size.width;
-      const py = ((1 - corner.y) / 2) * size.height;
+      const px = ((corner.x + 1) / 2) * width;
+      const py = ((1 - corner.y) / 2) * height;
       minX = Math.min(minX, px);
       maxX = Math.max(maxX, px);
       minY = Math.min(minY, py);
       maxY = Math.max(maxY, py);
     }
-    rect.x = minX;
-    rect.y = minY;
-    rect.w = maxX - minX;
-    rect.h = maxY - minY;
+    out.x = minX;
+    out.y = minY;
+    out.w = maxX - minX;
+    out.h = maxY - minY;
 
     // La tabla entera, de lado a lado (con el marco): el texto sólo va encima
     // si se ve entera.
@@ -113,13 +131,28 @@ export default function Kosatsu({ placed, palette, profile }: KosatsuProps) {
       const along = reach - writingOffset;
       corner.set(cx + rx * along, cy, cz + rz * along).project(camera);
       if (corner.z >= 1 || corner.z <= -1) behind = true;
-      const px = ((corner.x + 1) / 2) * size.width;
+      const px = ((corner.x + 1) / 2) * width;
       boardMin = Math.min(boardMin, px);
       boardMax = Math.max(boardMax, px);
     }
-    rect.boardX = boardMin;
-    rect.boardW = boardMax - boardMin;
-    rect.on = !behind;
+    out.boardX = boardMin;
+    out.boardW = boardMax - boardMin;
+    out.on = !behind;
+  };
+
+  useFrame(({ camera, size }) => {
+    const rect = KOSATSU.rects[card];
+    if (!rect) return;
+    project(camera, size.width, size.height, rect);
+    // La misma tabla vista desde su parada, con la lente y el aspecto de ahora.
+    const fov = (camera as PerspectiveCamera).fov;
+    const aspect = size.width / Math.max(1, size.height);
+    if (stopCamera.fov !== fov || stopCamera.aspect !== aspect) {
+      stopCamera.fov = fov;
+      stopCamera.aspect = aspect;
+      stopCamera.updateProjectionMatrix();
+    }
+    project(stopCamera, size.width, size.height, rect.stop);
   });
 
   return (

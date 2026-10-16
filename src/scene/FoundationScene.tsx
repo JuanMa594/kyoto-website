@@ -44,7 +44,7 @@ export function FoundationScene({ station, palette, profile }: FoundationScenePr
       <Sun palette={palette} profile={profile} />
 
       <Terrain palette={palette} profile={profile} />
-      <StonePath color={palette.ishi} profile={profile} />
+      <StonePath color={palette.ishi} palette={palette} profile={profile} />
 
       {/* Lo que hay a los lados del camino: el torii y el bambú de la Home, y lo
           que traigan las fases siguientes. Se declara en journey.ts. */}

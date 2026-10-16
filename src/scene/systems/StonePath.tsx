@@ -11,9 +11,11 @@ import {
   type InstancedMesh,
 } from 'three';
 
+import type { ScenePalette } from '@/lib/css-vars';
 import { stoneGeometry } from '@/scene/objects/stoneGeometry';
 import { STONE_VARIANTS, stoneLayout, stoneSeed, type StoneInstance } from '@/scene/path/stones';
 import type { QualityProfile } from '@/scene/quality/tiers';
+import { CARPET_LAYERS, withPetalCarpet } from '@/scene/shaders/petalCarpet';
 
 /**
  * El camino de piedras, entero.
@@ -27,10 +29,12 @@ import type { QualityProfile } from '@/scene/quality/tiers';
 
 interface StonePathProps {
   color: string;
+  /** Para los pétalos caídos que quedan sobre las piedras cerca de Eventos. */
+  palette: ScenePalette;
   profile: QualityProfile;
 }
 
-export function StonePath({ color, profile }: StonePathProps) {
+export function StonePath({ color, palette, profile }: StonePathProps) {
   // En tier bajo la piedra se ve igual de lejos con menos triángulos.
   const detail = profile.tier === 'low' ? 0 : 1;
 
@@ -41,9 +45,14 @@ export function StonePath({ color, profile }: StonePathProps) {
   );
   useEffect(() => () => geometries.forEach((geometry) => geometry.dispose()), [geometries]);
 
+  // Cerca de Eventos, con pétalos caídos en lo alto (no en los costados).
   const material = useMemo(
-    () => new MeshStandardMaterial({ color, flatShading: true, roughness: 0.95, metalness: 0 }),
-    [color],
+    () =>
+      withPetalCarpet(new MeshStandardMaterial({ color, flatShading: true, roughness: 0.95, metalness: 0 }), palette, {
+        tops: true,
+        layers: CARPET_LAYERS[profile.tier],
+      }),
+    [color, palette, profile.tier],
   );
   useEffect(() => () => material.dispose(), [material]);
 
