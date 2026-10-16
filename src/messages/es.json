@@ -106,6 +106,9 @@
     "label": "Camino hacia {station}",
     "continue": "Seguir el camino",
     "hint": "Sigue bajando: el camino continúa",
+    "read": "Ver de cerca",
+    "readLabel": "Leer «{title}» de cerca",
+    "close": "Cerrar",
     "maps": {
       "japon": "Mapa de Japón al estilo de Edo, con Kyoto marcado con un sello rojo.",
       "heian": "Plano de Heian-kyō en 794: la cuadrícula de avenidas, el palacio al norte, la avenida Suzaku y la puerta de Rashōmon al sur, entre los ríos Kamo y Katsura."

@@ -17,7 +17,13 @@ import { PETAL_CARPET } from '@/scene/systems/petalCarpet';
  * sólo hay pétalos sueltos, y en la estación el suelo entero es rosa.
  *
  * Lejos, una celda mide menos que unos píxeles y los pétalos titilarían: ahí
- * se funden en su color medio. Las derivadas se toman fuera del `if`, que no
+ * se funden en su color medio.
+ *
+ * **El rosa no lo tiñe la luz.** El sol y el cielo de la escena son cálidos y
+ * sobre el suelo el rosa salía salmón. Después de iluminar, lo que es pétalo
+ * conserva el brillo que le dio la luz (sombras incluidas) pero recupera el
+ * tono de su color: el rosa sakura frío de la temporada. La niebla, que va
+ * después, sí lo funde con la distancia. Las derivadas se toman fuera del `if`, que no
  * es uniforme entre píxeles vecinos.
  */
 
@@ -49,6 +55,7 @@ uniform float uCarpetCover;
 uniform vec3 uPetalLight;
 uniform vec3 uPetalDeep;
 uniform vec3 uPetalWash;
+uniform float uCarpetTrue;
 varying vec3 vCarpetWorld;
 
 // La misma curva que petalCarpetAt: sube, se mantiene y baja.
@@ -94,6 +101,9 @@ vec3 carpetDx = dFdx(vCarpetWorld);
 vec3 carpetDy = dFdy(vCarpetWorld);
 float carpetPx = max(length(carpetDx), length(carpetDy));
 float carpetCover = carpetCoverAt(-vCarpetWorld.z);
+// Cuánto del color es pétalo, y ese color: para devolverle el tono tras la luz.
+float carpetPink = 0.0;
+vec3 carpetColor = vec3(0.0);
 #ifdef CARPET_TOPS
 // Las piedras, sólo en lo alto: la normal de la cara, de las mismas derivadas.
 carpetCover *= smoothstep(0.75, 0.92, abs(normalize(cross(carpetDx, carpetDy)).y));
@@ -123,8 +133,20 @@ if (carpetCover > 0.001) {
   #else
   float carpetWash = 0.8;
   #endif
-  diffuseColor.rgb = mix(diffuseColor.rgb, uPetalWash, carpetCover * carpetCover * carpetWash);
+  float carpetVeil = carpetCover * carpetCover * carpetWash;
+  diffuseColor.rgb = mix(diffuseColor.rgb, uPetalWash, carpetVeil);
   diffuseColor.rgb = mix(diffuseColor.rgb, mix(uPetalLight, uPetalDeep, carpetTone), carpetAmount);
+  carpetPink = 1.0 - (1.0 - carpetVeil) * (1.0 - carpetAmount);
+  carpetColor = diffuseColor.rgb;
+}
+`;
+
+const HUE_FRAGMENT = /* glsl */ `
+// El brillo de la luz, con el tono del pétalo (lineal, luminancia Rec. 709).
+if (carpetPink > 0.001) {
+  vec3 carpetLuma = vec3(0.2126, 0.7152, 0.0722);
+  float carpetLit = dot(outgoingLight, carpetLuma) / max(dot(carpetColor, carpetLuma), 0.001);
+  outgoingLight = mix(outgoingLight, carpetColor * carpetLit, carpetPink * uCarpetTrue);
 }
 `;
 
@@ -147,6 +169,8 @@ export function withPetalCarpet(
     uPetalLight: { value: pale.clone() },
     uPetalDeep: { value: pale.clone().lerp(new Color(palette.sakura), 0.38) },
     uPetalWash: { value: pale.clone().lerp(new Color(palette.sakura), 0.22) },
+    // Cuánto tono recupera el pétalo tras la luz: casi todo.
+    uCarpetTrue: { value: 0.9 },
   };
 
   material.defines = { ...material.defines, CARPET_LAYERS: count, ...(tops ? { CARPET_TOPS: '' } : {}) };
@@ -157,7 +181,8 @@ export function withPetalCarpet(
       .replace('#include <project_vertex>', `#include <project_vertex>\n${WORLD_VERTEX}`);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${PARS_FRAGMENT}`)
-      .replace('#include <color_fragment>', `#include <color_fragment>\n${COLOR_FRAGMENT}`);
+      .replace('#include <color_fragment>', `#include <color_fragment>\n${COLOR_FRAGMENT}`)
+      .replace('#include <opaque_fragment>', `${HUE_FRAGMENT}\n#include <opaque_fragment>`);
   };
   material.customProgramCacheKey = () => `petal-carpet-${count}-${tops ? 'tops' : 'all'}`;
   return material;

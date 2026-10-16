@@ -334,10 +334,12 @@ geografía ya la dice la ficha de 5A): la capital de mil años, Heian-kyō y el 
   uno se planta a 20 u por delante de la cámara de su parada (`cardStopD`), en su lado,
   **paralelo al plano de la imagen**. El **texto es DOM** encajado cada frame sobre la zona
   de escritura proyectada (`KOSATSU.rects` → `useKosatsuFit`, translate + scale), a
-  17–18 px a 1600×900. Si **en la parada** la tabla no se ve entera, la letra bajaría de
-  14 px, la pantalla es vertical o táctil, o no hay escena, el texto vuelve a la **tarjeta de
-  papel** (`boardFit`). Se decide con la cámara de la parada, no con la de cada frame: así
-  una tarjeta se lee entera en un solo sitio, sin saltar entre la tabla y el papel. Los postes van detrás de la tabla y metidos 1 u: la tabla vuela hacia el
+  17–18 px a 1600×900 (más pequeño en pantallas bajas). **Tocando la tabla** se abre la
+  **tarjeta de lectura** (`KosatsuReader`, un `<dialog>`), con el texto y el mapa en grande:
+  la persona decide si la abre. Sólo si **en la parada** la tabla no se ve entera, la pantalla
+  es vertical o no hay escena, el texto vuelve a la **tarjeta de papel** (`boardFit`). Se
+  decide con la cámara de la parada, no con la de cada frame: así una tarjeta se lee entera
+  en un solo sitio, sin saltar entre la tabla y el papel. Los postes van detrás de la tabla y metidos 1 u: la tabla vuela hacia el
   camino sin que los postes pisen las piedras.
 - **Dos mapas antiguos** (`bun run maps`): Japón a la manera de Edo (Natural Earth, los
   tonos de región de la maqueta, olas, el sello de Kyoto) y el plano de Heian-kyō en 794
@@ -359,7 +361,11 @@ geografía ya la dice la ficha de 5A): la capital de mil años, Heian-kyō y el 
   la mitad del suelo en el tercero y bajo los cerezos, en Eventos y su llano casi todo, y se
   acaban en la subida a Fushimi. Sin geometría ni draw calls: los pinta el shader del
   terreno y de lo alto de las piedras (`scene/shaders/petalCarpet.ts`), pétalo a pétalo de
-  cerca y fundidos en su color a lo lejos.
+  cerca y fundidos en su color a lo lejos. **El rosa no lo tiñe la luz cálida**: tras
+  iluminar, el pétalo conserva el brillo y recupera su tono.
+- **Los botones del camino** («Seguir el camino», el zoom de la maqueta) ya no llevan el filo
+  de color: llevan el ícono de su estación, que al pasar por encima se desliza al centro, crece
+  y hace su microanimación mientras el texto se desvanece (`CaminoButton`).
 
 Medido por CDP (tier alto): de 41 a 59–81 draw calls en las paradas y de 62 a 94 en el
 cartel (por encima del presupuesto de +10 del spec: cada kōsatsu son seis mallas más su

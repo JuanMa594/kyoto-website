@@ -11,7 +11,7 @@ import { createDecorMaterial } from '@/scene/decor/materials';
 import type { PlacedObject } from '@/scene/decor/placement';
 import type { QualityProfile } from '@/scene/quality/tiers';
 
-import { boardWidth, KOSATSU, KOSATSU_SIZE, kosatsuWriting, type KosatsuProjection } from './kosatsu';
+import { boardWidth, KOSATSU, KOSATSU_BOARD_TOP, KOSATSU_SIZE, kosatsuWriting, type KosatsuProjection } from './kosatsu';
 import { kosatsuGeometry } from './kosatsuGeometry';
 import { KosatsuScroll } from './KosatsuScroll';
 
@@ -137,6 +137,18 @@ export default function Kosatsu({ placed, palette, profile }: KosatsuProps) {
     }
     out.boardX = boardMin;
     out.boardW = boardMax - boardMin;
+    // Y de arriba abajo, por el centro de lo escrito (la tabla es paralela a la imagen).
+    let boardTop = Number.POSITIVE_INFINITY;
+    let boardBottom = Number.NEGATIVE_INFINITY;
+    for (const ly of [KOSATSU_SIZE.boardBottom - KOSATSU_SIZE.frame, KOSATSU_BOARD_TOP + KOSATSU_SIZE.frame]) {
+      corner.set(cx, placed.y + ly * placed.scale, cz).project(camera);
+      if (corner.z >= 1 || corner.z <= -1) behind = true;
+      const py = ((1 - corner.y) / 2) * height;
+      boardTop = Math.min(boardTop, py);
+      boardBottom = Math.max(boardBottom, py);
+    }
+    out.boardY = boardTop;
+    out.boardH = boardBottom - boardTop;
     out.on = !behind;
   };
 

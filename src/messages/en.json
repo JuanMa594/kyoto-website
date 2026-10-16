@@ -106,6 +106,9 @@
     "label": "Path to {station}",
     "continue": "Continue the path",
     "hint": "Keep scrolling: the path goes on",
+    "read": "Look closer",
+    "readLabel": "Read “{title}” up close",
+    "close": "Close",
     "maps": {
       "japon": "Edo-style map of Japan, with Kyoto marked by a red seal.",
       "heian": "Plan of Heian-kyō in 794: the grid of avenues, the palace to the north, Suzaku Avenue and the Rashōmon gate to the south, between the Kamo and Katsura rivers."

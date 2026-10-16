@@ -162,6 +162,8 @@ src/
 │   └─ icons/                  ← los seis íconos calculados + sus microanimaciones
 ├─ components/sections/        ← StationShell, PathTramo (el tramo), ContentArrival, CartelTitle,
 │                                 kosatsuFit + useKosatsuFit (el texto del tramo sobre la tabla, 5B)
+│                                 y KosatsuReader (la tarjeta de lectura que abre la tabla)
+├─ components/ui/CaminoButton  ← los botones del camino: el ícono de la estación va al centro (5B)
 ├─ components/ubicacion/       ← MaquetaInput (la mano), MaquetaToggle, PrefectureLabels, KyotoFicha (5A)
 ├─ components/home/            ← HomeIntro (la entrada), introScript, WalkHint (Fase 4)
 ├─ components/kanji/           ← InkKanji: el kanji dibujado trazo a trazo (KanjiVG)
@@ -200,8 +202,10 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   Una tarjeta con `sign` (Fase 5B) no es de papel: es un **kōsatsu** que se
   planta solo delante de su parada (`cardStopD`), con el texto DOM encajado
   sobre su tabla (`useKosatsuFit`) y, si lleva `sign.map`, un mapa antiguo que
-  se desenrolla con el scroll (`tramoUnroll`). Si en la parada la tabla no se
-  lee bien (`boardFit`), el texto vuelve a ser la tarjeta de papel.
+  se desenrolla con el scroll (`tramoUnroll`). Tocando la tabla se abre la
+  tarjeta de lectura (`KosatsuReader`), con el texto y el mapa en grande. Si
+  en la parada la tabla no se ve entera, o la pantalla es vertical (`boardFit`),
+  el texto vuelve a ser la tarjeta de papel.
 - **Lo que hay a los lados del camino se declara en `journey.ts`**
   (`environment.decor`, Fase 4): objetos sueltos (`torii`, `arbusto`, `farol`
   kasuga o yukimi, la `maqueta` de Ubicación, la `roca` pintada y el `cerezo` de la 5B) y macizos (`bambu`, `susuki`), en coordenadas del camino —`d` desde la estación, `u` desde
@@ -575,18 +579,23 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   de su parada, no mirando a su posición: girados hacia ella, en una curva salían
   25° de canto, con trapecio. Y como el campo de visión vertical es fijo, **los px de
   lo 3D escalan con el alto de la ventana**: la letra que cabe en la tabla depende
-  de él. Por eso hay una regla de caída (`boardFit`: < 14 px, tabla cortada,
-  vertical o táctil → tarjeta de papel), no un tamaño fijo.
+  de él. En una pantalla baja sale pequeña; por eso la tabla se toca y abre la
+  tarjeta de lectura (`KosatsuReader`). Sólo vuelve a la tarjeta de papel si la
+  tabla no se ve entera o la pantalla es vertical (`boardFit`).
 - **Una decisión que depende de la cámara se toma con la cámara quieta, no con
   la de cada frame.** El texto de los kōsatsu decidía tabla o papel con la
   proyección de cada frame: en una pantalla de 1536×730 (un 1080p al 125 %) la
-  letra quedaba justo en el umbral de 14 px, y la deriva de la parada, el
-  parallax del cursor y el paso junto a la tabla al alejarse lo cruzaban: el
-  texto saltaba del papel a la tabla a mitad del fundido y se iba. Ahora se
+  letra quedaba justo en el umbral de 14 px que había entonces, y la deriva de
+  la parada, el parallax del cursor y el paso junto a la tabla al alejarse lo
+  cruzaban: el texto saltaba del papel a la tabla a mitad del fundido y se iba. Ahora se
   decide con la cámara de la parada (`KOSATSU.rects[].stop`), que sólo cambia
   con la ventana, y la proyección de cada frame sólo coloca el bloque. El alto
   del bloque se mide antes de ponerlo, en una copia invisible: medirlo en el
   primer frame sobre la tabla también lo hacía saltar.
+- **El reset de Tailwind descentra los `<dialog>`.** Un dialog modal se centra
+  con el `margin: auto` de la hoja del navegador, y el preflight lo pone a 0:
+  la tarjeta de lectura salía pegada arriba a la izquierda. Todo `<dialog>`
+  lleva `margin: auto` en su clase.
 - **Las derivadas de un shader se toman fuera de un `if` no uniforme.** Los
   pétalos caídos (`petalCarpet`) se dibujan sólo donde hay cobertura, y esa
   rama cambia de un píxel al vecino: `dFdx`/`fwidth` dentro de ella no están

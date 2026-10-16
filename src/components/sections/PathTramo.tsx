@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useRef } from 'react';
+import { useState, useRef } from 'react';
 
 import { tramoHeightVh, tramoWalkVh } from '@/animation/journeyScroll';
 import { useJourneyScroll } from '@/animation/useJourneyScroll';
@@ -9,6 +9,10 @@ import { getStation, neighbours, stationPath, type StationSlug } from '@/config/
 import { Link, useRouter } from '@/i18n/navigation';
 import { MAP_SIZE } from '@/scene/objects/kosatsu/kosatsu';
 
+import { isIconName } from '@/components/nav/icons';
+import { CaminoFace, useCaminoHover } from '@/components/ui/CaminoButton';
+
+import { KosatsuReader } from './KosatsuReader';
 import { useKosatsuFit } from './useKosatsuFit';
 import { selectMotionAllowed, useKyotoStore } from '@/store/useKyotoStore';
 
@@ -56,6 +60,9 @@ export function PathTramo({ station }: { station: StationSlug }) {
 
   // Las tarjetas con cartel se leen sobre la tabla de su kōsatsu (Fase 5B).
   useKosatsuFit(section, motionAllowed);
+  // Y tocando la tabla se leen de cerca, con el mapa en grande.
+  const [reading, setReading] = useState<number | null>(null);
+  const onward = useCaminoHover();
 
   // La última estación no tiene tramo, pero su scroll sí mueve la cámara (el
   // avance de lectura): por eso el hook va antes de este return.
@@ -106,6 +113,44 @@ export function PathTramo({ station }: { station: StationSlug }) {
           </article>
         ))}
 
+        {/* Sobre cada kōsatsu, un botón del tamaño de su tabla (lo coloca
+            useKosatsuFit): abre la tarjeta de lectura. Sin movimiento no hace
+            falta: las tarjetas ya son una lista con sus mapas. */}
+        {motionAllowed &&
+          cards.map((card, index) =>
+            card.sign ? (
+              <button
+                key={card.id}
+                type="button"
+                className="kosatsu-hit"
+                data-hit={index}
+                data-on="off"
+                tabIndex={-1}
+                aria-label={t('readLabel', { title: cardText(card.id, 'title') })}
+                onClick={() => setReading(index)}
+              >
+                <span className="kosatsu-hit__hint" aria-hidden="true">
+                  {t('read')}
+                </span>
+              </button>
+            ) : null,
+          )}
+
+        <KosatsuReader
+          card={
+            reading !== null && cards[reading]
+              ? {
+                  title: cardText(cards[reading].id, 'title'),
+                  body: cardText(cards[reading].id, 'body'),
+                  map: cards[reading].sign?.map,
+                  mapAlt: cards[reading].sign?.map ? t(`maps.${cards[reading].sign.map}`) : undefined,
+                }
+              : null
+          }
+          onClose={() => setReading(null)}
+          closeLabel={t('close')}
+        />
+
         <div className="path-tramo__arrival">
           <p
             className="path-tramo__sign kanji"
@@ -119,12 +164,12 @@ export function PathTramo({ station }: { station: StationSlug }) {
             {names(`${next.slug}.tagline`)}
           </p>
 
-          <Link
-            href={stationPath(next)}
-            className="paper mt-6 inline-flex items-baseline gap-2 px-4 py-2 transition-transform duration-200 hover:-translate-y-0.5"
-            style={{ borderLeft: `3px solid ${next.palette.accent}` }}
-          >
-            {t('continue')} → {name}
+          <Link href={stationPath(next)} className="paper camino-button mt-6" {...onward.props}>
+            {isIconName(next.icon) ? (
+              <CaminoFace icon={next.icon} label={`${t('continue')} → ${name}`} active={onward.active} />
+            ) : (
+              `${t('continue')} → ${name}`
+            )}
           </Link>
 
           {motionAllowed && <p className="brush mt-4 opacity-60">{t('hint')}</p>}

@@ -170,6 +170,9 @@ export interface KosatsuProjection {
   /** La tabla entera, de lado a lado, en px: el texto sólo va encima si se ve entera. */
   boardX: number;
   boardW: number;
+  /** Y de arriba abajo, con el marco: el botón que abre la lectura la cubre entera. */
+  boardY: number;
+  boardH: number;
   /** Si la escena la está proyectando (el kōsatsu montado y delante de la cámara). */
   on: boolean;
 }
@@ -184,7 +187,7 @@ export interface KosatsuRect extends KosatsuProjection {
   stop: KosatsuProjection;
 }
 
-const emptyProjection = (): KosatsuProjection => ({ x: 0, y: 0, w: 0, h: 0, boardX: 0, boardW: 0, on: false });
+const emptyProjection = (): KosatsuProjection => ({ x: 0, y: 0, w: 0, h: 0, boardX: 0, boardW: 0, boardY: 0, boardH: 0, on: false });
 
 /**
  * El puente entre el tramo (DOM) y los kōsatsu (escena). Cambia a 60 fps: por

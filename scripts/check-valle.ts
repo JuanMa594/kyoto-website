@@ -17,7 +17,7 @@ import { getStation, JOURNEY } from '../src/config/journey';
 import { createRig, snapRig } from '../src/scene/camera/pathRig';
 import { decorFootprints, insideFootprint, objectBases } from '../src/scene/decor/footprints';
 import { objectToWorld, stationDecorLayout, type PlacedObject } from '../src/scene/decor/placement';
-import { BLOCK_PX, BODY_PX, boardFit, boardReadable } from '../src/components/sections/kosatsuFit';
+import { BLOCK_PX, BODY_PX, boardFit, boardVisible } from '../src/components/sections/kosatsuFit';
 import { boardWidth, KOSATSU, KOSATSU_BOARD_TOP, KOSATSU_HEIGHT, KOSATSU_SIZE, kosatsuWriting, MAP_SIZE, unrollOf } from '../src/scene/objects/kosatsu/kosatsu';
 import { kosatsuGeometry } from '../src/scene/objects/kosatsu/kosatsuGeometry';
 import { blossomCount, CEREZO_SIZE, growCerezo } from '../src/scene/objects/cerezo/cerezo';
@@ -211,8 +211,9 @@ for (const [width, height, strict] of [
       check(`${label}: la tabla cabe en su mitad`, inHalf, `x ${(board.x0 * 100).toFixed(0)}–${(board.x1 * 100).toFixed(0)} %`);
       check(`${label}: lo escrito, en el tercio medio`, writing.y0 >= 0.25 && writing.y1 <= 0.72, `y ${(writing.y0 * 100).toFixed(0)}–${(writing.y1 * 100).toFixed(0)} %`);
     } else {
-      // Aquí puede no caber: entonces el texto va en la tarjeta de papel. Se
-      // informa, con la misma regla que aplica la página (`boardFit`).
+      // En pantallas más bajas la letra sale más pequeña, pero sigue sobre la
+      // tabla: para leerla con calma se toca y se abre la tarjeta de lectura.
+      // Basta con que en la parada la tabla se vea entera (`boardFit`).
       const rect = {
         x: writing.x0 * width,
         y: writing.y0 * height,
@@ -220,10 +221,12 @@ for (const [width, height, strict] of [
         h: (writing.y1 - writing.y0) * height,
         boardX: board.x0 * width,
         boardW: (board.x1 - board.x0) * width,
+        boardY: board.y0 * height,
+        boardH: (board.y1 - board.y0) * height,
         on: true,
       };
-      const onBoard = boardReadable({ rect, stop: rect, viewportWidth: width, blockHeight: 0, live: true, compact: false });
-      check(`${label}: ${onBoard ? 'sobre la tabla' : 'en la tarjeta de papel'}`, true, `cuerpo ${body.toFixed(1)} px, x ${(board.x0 * 100).toFixed(0)}–${(board.x1 * 100).toFixed(0)} %`);
+      const onBoard = boardVisible({ rect, stop: rect, viewportWidth: width, blockHeight: 0, live: true, portrait: false });
+      check(`${label}: sobre la tabla, que se ve entera`, onBoard, `cuerpo ${body.toFixed(1)} px, x ${(board.x0 * 100).toFixed(0)}–${(board.x1 * 100).toFixed(0)} %`);
     }
   }
 }
@@ -232,12 +235,24 @@ for (const [width, height, strict] of [
   // Tabla o papel se decide en la parada, no con la cámara de cada frame: al
   // pasar junto a la tabla, ésta crece y el texto saltaba a ella a mitad del
   // fundido de salida.
-  const board = (scale: number) => ({ x: 900, y: 300, w: BLOCK_PX * scale, h: 400 * scale, boardX: 850, boardW: 500 * scale, on: true });
-  const base = { viewportWidth: 1600, blockHeight: 260, live: true, compact: false };
+  const board = (scale: number, boardX = 850) => ({
+    x: 900,
+    y: 300,
+    w: BLOCK_PX * scale,
+    h: 400 * scale,
+    boardX,
+    boardW: 500 * scale,
+    boardY: 250,
+    boardH: 500 * scale,
+    on: true,
+  });
+  const base = { viewportWidth: 1600, blockHeight: 260, live: true, portrait: false };
   check(
-    'si en la parada no se lee, el texto sigue en el papel aunque la tabla crezca al pasar',
-    boardFit({ ...base, stop: board(0.6), rect: board(1.2) }) === null,
+    'si en la parada la tabla sale cortada, el texto sigue en el papel aunque al pasar se vea entera',
+    boardFit({ ...base, stop: board(1, -40), rect: board(1.2) }) === null,
   );
+  check('en vertical, en el papel: los kōsatsu son escenario', boardFit({ ...base, portrait: true, stop: board(1), rect: board(1) }) === null);
+  check('con la letra pequeña, sigue sobre la tabla (se toca para leerla)', boardFit({ ...base, stop: board(0.5), rect: board(0.5) }) !== null);
   const leaving = boardFit({ ...base, stop: board(1), rect: board(0.6) });
   check(
     'si en la parada se lee, sigue sobre la tabla al alejarse, a su escala',

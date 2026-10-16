@@ -281,6 +281,155 @@
     display: none;
   }
 
+  /* El botón que cubre la tabla de un kōsatsu, con su mapa (useKosatsuFit lo
+     coloca y le da el tamaño): tocándolo se abre la tarjeta de lectura. No se
+     ve; al pasar por encima o con el foco, un filo de tinta enmarca la tabla.
+     Debajo, la pista «ver de cerca», con la opacidad de la tarjeta. */
+  .kosatsu-hit {
+    position: absolute;
+    top: 0;
+    left: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0.35rem;
+    background: none;
+    cursor: zoom-in;
+    transition: box-shadow var(--dur-rapido) var(--ease-washi);
+  }
+
+  .kosatsu-hit[data-on='off'] {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .kosatsu-hit:hover,
+  .kosatsu-hit:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--color-sumi) 55%, transparent),
+      0 0 0 6px color-mix(in srgb, var(--color-washi) 75%, transparent),
+      0 0 2rem color-mix(in srgb, var(--color-washi) 80%, transparent);
+  }
+
+  .kosatsu-hit__hint {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    padding: 0.2rem 0.75rem;
+    border-radius: 999px;
+    background: var(--surface-paper);
+    box-shadow: var(--shadow-paper);
+    color: var(--color-sumi);
+    font-family: var(--font-brush);
+    font-size: 0.95rem;
+    white-space: nowrap;
+    opacity: calc(var(--card, 0) * 0.8);
+    translate: -50% 0.6rem;
+    transition: translate var(--dur-rapido) var(--ease-washi);
+  }
+
+  .kosatsu-hit:hover .kosatsu-hit__hint,
+  .kosatsu-hit:focus-visible .kosatsu-hit__hint {
+    opacity: var(--card, 0);
+    translate: -50% 0.35rem;
+  }
+
+  /* La tarjeta de lectura (KosatsuReader): el mapa a la izquierda, grande,
+     y el texto a buen tamaño. Entra subiendo un poco y aclarándose. */
+  .kosatsu-reader {
+    /* El reset de Tailwind le quita el margin: auto con que el navegador centra
+       un <dialog> modal. */
+    margin: auto;
+    max-width: min(58rem, calc(100vw - 2rem));
+    max-height: calc(100dvh - 2rem);
+    padding: 0;
+    border: 0;
+    overflow: visible;
+    background: none;
+    color: var(--color-sumi);
+  }
+
+  .kosatsu-reader::backdrop {
+    background: color-mix(in srgb, var(--color-sumi) 30%, transparent);
+    backdrop-filter: blur(3px);
+  }
+
+  .kosatsu-reader__sheet {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 2.25rem;
+    align-items: center;
+    max-height: calc(100dvh - 2rem);
+    padding: 2.25rem 2.5rem;
+    overflow: auto;
+    opacity: 1;
+    translate: 0 0;
+    transition:
+      opacity 0.35s var(--ease-washi),
+      translate 0.35s var(--ease-washi);
+
+    @starting-style {
+      opacity: 0;
+      translate: 0 1rem;
+    }
+  }
+
+  .kosatsu-reader__sheet[data-map='off'] {
+    grid-template-columns: minmax(0, 36rem);
+  }
+
+  .kosatsu-reader__map img {
+    width: auto;
+    height: min(72dvh, 38rem);
+    border-radius: 0.25rem;
+    background: radial-gradient(circle at 50% 45%, var(--color-washi) 55%, var(--color-washi-deep));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-sumi-faint) 60%, transparent);
+  }
+
+  .kosatsu-reader__title {
+    font-size: 2rem;
+    line-height: 1.15;
+  }
+
+  .kosatsu-reader__body {
+    margin-top: 1rem;
+    font-size: 1.3rem;
+    line-height: 1.7;
+  }
+
+  .kosatsu-reader__close {
+    position: absolute;
+    top: 0.9rem;
+    right: 1.1rem;
+    padding: 0.25rem 0.8rem;
+    border-radius: 999px;
+    font-family: var(--font-brush);
+    transition: background-color var(--dur-rapido) var(--ease-washi);
+  }
+
+  .kosatsu-reader__close:hover,
+  .kosatsu-reader__close:focus-visible {
+    background: color-mix(in srgb, var(--color-washi-deep) 70%, transparent);
+  }
+
+  @media (max-width: 767px) {
+    .kosatsu-reader__sheet {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 1.25rem;
+      padding: 2.5rem 1.4rem 1.6rem;
+    }
+
+    .kosatsu-reader__map {
+      display: flex;
+      justify-content: center;
+    }
+
+    .kosatsu-reader__map img {
+      height: min(42dvh, 22rem);
+    }
+  }
+
   /* En un móvil no hay costados: la tarjeta va centrada, por encima del
      camino. */
   @media (max-width: 767px) {
@@ -540,20 +689,71 @@
   }
 
   .cartel-button {
-    display: inline-flex;
     margin-top: 1.5rem;
-    padding: 0.55rem 1.1rem;
-    border-left: 3px solid var(--color-koke-deep);
-    transition: translate var(--dur-rapido) var(--ease-washi);
-  }
-
-  .cartel-button:hover {
-    translate: 0 -2px;
   }
 
   .cartel-button:focus-visible {
     outline: 2px solid var(--color-koke-deep);
     outline-offset: 3px;
+  }
+
+  /* Los botones del camino (`CaminoButton`, 5B): el ícono de la estación a la
+     izquierda; al pasar por encima se desliza al centro, crece y hace su
+     microanimación mientras el texto se desvanece, y al pulsar el botón se
+     hunde. El ícono va en absoluto para poder llevarlo al 50 % del botón sin
+     medirlo. Sin movimiento, se queda donde está. */
+  .camino-button {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    padding: 0.6rem 1.15rem 0.6rem 2.9rem;
+    overflow: hidden;
+    color: var(--color-sumi);
+    transition:
+      scale 0.15s var(--ease-washi),
+      background-color var(--dur-rapido) var(--ease-washi);
+  }
+
+  .camino-button__icon {
+    position: absolute;
+    top: 50%;
+    left: 0.85rem;
+    width: 1.55rem;
+    height: 1.55rem;
+    translate: 0 -50%;
+    transition:
+      left 0.5s var(--ease-washi),
+      scale 0.5s var(--ease-washi);
+  }
+
+  .camino-button__icon svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .camino-button__label {
+    transition: opacity 0.35s var(--ease-washi);
+  }
+
+  .camino-button[data-motion='on']:hover .camino-button__icon,
+  .camino-button[data-motion='on']:focus-visible .camino-button__icon {
+    left: calc(50% - 0.775rem);
+    scale: 1.35;
+  }
+
+  .camino-button[data-motion='on']:hover .camino-button__label,
+  .camino-button[data-motion='on']:focus-visible .camino-button__label {
+    opacity: 0;
+  }
+
+  .camino-button:hover {
+    background-color: color-mix(in srgb, var(--surface-paper) 88%, var(--color-washi-deep));
+  }
+
+  .camino-button[data-motion='on']:active {
+    scale: 0.95;
   }
 
   .kyoto-ficha {
