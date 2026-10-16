@@ -108,6 +108,8 @@ function stoneHits(footprints: readonly Footprint[]): number {
   let hits = 0;
   for (const stone of stones) {
     for (const f of footprints) {
+      // Lo que no toca el suelo (el tejadillo de un kōsatsu) no pisa piedras.
+      if (f.kind === 'rectangulo' && f.ground === false) continue;
       if (footprintDistance(f, stone.x, stone.z) < STONE_RADIUS) hits += 1;
     }
   }

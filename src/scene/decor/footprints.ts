@@ -15,7 +15,10 @@
  */
 
 import { JOURNEY } from '@/config/journey';
+import { boardWidth, KOSATSU_HEIGHT, KOSATSU_POST_Z, KOSATSU_SIZE, kosatsuPosts } from '@/scene/objects/kosatsu/kosatsu';
 import { MAQUETA_PLAN, MAQUETA_SIZE } from '@/scene/objects/maqueta/maqueta';
+import { growCerezo } from '@/scene/objects/cerezo/cerezo';
+import { ROCA_FOOTPRINTS, ROCA_SIZE } from '@/scene/objects/roca/roca';
 import { LANTERN_SIZE } from '@/scene/objects/toro/toro';
 import { RYOBU_FOOTPRINTS } from '@/scene/objects/torii/ryobu';
 import { frameToWorld, pathX, type PathFrame, type Point3 } from '@/scene/path/journeyPath';
@@ -71,6 +74,11 @@ export interface RectFootprint {
   readonly hz: number;
   readonly top: number;
   readonly faunaMargin: number;
+  /**
+   * `false` si no toca el suelo: el tejadillo de un kōsatsu, a 4,5 u, cuenta
+   * para la cámara y la fauna, pero no pisa las piedras (eso lo miran sus postes).
+   */
+  readonly ground?: false;
 }
 
 export type Footprint = CircleFootprint | BandFootprint | RectFootprint;
@@ -112,6 +120,52 @@ export function objectBases(o: PlacedObject): ObjectBase[] {
         faunaMargin: SOLID_MARGIN,
       },
     ];
+  }
+  if (item.kind === 'kosatsu') {
+    // Los dos postes. La tabla y el tejadillo van aparte (`kosatsuFootprint`).
+    const point = { x: 0, z: 0 };
+    return kosatsuPosts(item.map).map((lx) => {
+      objectToWorld(o, lx, KOSATSU_POST_Z, point);
+      return {
+        kind: 'circulo',
+        x: point.x,
+        z: point.z,
+        r: KOSATSU_SIZE.postSize * o.scale,
+        foot: KOSATSU_SIZE.postSize * o.scale,
+        top: o.y + KOSATSU_HEIGHT * o.scale,
+        faunaMargin: SOLID_MARGIN,
+      };
+    });
+  }
+  if (item.kind === 'cerezo') {
+    // El tronco. La copa es blanda: lo que vuela la cruza.
+    const tree = growCerezo(item.seed);
+    return [
+      {
+        kind: 'circulo',
+        x: o.x,
+        z: o.z,
+        r: tree.trunkRadius * 1.6 * o.scale,
+        foot: tree.trunkRadius * 1.4 * o.scale,
+        top: o.y + 2 * o.scale,
+        faunaMargin: SOLID_MARGIN,
+      },
+    ];
+  }
+  if (item.kind === 'roca') {
+    const point = { x: 0, z: 0 };
+    return ROCA_FOOTPRINTS.map((f) => {
+      objectToWorld(o, f.x, 0, point);
+      return {
+        kind: 'circulo',
+        x: point.x,
+        z: point.z,
+        r: f.r * o.scale,
+        foot: f.foot * o.scale,
+        top: o.y + ROCA_SIZE.height * o.scale,
+        faunaMargin: SOLID_MARGIN,
+      };
+    });
   }
   if (item.kind === 'maqueta') {
     // El pie del atril. La bandeja va aparte, como rectángulo (`trayFootprint`).
@@ -156,6 +210,25 @@ export function trayFootprint(o: PlacedObject): RectFootprint {
   };
 }
 
+/**
+ * La planta del tejadillo de un kōsatsu: la tabla baja hasta 0,6 u del suelo,
+ * así que lo que anda no pasa por debajo; y la cámara, al pasar a su lado,
+ * tiene que quedar a su distancia también del vuelo del tejado.
+ */
+export function kosatsuFootprint(o: PlacedObject): RectFootprint {
+  return {
+    kind: 'rectangulo',
+    x: o.x,
+    z: o.z,
+    yaw: o.yaw,
+    hx: (boardWidth(o.item.kind === 'kosatsu' ? o.item.map : undefined) / 2 + KOSATSU_SIZE.roofOverhang) * o.scale,
+    hz: (KOSATSU_SIZE.roofDepth / 2) * o.scale,
+    top: o.y + KOSATSU_HEIGHT * o.scale,
+    faunaMargin: SOLID_MARGIN,
+    ground: false,
+  };
+}
+
 const cache = new Map<boolean, readonly Footprint[]>();
 
 /** Todas las huellas del camino para un aspecto, calculadas una vez. */
@@ -171,6 +244,7 @@ export function decorFootprints(portrait: boolean): readonly Footprint[] {
     for (const o of layout.objects) {
       list.push(...objectBases(o));
       if (o.item.kind === 'maqueta') list.push(trayFootprint(o));
+      if (o.item.kind === 'kosatsu') list.push(kosatsuFootprint(o));
     }
 
     for (const g of layout.groves) {
@@ -197,6 +271,19 @@ export function decorFootprints(portrait: boolean): readonly Footprint[] {
           faunaMargin: CULM_MARGIN,
         });
       }
+    }
+
+    // La susuki (Fase 5B): sólo su franja, para la cámara y las piedras. Para
+    // la fauna es blanda: la cruzan las libélulas y la garza.
+    for (const s of layout.susuki) {
+      const [u0, u1] = areaU(s.area);
+      const d0 = s.stationD + s.area.from;
+      const d1 = s.stationD + s.area.to;
+      let floor = Number.NEGATIVE_INFINITY;
+      for (const d of [d0, (d0 + d1) / 2, d1]) {
+        for (const u of [u0, (u0 + u1) / 2, u1]) floor = Math.max(floor, groundY(pathX(d) + u, -d));
+      }
+      list.push({ kind: 'franja', d0, d1, u0, u1, top: floor + s.item.height[1] + 0.3, faunaMargin: 0 });
     }
   });
 

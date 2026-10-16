@@ -226,16 +226,59 @@
     right: max(6vw, 4.5rem);
   }
 
-  /* El hueco del mapa antiguo desplegable, que llega en la Fase 5. */
+  /* El mapa antiguo cuando el texto no va sobre la tabla (Fase 5B): en la
+     tarjeta de papel y en la lista de 静. Es un rollo, alto y estrecho: se
+     limita por el alto. El papel envejecido lo pone el fondo; el SVG sólo
+     trae la tinta. */
   .tramo-card__map {
-    display: grid;
-    aspect-ratio: 4 / 3;
+    display: flex;
+    justify-content: center;
     margin-bottom: 1rem;
-    place-items: center;
-    border: 1px dashed var(--color-sumi-faint);
-    border-radius: 0.5rem;
-    background: color-mix(in srgb, var(--color-ishi) 55%, transparent);
-    opacity: 0.75;
+  }
+
+  .tramo-card__map img {
+    width: auto;
+    height: min(30vh, 16rem);
+    border-radius: 0.2rem;
+    background: radial-gradient(circle at 50% 45%, var(--color-washi) 55%, var(--color-washi-deep));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-sumi-faint) 60%, transparent);
+  }
+
+  .path-tramo[data-motion='off'] .tramo-card__map img {
+    height: min(60vh, 34rem);
+  }
+
+  /* Sobre la tabla del kōsatsu (Fase 5B): sin papel, tinta sobre la madera.
+     useKosatsuFit la lleva encima de la zona de escritura con translate +
+     scale; el bloque mide siempre 19 rem (BLOCK_REM). El mapa ya cuelga en
+     el kakejiku de la escena. */
+  .tramo-card[data-board='on'] {
+    top: 0;
+    right: auto;
+    left: 0;
+    width: 19rem;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    color: var(--color-sumi);
+    transform-origin: 0 0;
+    translate: none;
+    backdrop-filter: none;
+  }
+
+  .tramo-card[data-board='on'] h2 {
+    font-size: 1.6rem;
+  }
+
+  .tramo-card[data-board='on'] .tramo-card__body {
+    font-size: 1.1rem;
+    line-height: 1.55;
+  }
+
+  .tramo-card[data-board='on'] .tramo-card__map {
+    display: none;
   }
 
   /* En un móvil no hay costados: la tarjeta va centrada, por encima del
@@ -246,6 +289,11 @@
       right: 1.25rem;
       left: 1.25rem;
       width: auto;
+    }
+
+    /* El rollo, más corto: la tarjeta no puede bajar hasta el cartel de llegada. */
+    .tramo-card__map img {
+      height: min(18vh, 10rem);
     }
   }
 

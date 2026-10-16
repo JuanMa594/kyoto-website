@@ -10,6 +10,7 @@
  */
 
 import {
+  cardStopD,
   createArrivalGate,
   passTramo,
   READING_DRIFT,
@@ -19,12 +20,13 @@ import {
   tramoFraction,
   tramoHeightVh,
   tramoSignOpacity,
+  tramoUnroll,
   tramoWalkVh,
   walkEase,
 } from '../src/animation/journeyScroll';
 import { cubicBezierEase } from '../src/animation/presets';
 import { jumpOffset, travelDuration } from '../src/animation/travel';
-import { JOURNEY, PATH_LENGTH } from '../src/config/journey';
+import { getStation, JOURNEY, PATH_LENGTH } from '../src/config/journey';
 import messagesEn from '../src/messages/en.json';
 import messagesEs from '../src/messages/es.json';
 import { CAMERA_BASE } from '../src/scene/camera/framing';
@@ -511,6 +513,64 @@ check(
   missingTexts.length === 0,
   missingTexts.join(', '),
 );
+
+/* ── El tramo de Ubicación y sus carteles (Fase 5B) ──────────────────── */
+
+section('El tramo y sus carteles');
+
+{
+  const slug = 'ubicacion' as const;
+  const cards = getStation(slug).tramo.cards;
+  const n = cards.length;
+  const walkVh = tramoWalkVh(slug);
+  const stationD = STATION_DEPTHS[stationIndex(slug)]!;
+  const stops = cards.map((_, i) => cardStopD(slug, i));
+  check(
+    'las paradas de Ubicación caen a ~35, ~66 y ~97 u de la estación',
+    n === 3 && [34.8, 66.0, 97.2].every((want, i) => Math.abs(stops[i]! - stationD - want) < 1),
+    stops.map((d) => (d - stationD).toFixed(1)).join(' · '),
+  );
+  const height = tramoHeightVh(n, walkVh);
+  const walk = walkVh / (n + 1);
+  check(
+    'cada parada es la profundidad del scroll en mitad de su lectura',
+    cards.every((_, i) => {
+      const mid = ((i + 1) * walk + i * 80 + 40) / height;
+      const d = scrollTargetDepth(slug, { station: slug, content: 1, tramo: tramoFraction(mid, n, walkVh) });
+      return Math.abs(d - stops[i]!) < 0.05;
+    }),
+  );
+  const ps = range(0, 1, 0.0005);
+  for (let i = 0; i < n; i += 1) {
+    const samples = ps.map((p) => tramoUnroll(p, n, i, walkVh));
+    const max = Math.max(...samples);
+    const peak = samples.indexOf(max);
+    const up = samples.slice(0, peak + 1).every((v, k, a) => k === 0 || v >= a[k - 1]! - 1e-9);
+    const down = samples.slice(peak).every((v, k, a) => k === 0 || v <= a[k - 1]! + 1e-9);
+    const smooth = samples.every((v, k, a) => k === 0 || Math.abs(v - a[k - 1]!) < 0.05);
+    check(
+      `tarjeta ${i}: el rollo baja, se queda y vuelve a subir, sin saltos`,
+      up && down && smooth && samples[0] === 0 && samples[samples.length - 1] === 0 && max === 1,
+    );
+    check(
+      `tarjeta ${i}: el rollo ya está abajo cuando el texto se lee`,
+      ps.every((p) => tramoCardOpacity(p, n, i, walkVh) < 0.5 || tramoUnroll(p, n, i, walkVh) > 0.95),
+    );
+  }
+  for (const [lang, messages] of [
+    ['es', messagesEs],
+    ['en', messagesEn],
+  ] as const) {
+    const texts = messages.tramos.ubicacion as Record<string, { title?: string; body?: string } | undefined>;
+    const maps = (messages.tramo as { maps?: Record<string, string> }).maps ?? {};
+    for (const card of cards) {
+      const text = texts[card.id];
+      const words = text?.body?.split(/\s+/).length ?? 0;
+      check(`${lang} · ${card.id}: título y texto de ≤ 60 palabras`, Boolean(text?.title) && words > 0 && words <= 60, `${words}`);
+      if (card.sign?.map) check(`${lang} · el alt del mapa ${card.sign.map}`, Boolean(maps[card.sign.map]));
+    }
+  }
+}
 
 section('La llegada');
 

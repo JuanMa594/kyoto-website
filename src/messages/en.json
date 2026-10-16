@@ -106,7 +106,10 @@
     "label": "Path to {station}",
     "continue": "Continue the path",
     "hint": "Keep scrolling: the path goes on",
-    "mapPlaceholder": "Old map · coming in Phase 5"
+    "maps": {
+      "japon": "Edo-style map of Japan, with Kyoto marked by a red seal.",
+      "heian": "Plan of Heian-kyō in 794: the grid of avenues, the palace to the north, Suzaku Avenue and the Rashōmon gate to the south, between the Kamo and Katsura rivers."
+    }
   },
   "tramos": {
     "inicio": {
@@ -116,17 +119,17 @@
       }
     },
     "ubicacion": {
-      "japon": {
-        "title": "In the heart of Japan",
-        "body": "Kyoto lies on Honshū, the main island of the archipelago, about 370 km west of Tokyo. It was the imperial capital for more than a thousand years, from 794 to 1868."
+      "capital": {
+        "title": "The thousand-year capital",
+        "body": "In 794 Emperor Kanmu moved the court to this valley and named it Heian-kyō, “the capital of peace and tranquility”. For more than a thousand years, until 1868, it was the heart of the country: the emperors lived here, and from here the roads set out to every province."
       },
-      "kansai": {
-        "title": "A basin among mountains",
-        "body": "It belongs to the Kansai region, alongside Osaka and Nara, each less than an hour away by train. Mountains enclose it to the north, east and west, and the Kamo River runs through it from north to south."
+      "heian": {
+        "title": "A city laid out with a cord",
+        "body": "Heian-kyō (as Kyoto was called back then) was laid out in the image of Chang’an, the Tang capital: a grid of about 4.5 by 5.2 km, with the palace to the north and Suzaku Avenue, some 85 metres wide, running down to the Rashōmon gate. Today’s streets still carry its numbers: Nijō, Shijō, Gojō."
       },
-      "resena": {
-        "title": "What Kyoto is like",
-        "body": "A city of nearly one and a half million people, laid out on a grid, with more than 1,600 Buddhist temples and some 400 Shinto shrines. Its historic monuments — seventeen sites across Kyoto, Uji and Ōtsu — have been a World Heritage Site since 1994: here the ancient and the everyday share the same street."
+      "kyoto": {
+        "title": "From Heian-kyō to Kyoto",
+        "body": "Over the centuries the city came to be called simply Kyoto, 京都, “the capital”. In 1868 the emperor moved to Tokyo, but the city kept what it had gathered: more than 1,600 temples, some 400 shrines and seventeen World Heritage monuments. The ancient and the everyday still share the same street."
       }
     }
   },

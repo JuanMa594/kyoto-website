@@ -3,8 +3,10 @@
 > Documento de referencia del proyecto. Consolida las decisiones tomadas en la fase de
 > definición. Si algo cambia, se actualiza aquí y no en la memoria de nadie.
 >
-> Estado: **Fase 5A implementada, en revisión** (Ubicación 位置: la maqueta de Japón, el
-> zoom a Kinki y *Ichi* / 位置). Después viene la 5B, el tramo hacia Eventos. La Fase 4 está
+> Estado: **Fase 5B implementada, en revisión** (el tramo de Ubicación hacia Eventos: tres
+> kōsatsu con la historia de la ciudad y dos mapas antiguos que se desenrollan, la roca
+> pintada, la susuki, los faroles y los primeros cerezos). La 5A (la maqueta de Japón, el
+> zoom a Kinki y *Ichi* / 位置) está cerrada. La Fase 4 está
 > completa (Home 京都: el cartel de `1.png`, la entrada, el tramo hacia Ubicación, los
 > faroles y el musgo).
 > La Fase 3 está completa — 3A (el mundo), 3B (la
@@ -322,6 +324,41 @@ Rendimiento medido (tier alto, GPU integrada): la maqueta suma 16 draw calls (48
 64 en el cartel, con su sombra) y ~24 k triángulos, a 60 fps. Detalle:
 `docs/superpowers/specs/2026-10-13-fase-5a-el-cartel-design.md`.
 
+### 5.4d El tramo de Ubicación (Fase 5B)
+
+Los 128 u de valle entre Ubicación y Eventos, que **cuentan la historia** de la ciudad (la
+geografía ya la dice la ficha de 5A): la capital de mil años, Heian-kyō y el paso a Kyoto.
+
+- **Kōsatsu** (高札, el tablón de avisos de Edo), uno por tarjeta del tramo. **Se derivan de
+  las tarjetas** (`tramo.cards[].sign` en `journey.ts`), no se declaran en `decor`: cada
+  uno se planta a 20 u por delante de la cámara de su parada (`cardStopD`), en su lado,
+  **paralelo al plano de la imagen**. El **texto es DOM** encajado cada frame sobre la zona
+  de escritura proyectada (`KOSATSU.rects` → `useKosatsuFit`, translate + scale), a
+  17–18 px a 1600×900. Si la tabla no se ve entera, la letra bajaría de 14 px, la
+  pantalla es vertical o táctil, o no hay escena, el texto vuelve a la **tarjeta de papel**
+  (`boardFit`). Los postes van detrás de la tabla y metidos 1 u: la tabla vuela hacia el
+  camino sin que los postes pisen las piedras.
+- **Dos mapas antiguos** (`bun run maps`): Japón a la manera de Edo (Natural Earth, los
+  tonos de región de la maqueta, olas, el sello de Kyoto) y el plano de Heian-kyō en 794
+  (la cuadrícula de 一条 a 九条, 朱雀大路, 大内裏, 羅城門, los ríos). Etiquetas con trazos de
+  KanjiVG (un `<img>` no carga fuentes). Cada uno es un **kakejiku** que baja con el scroll
+  (`tramoUnroll`, reversible) y sube al alejarse; el papel envejecido lo pone el shader. En la
+  tarjeta de papel y en la lista de 静 son un `<img>` del SVG, que también leen los buscadores.
+- **La roca pintada**: un tateishi de 3,8 × 2,8 u con la esquina de `2.png` (sol, Fuji y
+  torii) pintada en el shader con pincel seco. Desde la vista inicial queda **en el hueco
+  entre la maqueta y el título**, a ~52 u, difusa; en la primera parada, al otro lado del
+  camino que el kōsatsu.
+- **El valle**: manchas de **susuki** (blanda para la fauna, fuera de las visuales de cada
+  parada, y se aclara antes de los cerezos), un grupo de **kasuga + yukimi** con un
+  arbusto y un yukimi suelto, y **tres cerezos** en los últimos 25 u (`scene/objects/cerezo/`,
+  el árbol base de la Fase 7: crecimiento por semilla, copa de flores instanciadas, se mece
+  entero con un muelle lento).
+
+Medido por CDP (tier alto): de 41 a 59–81 draw calls en las paradas y de 62 a 94 en el
+cartel (por encima del presupuesto de +10 del spec: cada kōsatsu son seis mallas más su
+sombra; instanciarlos como los faroles ahorraría ~18). Detalle:
+`docs/superpowers/specs/2026-10-15-fase-5b-el-tramo-design.md`.
+
 ### 5.5 Ambiente
 
 - **Pétalos y hojas** en varias capas de profundidad, con viento direccional variable.
@@ -602,6 +639,11 @@ instancia miles de veces y reacciona al input. Un dibujo estático no.
 | **Ambiente sonoro** | Sintetizado con la Web Audio API: ruido rosa filtrado para el viento (la frecuencia sigue al `WindField`), parciales con decaimiento para el *fūrin*, ráfagas cortas para los grillos, envolvente sobre oscilador ruidoso para el graznido | Web Audio nativa |
 | **Pétalos y hojas** | Densidad por zona con pico en cada ráfaga. Contorno paramétrico triangulado en abanico (pétalo de cerezo con su muesca, arce de cinco lóbulos por el valor absoluto de cos(2.5θ), hoja lanceolada de bambú) + `InstancedMesh` con la posición calculada **en el vertex shader** | R3F + GLSL |
 | **Estallido de pétalos al click** | `confetti.shapeFromPath()` con la silueta de un pétalo | canvas-confetti |
+| **Kōsatsu** | Cajas redondeadas fusionadas en tres geometrías (madera, tabla con la veta en el shader, tejadillo); la de sin mapa, más estrecha. El kakejiku: un plano que el shader recorta al desenrollarse, con el mapa en textura | three + GLSL |
+| **Mapas antiguos** | SVG generados por `bun run maps` (Natural Earth + el plano de Heian-kyō como dato + trazos de KanjiVG) y rasterizados a WebP con sharp | topojson + sharp (sólo desarrollo) |
+| **Roca pintada** | Esfera llevada a superelipsoide con ruido direccional y la cara plana; la pintura, funciones de distancia en el shader con pincel seco | three + GLSL |
+| **Susuki** | Hojas (cintas arqueadas) y espigas instanciadas por mata, en el viento de siempre en modo hoja | three + GLSL |
+| **Cerezo** | Crecimiento recursivo con semilla (tubos de seis lados fusionados) + flores instanciadas dibujadas en el shader; tronco y copa con el mismo muelle | three + GLSL |
 | **Mapa de Japón** | Prefecturas de Natural Earth simplificadas con topología compartida y encogidas (juntas de tinta) por `bun run geo` → `ExtrudeGeometry` en dos capas fundidas con un id por prefectura (`aPref`) → la elevación y el fundido, en el shader. El zoom escala el contenido dentro de la bandeja con planos de recorte | three + topojson + clipper-lib (sólo desarrollo) |
 | **Agua / estanque** | `MeshReflectorMaterial` con distorsión | drei |
 | **Niebla y atmósfera** | `fog` + `<Cloud>` + god rays | drei + postprocessing |
@@ -739,9 +781,9 @@ fase** para revisión antes de seguir.
 | **3B** | · La fauna en el camino | Actos anclados al mundo · lo que vuela se adelanta (ancla que se desliza) · nace por delante al caminar · cercanía por estación · márgenes con la cámara real · nunca desaparece a la vista | ✅ |
 | **3C** | · La navegación | Sidebar radial (`13.png`) con íconos generados por código · progreso del camino · nav móvil · teclado · transiciones | ✅ |
 | **4** | Home 京都 | Torii 3D, bambú, arbusto, título tipográfico, composición del hero · decoración declarada en `journey.ts` · entrada «el cartel se compone» · tramo hacia Ubicación con tarjeta de bienvenida · faroles kasuga y yukimi, musgo y halo de papel en el texto (revisión) | ✅ |
-| **5** | Ubicación 位置 | Se parte en dos bloques con parada propia, ver abajo | ⏸ |
-| **5A** | · El cartel | Maqueta de Japón por prefecturas sobre un atril de piedra, inclinada hacia la cámara · hover que levanta cada prefectura con su nombre · zoom a Kyoto (Kinki y el lago Biwa) · pin blanco con contorno shu · *Ichi* y 位置 dibujado con `<InkKanji>` · ficha de Kyoto. Detalle: `docs/superpowers/specs/2026-10-13-fase-5a-el-cartel-design.md` | 🔎 |
-| **5B** | · El tramo hacia Eventos | Los dos mapas antiguos, desplegables, **no como tarjetas sino como carteles de madera insertados en el camino** (en 3A son tarjetas provisionales, con el hueco del mapa), junto a la reseña breve de Kyoto · **una roca pequeña vertical pintada** con la esquina de `2.png` (torii, Fuji y sol rojo), que se sacó del cartel para no sobrecargarlo · la decoración del valle · los textos del tramo cuentan la **historia** (la capital de mil años, Heian-kyō) para no repetir la geografía de la ficha de 5A | ⏸ |
+| **5** | Ubicación 位置 | Se parte en dos bloques con parada propia, ver abajo | 🔎 |
+| **5A** | · El cartel | Maqueta de Japón por prefecturas sobre un atril de piedra, inclinada hacia la cámara · hover que levanta cada prefectura con su nombre · zoom a Kyoto (Kinki y el lago Biwa) · pin blanco con contorno shu · *Ichi* y 位置 dibujado con `<InkKanji>` · ficha de Kyoto. Detalle: `docs/superpowers/specs/2026-10-13-fase-5a-el-cartel-design.md` | ✅ |
+| **5B** | · El tramo hacia Eventos | Los dos mapas antiguos, desplegables, **no como tarjetas sino como carteles de madera insertados en el camino** (en 3A son tarjetas provisionales, con el hueco del mapa), junto a la reseña breve de Kyoto · **una roca pequeña vertical pintada** con la esquina de `2.png` (torii, Fuji y sol rojo), que se sacó del cartel para no sobrecargarlo · la decoración del valle · los textos del tramo cuentan la **historia** (la capital de mil años, Heian-kyō) para no repetir la geografía de la ficha de 5A. Detalle: `docs/superpowers/specs/2026-10-15-fase-5b-el-tramo-design.md` | 🔎 |
 | **6** | Lugares | Plantilla + Fushimi Inari, Kiyomizu-dera, Gion · sus kanji dibujados con `<InkKanji>` · variante `inari` del torii · **tramos**: de Eventos a Fushimi, paso por los costados del santuario y subida escalonada —gradas en la malla del terreno— con toriis (`5.png`); de Fushimi a Kiyomizu-dera, un bosque denso de bambú y un puente de madera sobre una pequeña vaguada antes de la plataforma del templo; de Kiyomizu-dera a Gion, la bajada termina en calzadas tradicionales y faroles | ⏸ |
 | **7** | Eventos | Sakura + rueda de estaciones / calendario del año · 桜 dibujado con `<InkKanji>` · **tramo de llegada**: el bosque de cerezos al acercarse a la sakura (el aumento progresivo de pétalos ya lo hace 3A) | ⏸ |
 | **8** | Gastronomía 京料理 | Platos interactivos · 京料理 dibujado con `<InkKanji>` · **tramo final**: llano, culmina en el espacio gastronómico | ⏸ |
@@ -764,7 +806,7 @@ buena medida rellenar contenido sobre una plantilla que ya funciona.
 | Carpa koi | ⏳ Aplazada hasta que haya agua: un estanque en alguno de los templos o en la home. El koi que había es un asset de Animal Crossing y **no se puede publicar**; se hará uno propio (los peces son el caso de libro de la deformación en el shader) |
 | **Créditos de los modelos** | ⚠️ Garza y gorrión son CC BY: **antes de publicar tiene que existir una sección de créditos visible**. Detalle en `assets/models/LICENSES.md` (Fase 9) |
 | **Créditos de KanjiVG** | ⚠️ Los trazos de los kanji son CC BY-SA 3.0 (© Ulrich Apel): entran en la misma sección de créditos. El «compartir igual» afecta sólo a `strokes.generated.ts`. Detalle en `assets/kanji/LICENSES.md` |
-| Faroles de piedra | ✅ En la revisión de la Fase 4: tres en el tramo de la Home (un yukimi y un par de kasuga), fuera del cartel. **Los dos tipos se reparten por el resto del camino en sus fases**, pensando en el modo noche |
+| Faroles de piedra | ✅ En la revisión de la Fase 4: tres en el tramo de la Home (un yukimi y un par de kasuga), fuera del cartel. **Los dos tipos se reparten por el resto del camino en sus fases**, pensando en el modo noche, y **no siempre igual**: en pareja, mezclados (un kasuga junto a un yukimi, a veces con un arbusto) o solos (decidido en la 5B) |
 | Faroles encendidos | ⏳ **A la fase de la noche.** Las ventanas de papel ya son un material propio (`StoneLanterns`, `DAY_GLOW`); de noche subirá su brillo y se sumará la luz al sendero desde la cámara del fuego (`LANTERN_SIZE.fireY`), con presupuesto de luces: no una luz por farol |
 | Profundidad de campo en la Home | ✅ Se queda como está (decidido al cerrar la Fase 4): estrecharla desenfocaría también las piedras cercanas de todas las estaciones |
 | Compilación del shader de la fauna | ⏳ Fase 9. El primer animal que entra en cuadro compila su programa en ese frame: ~120 ms de tirón unos 10 s después de cargar (perfil de CPU: `getProgramInfoLog` dentro de `getUniforms`, el programa de la fauna con deformación). Arreglo: precompilar los materiales de la fauna al cargar (`renderer.compileAsync`, que usa `KHR_parallel_shader_compile`) |

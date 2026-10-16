@@ -106,7 +106,10 @@
     "label": "Camino hacia {station}",
     "continue": "Seguir el camino",
     "hint": "Sigue bajando: el camino continúa",
-    "mapPlaceholder": "Mapa antiguo · llega en la Fase 5"
+    "maps": {
+      "japon": "Mapa de Japón al estilo de Edo, con Kyoto marcado con un sello rojo.",
+      "heian": "Plano de Heian-kyō en 794: la cuadrícula de avenidas, el palacio al norte, la avenida Suzaku y la puerta de Rashōmon al sur, entre los ríos Kamo y Katsura."
+    }
   },
   "tramos": {
     "inicio": {
@@ -116,17 +119,17 @@
       }
     },
     "ubicacion": {
-      "japon": {
-        "title": "En el corazón de Japón",
-        "body": "Kyoto está en Honshū, la isla principal del archipiélago, a unos 370 km al oeste de Tokio. Fue la capital imperial durante más de mil años, del 794 al 1868."
+      "capital": {
+        "title": "La capital de mil años",
+        "body": "En 794 el emperador Kanmu trasladó la corte a este valle y la llamó Heian-kyō, «la capital de la paz y la tranquilidad». Durante más de mil años, hasta 1868, fue el centro del país: aquí vivían los emperadores y de aquí partían los caminos hacia todas las provincias."
       },
-      "kansai": {
-        "title": "Una cuenca entre montañas",
-        "body": "Pertenece a la región de Kansai, junto a Osaka y Nara, a menos de una hora en tren de cada una. Las montañas la rodean por el norte, el este y el oeste, y el río Kamo la cruza de norte a sur."
+      "heian": {
+        "title": "Una ciudad trazada a cordel",
+        "body": "Heian-kyō (así se llamaba entonces Kyoto) se trazó a imagen de Chang’an, la capital de los Tang: una cuadrícula de unos 4,5 por 5,2 km, con el palacio al norte y la avenida Suzaku, de unos 85 metros de ancho, hasta la puerta de Rashōmon. Las calles de hoy aún llevan su número: Nijō, Shijō, Gojō."
       },
-      "resena": {
-        "title": "Cómo es Kyoto",
-        "body": "Una ciudad de casi un millón y medio de habitantes, trazada en cuadrícula, con más de 1.600 templos budistas y unos 400 santuarios sintoístas. Sus monumentos históricos —diecisiete lugares entre Kyoto, Uji y Ōtsu— son Patrimonio de la Humanidad desde 1994: aquí lo milenario y lo cotidiano comparten la misma calle."
+      "kyoto": {
+        "title": "De Heian-kyō a Kyoto",
+        "body": "Con los siglos, la ciudad pasó a llamarse sencillamente Kyoto, 京都, «la capital». En 1868 el emperador se mudó a Tokio, pero la ciudad guardó lo que había reunido: más de 1.600 templos, unos 400 santuarios y diecisiete monumentos Patrimonio de la Humanidad. Lo milenario y lo cotidiano siguen compartiendo la misma calle."
       }
     }
   },

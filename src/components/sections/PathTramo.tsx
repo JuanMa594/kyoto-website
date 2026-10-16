@@ -7,6 +7,9 @@ import { tramoHeightVh, tramoWalkVh } from '@/animation/journeyScroll';
 import { useJourneyScroll } from '@/animation/useJourneyScroll';
 import { getStation, neighbours, stationPath, type StationSlug } from '@/config/journey';
 import { Link, useRouter } from '@/i18n/navigation';
+import { MAP_SIZE } from '@/scene/objects/kosatsu/kosatsu';
+
+import { useKosatsuFit } from './useKosatsuFit';
 import { selectMotionAllowed, useKyotoStore } from '@/store/useKyotoStore';
 
 /**
@@ -51,6 +54,9 @@ export function PathTramo({ station }: { station: StationSlug }) {
     },
   });
 
+  // Las tarjetas con cartel se leen sobre la tabla de su kōsatsu (Fase 5B).
+  useKosatsuFit(section, motionAllowed);
+
   // La última estación no tiene tramo, pero su scroll sí mueve la cámara (el
   // avance de lectura): por eso el hook va antes de este return.
   if (!next) return null;
@@ -72,17 +78,27 @@ export function PathTramo({ station }: { station: StationSlug }) {
       style={motionAllowed ? { height: `${tramoHeightVh(cards.length, walkVh)}vh` } : undefined}
     >
       <div className="path-tramo__stage">
-        {cards.map((card) => (
+        {cards.map((card, index) => (
           <article
             key={card.id}
             className="tramo-card paper"
             data-tramo-card=""
             data-side={card.side}
             data-kind={card.kind}
+            data-sign={card.sign ? index : undefined}
           >
-            {card.kind === 'mapa' && (
-              <div className="tramo-card__map" role="img" aria-label={t('mapPlaceholder')}>
-                <span>{t('mapPlaceholder')}</span>
+            {card.sign?.map && (
+              // El mapa antiguo, para cuando el texto no va sobre la tabla del
+              // kōsatsu: la lista de 静, la tarjeta en vertical, los buscadores.
+              // Lo genera `bun run maps`; las rutas de `public` no llevan idioma.
+              <div className="tramo-card__map">
+                <img
+                  src={`/maps/${card.sign.map}.svg`}
+                  alt={t(`maps.${card.sign.map}`)}
+                  width={MAP_SIZE[card.sign.map].width}
+                  height={MAP_SIZE[card.sign.map].height}
+                  loading="lazy"
+                />
               </div>
             )}
             <h2 className="text-2xl leading-tight">{cardText(card.id, 'title')}</h2>

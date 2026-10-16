@@ -332,6 +332,16 @@ check('si la cámara retrocede no vuelve atrás', slideStep(5, 12, -0.2, 10, 1 /
     `a ${(6 + push).toFixed(2)} u en 2 s; paso máx ${biggestStep.toFixed(2)} u`,
   );
 }
+{
+  // Y aunque alce el vuelo muy por dentro de su mínimo, a 30 fps nunca se
+  // aparta más que el umbral de «salto» de la simulación (0,15 u por frame).
+  const dt = 1 / 30;
+  let biggestStep = 0;
+  for (const inside of [2, 4, 8, 12]) {
+    biggestStep = Math.max(biggestStep, slideStep(0, 12 - inside, 0, 12, dt));
+  }
+  check('al apartarse, nunca más de 0,15 u por frame a 30 fps', biggestStep <= 0.15, `${biggestStep.toFixed(3)} u`);
+}
 
 /* ── 4. La cámara real ─────────────────────────────────────────────────── */
 

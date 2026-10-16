@@ -4,6 +4,7 @@ import { useEffect, useRef, type RefObject } from 'react';
 
 import type { StationSlug } from '@/config/journey';
 import { clamp } from '@/lib/procedural';
+import { KOSATSU } from '@/scene/objects/kosatsu/kosatsu';
 
 import { getLenis, ScrollTrigger } from './gsap';
 import {
@@ -15,6 +16,7 @@ import {
   tramoCardOpacity,
   tramoFraction,
   tramoSignOpacity,
+  tramoUnroll,
 } from './journeyScroll';
 
 /**
@@ -99,6 +101,10 @@ export function useJourneyScroll({
       SCROLL_PATH.tramo = 0;
       cardNodes.forEach((node) => node.style.removeProperty('--card'));
       section?.style.removeProperty('--llegada');
+      // Y los mapas de los kōsatsu, desplegados.
+      KOSATSU.unrollFor = 'todas';
+      KOSATSU.unroll.fill(1);
+      KOSATSU.wake();
       return;
     }
 
@@ -106,6 +112,12 @@ export function useJourneyScroll({
     // repone en cada refresh —que el motor pide en cada cambio de ruta—: el
     // 'manual' de arriba no duraría ni una navegación. Hay que decírselo a él.
     ScrollTrigger.clearScrollMemory('manual');
+
+    // Los mapas de los kōsatsu, enrollados hasta que el tramo diga otra cosa
+    // (al volver de 静 estaban todos desplegados).
+    KOSATSU.unrollFor = station;
+    KOSATSU.unroll.fill(0);
+    KOSATSU.wake();
 
     const content = ScrollTrigger.create({
       start: 0,
@@ -131,9 +143,14 @@ export function useJourneyScroll({
           onUpdate: (self) => {
             const progress = unit(self.progress);
             SCROLL_PATH.tramo = tramoFraction(progress, cards, walkVh);
+            // Los índices son de tarjeta: cuentan sólo para el tramo de esta estación.
+            KOSATSU.unrollFor = station;
             cardNodes.forEach((node, index) => {
               node.style.setProperty('--card', tramoCardOpacity(progress, cards, index, walkVh).toFixed(3));
+              // El rollo del mapa del kōsatsu de esta tarjeta (Fase 5B).
+              KOSATSU.unroll[index] = tramoUnroll(progress, cards, index, walkVh);
             });
+            KOSATSU.wake();
             section.style.setProperty('--llegada', tramoSignOpacity(progress, cards, walkVh).toFixed(3));
             if (passTramo(gate, progress, self.direction)) arrive.current();
           },

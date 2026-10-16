@@ -192,7 +192,56 @@ export interface DecorMaqueta extends DecorObjectBase {
   readonly kind: 'maqueta';
 }
 
-export type DecorItem = DecorTorii | DecorShrub | DecorLantern | DecorGrove | DecorMaqueta;
+/**
+ * La roca pintada del tramo de Ubicación (Fase 5B): un tateishi más ancho que
+ * alto con la esquina de `2.png` —sol, Fuji y torii— pintada en la cara. Como
+ * la maqueta, mira siempre a la cámara: no se voltea al otro lado del camino.
+ * Le cierra el paso a la fauna. Medidas: `scene/objects/roca/roca.ts`.
+ */
+export interface DecorRoca extends DecorObjectBase {
+  readonly kind: 'roca';
+}
+
+/**
+ * Un macizo de susuki (すすき, Fase 5B): matas de hierba alta con sus espigas,
+ * que se mecen con el viento. Es blanda para la fauna —la cruzan las
+ * libélulas y la garza—; sólo la cámara y las piedras la tratan como franja.
+ * Va declarada por área, como el bambú.
+ */
+export interface DecorSusuki {
+  readonly kind: 'susuki';
+  readonly area: DecorArea;
+  readonly portrait?: DecorArea | null;
+  /** Matas por unidad² en tier alto. */
+  readonly density: number;
+  /** Densidad al final, como fracción de la del principio: < 1 se aclara. */
+  readonly taper?: number;
+  /** Alto de las matas, de las más bajas a las más altas. */
+  readonly height: readonly [number, number];
+  readonly seed: number;
+}
+
+/**
+ * Un cerezo (桜, Fase 5B): tronco y ramas procedurales con su copa de flor,
+ * que se mece despacio con el viento. Es el árbol base de la Fase 7. No se
+ * gira (lo que se mece no se gira: el viento lo doblaría en otra dirección):
+ * la variedad la da la semilla. El tronco cierra el paso a lo que anda.
+ * Medidas: `scene/objects/cerezo/cerezo.ts`.
+ */
+export interface DecorCerezo extends DecorObjectBase {
+  readonly kind: 'cerezo';
+  readonly seed: number;
+}
+
+export type DecorItem =
+  | DecorTorii
+  | DecorShrub
+  | DecorLantern
+  | DecorGrove
+  | DecorMaqueta
+  | DecorRoca
+  | DecorSusuki
+  | DecorCerezo;
 
 /**
  * El "preset de ambiente" de la estación: qué forma tiene el terreno, por qué
@@ -241,9 +290,18 @@ export interface TramoCard {
   readonly id: string;
   /** A qué lado del camino aparece. En móvil, siempre centrada. */
   readonly side: Side;
-  /** `mapa` deja además el hueco del mapa (Fase 5); `texto` es sólo lectura. */
+  /** `mapa` lleva un mapa antiguo (`sign.map`); `texto` es sólo lectura. */
   readonly kind: 'texto' | 'mapa';
+  /**
+   * Va escrita en un kōsatsu plantado delante de su parada (Fase 5B). El
+   * tablón se deriva de aquí (`scene/decor/placement.ts`): no se declara en
+   * `decor`. Sin `sign`, la tarjeta es de papel.
+   */
+  readonly sign?: { readonly map?: OldMap };
 }
+
+/** Los mapas antiguos del tramo de Ubicación (Fase 5B), los genera `bun run maps`. */
+export type OldMap = 'japon' | 'heian';
 
 /** Lo que hay en el camino entre esta estación y la siguiente. */
 export interface StationTramo {
@@ -335,15 +393,16 @@ const TRAMO_INICIO: StationTramo = {
 };
 
 /**
- * De Ubicación a la sakura: dónde está Kyoto y cómo es, antes de llegar a los
- * cerezos. Provisional: las dos tarjetas de mapa dejan el hueco del mapa
- * antiguo desplegable, que se hace en la Fase 5.
+ * De Ubicación a la sakura (Fase 5B): la historia de la ciudad, escrita en
+ * tres kōsatsu plantados junto al camino —la capital de mil años con el mapa
+ * de Japón, Heian-kyō con su plano y el paso a Kyoto—. Cada tablón se planta
+ * delante de su parada (`scene/decor/placement.ts`).
  */
 const TRAMO_UBICACION: StationTramo = {
   cards: [
-    { id: 'japon', side: 'izquierda', kind: 'mapa' },
-    { id: 'kansai', side: 'derecha', kind: 'mapa' },
-    { id: 'resena', side: 'izquierda', kind: 'texto' },
+    { id: 'capital', side: 'derecha', kind: 'mapa', sign: { map: 'japon' } },
+    { id: 'heian', side: 'izquierda', kind: 'mapa', sign: { map: 'heian' } },
+    { id: 'kyoto', side: 'derecha', kind: 'texto', sign: {} },
   ],
 };
 
@@ -447,6 +506,22 @@ const DECOR_INICIO: readonly DecorItem[] = [
   { kind: 'farol', variant: 'kasuga', at: { d: 54, u: 4.6 } },
 ];
 
+/** La susuki del valle de Ubicación (Fase 5B), por manchas. Calibrado con `check:path` («La susuki»). */
+const SUSUKI_UBICACION: readonly DecorSusuki[] = [
+  { kind: 'susuki', area: { side: 'izquierda', from: 8, to: 25, inner: 4, outer: 10 }, density: 0.6, height: [0.9, 1.6], seed: 42 },
+  { kind: 'susuki', area: { side: 'derecha', from: 37, to: 58, inner: 4, outer: 11 }, density: 0.55, height: [1, 1.6], seed: 43 },
+  { kind: 'susuki', area: { side: 'izquierda', from: 40, to: 57, inner: 9, outer: 15 }, density: 0.45, height: [1, 1.6], seed: 44 },
+  { kind: 'susuki', area: { side: 'izquierda', from: 68, to: 86, inner: 4, outer: 11 }, density: 0.55, height: [0.9, 1.5], seed: 45 },
+  {
+    kind: 'susuki',
+    area: { side: 'derecha', from: 66, to: 90, inner: 9, outer: 15 },
+    density: 0.5,
+    taper: 0.3,
+    height: [0.9, 1.4],
+    seed: 46,
+  },
+];
+
 /**
  * Ubicación: el cartel de `2.png` en espejo respecto de la Home —la maqueta
  * de Japón a la izquierda del camino, el texto a la derecha—. Girada hacia la
@@ -457,6 +532,24 @@ const DECOR_UBICACION: readonly DecorItem[] = [
   // En vertical no hay sitio junto al camino para una bandeja grande: más
   // lejos y algo menor, entera en el cuadro de un teléfono (≈ 0,45).
   { kind: 'maqueta', at: { d: -5, u: -5.8 }, portrait: { d: 20, u: -4.5, scale: 0.8 }, yaw: 0.15 },
+  // La roca pintada (5B): desde la vista inicial, a ~50 u y difusa por la
+  // niebla; en la primera parada, al otro lado del camino que el kōsatsu.
+  { kind: 'roca', at: { d: 30, u: -5.2 }, portrait: { d: 34, u: -3.4, scale: 0.8 }, yaw: 0.2 },
+  // La susuki (5B): manchas por los dos costados, nunca entre la cámara de una
+  // parada y su kōsatsu; se aclara al final y no llega a los cerezos.
+  ...SUSUKI_UBICACION,
+  // Faroles y arbustos (5B): un kasuga y un yukimi juntos, otro yukimi solo
+  // más allá; los arbustos acompañan a la roca y rellenan el final.
+  { kind: 'farol', variant: 'kasuga', at: { d: 47.5, u: -4.6 } },
+  { kind: 'farol', variant: 'yukimi', at: { d: 49.6, u: -6 } },
+  { kind: 'arbusto', seed: 31, at: { d: 51.5, u: -7.4 } },
+  { kind: 'farol', variant: 'yukimi', at: { d: 61, u: 4.8 } },
+  { kind: 'arbusto', seed: 32, at: { d: 26.5, u: -8.8 } },
+  { kind: 'arbusto', seed: 33, at: { d: 92, u: -6.5 } },
+  // Los primeros cerezos (5B), al final: anuncian Eventos sin pegarse al camino.
+  { kind: 'cerezo', seed: 22, at: { d: 106, u: -9 } },
+  { kind: 'cerezo', seed: 24, at: { d: 115, u: 11.5 }, scale: 1.08 },
+  { kind: 'cerezo', seed: 25, at: { d: 124, u: -12.5 }, scale: 0.92 },
 ];
 
 /**

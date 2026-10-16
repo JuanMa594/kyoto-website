@@ -83,6 +83,8 @@ export const SLIDE: Readonly<Record<BehaviorName, Slide>> = {
 export const SLIDE_RANGE = 3;
 /** Con qué constante (1/s) se aparta hasta su mínimo lo que arranca a volar ya más cerca. */
 export const SLIDE_RESTORE = 3;
+/** Lo más deprisa que se aparta (u/s): a esa velocidad un ave que despega no parece arrastrada. */
+export const SLIDE_RESTORE_MAX_SPEED = 4;
 
 /**
  * Un frame del ancla que se desliza: cuánto se ha deslizado después de que la
@@ -102,7 +104,12 @@ export function slideStep(
   dt: number,
 ): number {
   const follow = Math.max(0, advance) * smoothstep(min + SLIDE_RANGE, min, distance);
-  const restore = Math.max(0, min - distance) * (1 - Math.exp(-SLIDE_RESTORE * Math.max(0, dt)));
+  // Con tope de velocidad: un gorrión que alza el vuelo varias unidades por
+  // dentro de su mínimo se apartaba a ~10 u/s, y eso ya se lee como un salto.
+  const restore = Math.min(
+    Math.max(0, min - distance) * (1 - Math.exp(-SLIDE_RESTORE * Math.max(0, dt))),
+    SLIDE_RESTORE_MAX_SPEED * Math.max(0, dt),
+  );
   return push + follow + restore;
 }
 

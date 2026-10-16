@@ -27,8 +27,8 @@ export interface ContactShadow {
 }
 
 /** Cuánto más ancha que lo que toca el suelo, y cuán oscura, según qué la proyecta. */
-const SPREAD = { torii: 1.6, farol: 1.9, arbusto: 1.75, maqueta: 1.7 } as const;
-const STRENGTH = { torii: 0.7, farol: 0.85, arbusto: 0.95, maqueta: 0.85 } as const;
+const SPREAD = { torii: 1.6, farol: 1.9, arbusto: 1.75, maqueta: 1.7, kosatsu: 1.9, roca: 1.5, cerezo: 2.4 } as const;
+const STRENGTH = { torii: 0.7, farol: 0.85, arbusto: 0.95, maqueta: 0.85, kosatsu: 0.8, roca: 0.9, cerezo: 0.75 } as const;
 
 /** Por debajo del musgo: se dibuja antes y él la cubre. */
 const CONTACT_LIFT = 0.008;

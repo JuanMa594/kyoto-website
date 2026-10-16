@@ -39,7 +39,8 @@ bun run models       # assets/models/source → public/models (fauna optimizada)
 bun run geo          # Natural Earth → el Japón del ícono y las prefecturas de la maqueta de Ubicación
 bun run palette      # muestrea los colores de docs/referencias/*.png
 bun run kanji        # KanjiVG → components/kanji/strokes.generated.ts (trazos de los kanji)
-bun run check:path   # comprobaciones puras del camino, el terreno, la cámara, el scroll, la fauna, la navegación y la decoración
+bun run maps         # los dos mapas antiguos del tramo de Ubicación → public/maps/{japon,heian}.{svg,webp}
+bun run check:path   # comprobaciones puras del camino, el terreno, la cámara, el scroll, la fauna, la navegación, la decoración y el valle de Ubicación
 ```
 
 En desarrollo, **`?fauna=<especie>`** en cualquier página (`/es/ubicacion?fauna=libelula`)
@@ -116,7 +117,11 @@ src/
 │   ├─ objects/Shrub.tsx       ← el arbusto podado en nube (o-karikomi)
 │   ├─ objects/maqueta/        ← ★ la maqueta de Japón de Ubicación (Fase 5A): dato generado,
 │   │                            medidas y poses (puro), geometría, losas en el shader, MAQUETA
-│   ├─ decor/                  ← ★ la decoración de journey.ts (Fase 4)
+│   ├─ objects/kosatsu/        ← ★ el kōsatsu del tramo de Ubicación (5B): medidas y KOSATSU
+│   │                            (puro), geometría, la tabla (KosatsuSign) y el kakejiku que baja
+│   ├─ objects/roca/           ← la roca pintada (5B): forma (puro), geometría, la pintura en el shader
+│   ├─ objects/cerezo/         ← el cerezo (5B, base de la Fase 7): crecimiento (puro), tronco, flores
+│   ├─ decor/                  ← ★ la decoración de journey.ts (Fase 4; susuki.ts en la 5B)
 │   │   ├─ placement.ts        ← descriptor → mundo, por aspecto (puro)
 │   │   ├─ footprints.ts       ← huellas: piedras, cámara y fauna (puro)
 │   │   ├─ moss.ts             ← dónde crece el musgo (puro)
@@ -153,7 +158,8 @@ src/
 │   ├─ railProgress.ts         ← profundidad → riel, barra y abanico (puro)
 │   ├─ useRailProgress.ts      ← la marca «tú», desde gsap.ticker (fuera de React)
 │   └─ icons/                  ← los seis íconos calculados + sus microanimaciones
-├─ components/sections/        ← StationShell, PathTramo (el tramo), ContentArrival, CartelTitle
+├─ components/sections/        ← StationShell, PathTramo (el tramo), ContentArrival, CartelTitle,
+│                                 kosatsuFit + useKosatsuFit (el texto del tramo sobre la tabla, 5B)
 ├─ components/ubicacion/       ← MaquetaInput (la mano), MaquetaToggle, PrefectureLabels, KyotoFicha (5A)
 ├─ components/home/            ← HomeIntro (la entrada), introScript, WalkHint (Fase 4)
 ├─ components/kanji/           ← InkKanji: el kanji dibujado trazo a trazo (KanjiVG)
@@ -168,8 +174,9 @@ src/
 └─ lib/procedural.ts           ← PRNG, ruido direccional, damping
 ```
 
-Fuera de `src/`: `scripts/` (pipelines de fuentes, paleta, modelos, kanji y el Japón
-del ícono de Ubicación) y `assets/` (originales; los trazos de KanjiVG, CC BY-SA,
+Fuera de `src/`: `scripts/` (pipelines de fuentes, paleta, modelos, kanji, el Japón
+del ícono de Ubicación y los mapas antiguos; `maps/` lleva el plano de Heian-kyō como dato)
+y `assets/` (originales; los trazos de KanjiVG, CC BY-SA,
 en `assets/kanji/`). Los modelos originales de `assets/models/source/` **no
 se versionan** —la garza pesa 127 MB y GitHub no acepta más de 100—; sí se
 versionan los optimizados de `public/models/`. Créditos y licencias en
@@ -188,9 +195,14 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   Un tramo puede empezar con un llano recto (`tramo.flat`, en unidades): el de
   Eventos camina 50 u entre los cerezos antes de que empiece la subida a
   Fushimi. Los tramos crecen cuando una página les pone tarjetas.
+  Una tarjeta con `sign` (Fase 5B) no es de papel: es un **kōsatsu** que se
+  planta solo delante de su parada (`cardStopD`), con el texto DOM encajado
+  sobre su tabla (`useKosatsuFit`) y, si lleva `sign.map`, un mapa antiguo que
+  se desenrolla con el scroll (`tramoUnroll`). Si la tabla no se lee bien
+  (`boardFit`), el texto vuelve a ser la tarjeta de papel.
 - **Lo que hay a los lados del camino se declara en `journey.ts`**
   (`environment.decor`, Fase 4): objetos sueltos (`torii`, `arbusto`, `farol`
-  kasuga o yukimi, la `maqueta` de Ubicación) y macizos (`bambu`), en coordenadas del camino —`d` desde la estación, `u` desde
+  kasuga o yukimi, la `maqueta` de Ubicación, la `roca` pintada y el `cerezo` de la 5B) y macizos (`bambu`, `susuki`), en coordenadas del camino —`d` desde la estación, `u` desde
   el eje—, con otra colocación opcional para pantallas verticales
   (`portrait`). **La decoración de una estación incluye su tramo de salida.**
   `scene/decor/placement.ts` la lleva al mundo y `footprints.ts` publica sus
@@ -552,6 +564,23 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   movimiento. Lo que pinta una superficie va **en ella** (un atributo y el
   shader, como `aSea`); lo que de verdad flota encima, a ≥ 1 cm y con
   `polygonOffset`.
+- **`half` es palabra reservada en GLSL ES** (como `input`, `output`, `filter`,
+  `sample`…): un `vec2 half` en una función de la roca pintada tumbó el programa. Pasó
+  el typecheck y el build; lo cazó la consola del navegador («Shader Error»). Otra
+  razón para compilar cada shader nuevo en un WebGL2 real.
+- **Un texto DOM encajado sobre algo 3D con translate + scale sólo cuadra si el
+  plano es paralelo a la imagen.** Los kōsatsu se plantan con el rumbo de la cámara
+  de su parada, no mirando a su posición: girados hacia ella, en una curva salían
+  25° de canto, con trapecio. Y como el campo de visión vertical es fijo, **los px de
+  lo 3D escalan con el alto de la ventana**: la letra que cabe en la tabla depende
+  de él. Por eso hay una regla de caída (`boardFit`: < 14 px, tabla cortada,
+  vertical o táctil → tarjeta de papel), no un tamaño fijo.
+- **La simulación de la fauna de `check:path` va con semilla, y cualquier
+  decoración nueva cambia el reparto.** Al sumar los kōsatsu, otro sorteo sacó un
+  gorrión que despegaba muy por dentro de su mínimo y se apartaba a 10 u/s («salto»):
+  un defecto de la 3B que el sorteo viejo nunca tocaba. Se arregló en su sitio
+  (`SLIDE_RESTORE_MAX_SPEED`), con su comprobación. Si un check de fauna cae tras
+  tocar la decoración, buscar el defecto, no la semilla que lo esconde.
 - **Un dato pesado no va al bundle de la página.** Los polígonos de la maqueta
   (~80 KB) se cargan con `lazy()` desde `StationDecor`; el DOM, que sólo
   necesita los nombres, lee `names.generated.ts`. Importar `PREFECTURES` desde
@@ -616,8 +645,8 @@ llega en las fases 4–8 y se cuelga de ese mismo objeto.
 | 3C | · La navegación (sidebar radial, íconos por código, móvil, teclado) | ✅ |
 | 4 | Home 京都: torii, bambú, arbusto, cartel, entrada, tramo hacia Ubicación, faroles y musgo | ✅ |
 | 5 | Ubicación 位置, en dos bloques: | 🔎 |
-| 5A | · El cartel: la maqueta de Japón, hover, zoom a Kinki, el pin, Ichi / 位置 y la ficha | 🔎 en revisión |
-| 5B | · El tramo hacia Eventos: carteles de madera con los mapas antiguos, la roca pintada | ⏸ |
+| 5A | · El cartel: la maqueta de Japón, hover, zoom a Kinki, el pin, Ichi / 位置 y la ficha | ✅ |
+| 5B | · El tramo hacia Eventos: kōsatsu con la historia y los mapas antiguos, la roca pintada, susuki, cerezos | 🔎 en revisión |
 | 6 | Lugares | ⏸ |
 | 7 | Eventos 桜 | ⏸ |
 | 8 | Gastronomía 京料理 | ⏸ |

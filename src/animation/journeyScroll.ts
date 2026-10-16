@@ -15,7 +15,7 @@
  * donde estaba en vez de volver a cero.
  */
 
-import type { StationSlug } from '@/config/journey';
+import { getStation, type StationSlug } from '@/config/journey';
 import { clamp, smoothstep } from '@/lib/procedural';
 import { STATION_DEPTHS, stationIndex } from '@/scene/path/journeyPath';
 
@@ -163,6 +163,46 @@ export function tramoCardOpacity(
   const start = (index + 1) * walk + index * TRAMO_STOP_VH;
   const end = start + TRAMO_STOP_VH;
   return smoothstep(start - CARD_FADE_VH, start, x) * (1 - smoothstep(end, end + CARD_FADE_VH, x));
+}
+
+/** Cuánto antes de su parada empieza a bajar el rollo de un mapa, y cuánto antes termina, en vh. */
+const UNROLL_FROM_VH = 60;
+const UNROLL_TO_VH = 10;
+
+/**
+ * Cuánto está desenrollado el mapa de la tarjeta `index` (0–1, Fase 5B): baja
+ * antes de que el texto aparezca, se queda abajo mientras se lee y vuelve a
+ * subir al irse. Continua y monótona a cada lado de la parada: al desandar el
+ * tramo, sube por el mismo camino.
+ */
+export function tramoUnroll(progress: number, cards: number, index: number, walkVh = TRAMO_WALK_VH): number {
+  const { count, walk, height } = tramoLayout(cards, walkVh);
+  if (index < 0 || index >= count) return 0;
+
+  const x = unit(progress) * height;
+  const start = (index + 1) * walk + index * TRAMO_STOP_VH;
+  const end = start + TRAMO_STOP_VH;
+  const down = smoothstep(start - UNROLL_FROM_VH, start - UNROLL_TO_VH, x);
+  const up = 1 - smoothstep(end + UNROLL_TO_VH, end + UNROLL_FROM_VH, x);
+  return Math.min(down, up);
+}
+
+/**
+ * La d (absoluta) del punto de interés de la cámara en mitad de la parada
+ * `index` del tramo que sale de `station`. Los kōsatsu se plantan respecto de
+ * ella (`scene/decor/placement.ts`): si el tramo cambia de largo o de
+ * tarjetas, los tablones se mueven solos.
+ */
+export function cardStopD(station: StationSlug, index: number): number {
+  const i = stationIndex(station);
+  const here = STATION_DEPTHS[i]!;
+  const next = STATION_DEPTHS[i + 1];
+  if (next === undefined) return here;
+
+  const { distance } = tramoLayout(getStation(station).tramo.cards.length, tramoWalkVh(station));
+  const fraction = (index + 1) * distance + index * STOP_DRIFT + STOP_DRIFT / 2;
+  const reading = here + READING_DRIFT;
+  return reading + (next - reading) * fraction;
 }
 
 /**
