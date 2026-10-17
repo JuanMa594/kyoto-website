@@ -180,8 +180,10 @@
     position: sticky;
     top: 0;
     /* El texto sigue a su tabla también cuando ésta sale por un lado al pasar
-       junto a ella: se recorta en el borde, la página no se ensancha. */
-    overflow: clip;
+       junto a ella: se recorta en el borde, la página no se ensancha. Sólo de
+       lado: mientras el escenario aún entra por abajo, el texto de la primera
+       tabla queda por encima de su borde y no debe cortarse. */
+    overflow-x: clip;
     display: flex;
     min-height: 100dvh;
     flex-direction: column;

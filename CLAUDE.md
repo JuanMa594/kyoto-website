@@ -599,6 +599,14 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   un frame por detrás y con la cámara en marcha se le veía llegar a la madera.
   Lo que tiene que moverse pegado a algo 3D se coloca desde el `useFrame` que
   lo proyecta (`KOSATSU.place`), después de `CameraRig` (prioridad −1).
+- **Una proyección está en px de la ventana; un hijo de un `sticky`, no.** El
+  texto de los kōsatsu se coloca dentro del escenario del tramo, que es
+  `sticky` y sólo se queda fijo arriba cuando el tramo ha subido una pantalla:
+  antes, sigue entrando por abajo. La primera tabla se lee justo en esa fase y
+  su texto bajaba con el escenario, por debajo de la madera (las otras dos se
+  leen con el escenario ya fijo y no lo mostraban). Al colocar algo con una
+  proyección se resta dónde está su contenedor (`offsetParent`), y el
+  escenario recorta sólo de lado (`overflow-x: clip`).
 - **El reset de Tailwind descentra los `<dialog>`.** Un dialog modal se centra
   con el `margin: auto` de la hoja del navegador, y el preflight lo pone a 0:
   la tarjeta de lectura salía pegada arriba a la izquierda. Todo `<dialog>`

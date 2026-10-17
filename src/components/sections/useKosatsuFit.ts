@@ -106,8 +106,16 @@ export function useKosatsuFit(section: RefObject<HTMLElement | null>, enabled: b
       const placement = boardFit(input);
       const ink = placement && rect.on ? boardInk(rect.distance) : 0;
       const legible = ink.toFixed(3);
+      // La proyección está en px de la ventana, pero la tarjeta se coloca
+      // dentro del escenario del tramo, que es sticky: hasta que el tramo ha
+      // subido una pantalla entera, el escenario aún entra por abajo y todo lo
+      // que lleva bajaba con él. La primera tabla se lee justo entonces (las
+      // demás, con el escenario ya fijo arriba): se resta dónde está.
+      const stage = node.offsetParent?.getBoundingClientRect();
+      const ox = stage?.left ?? 0;
+      const oy = stage?.top ?? 0;
       const key = placement && ink > 0
-        ? `${placement.x.toFixed(1)},${placement.y.toFixed(1)},${placement.scale.toFixed(4)},${rect.boardY.toFixed(1)},${legible}`
+        ? `${(placement.x - ox).toFixed(1)},${(placement.y - oy).toFixed(1)},${placement.scale.toFixed(4)},${(rect.boardY - oy).toFixed(1)},${legible}`
         : 'hidden';
       if (key === last.get(index)) return;
       last.set(index, key);
@@ -117,7 +125,7 @@ export function useKosatsuFit(section: RefObject<HTMLElement | null>, enabled: b
         hideHit(hit);
         return;
       }
-      node.style.transform = `translate3d(${placement.x.toFixed(1)}px, ${placement.y.toFixed(1)}px, 0) scale(${placement.scale.toFixed(4)})`;
+      node.style.transform = `translate3d(${(placement.x - ox).toFixed(1)}px, ${(placement.y - oy).toFixed(1)}px, 0) scale(${placement.scale.toFixed(4)})`;
       if (!hit) return;
       if (ink < HIT_FROM) {
         hideHit(hit);
@@ -126,7 +134,7 @@ export function useKosatsuFit(section: RefObject<HTMLElement | null>, enabled: b
       // La tabla entera, con el marco y el mapa: lo que se puede tocar.
       hit.dataset.on = 'on';
       hit.tabIndex = 0;
-      hit.style.transform = `translate3d(${rect.boardX.toFixed(1)}px, ${rect.boardY.toFixed(1)}px, 0)`;
+      hit.style.transform = `translate3d(${(rect.boardX - ox).toFixed(1)}px, ${(rect.boardY - oy).toFixed(1)}px, 0)`;
       hit.style.width = `${rect.boardW.toFixed(1)}px`;
       hit.style.height = `${rect.boardH.toFixed(1)}px`;
       hit.style.setProperty('--legible', legible);
