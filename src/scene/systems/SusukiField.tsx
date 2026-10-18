@@ -54,11 +54,19 @@ export function SusukiField({ patches, palette, profile }: SusukiFieldProps) {
     );
     const green = new Color(palette.matchaSoft);
     const straw = new Color(palette.kohaku).lerp(new Color(palette.bambu), 0.25);
+    // Los juncos, de un verde más hondo y apenas pajizos en la punta de la mata.
+    const rushGreen = new Color(palette.bambu).lerp(new Color(palette.kokeDeep), 0.3);
     const color = new Color();
     blades.forEach((blade, i) => {
       const tuft = tufts[blade.tuft]!;
       bladeMesh.setMatrixAt(i, blade.matrix);
-      bladeMesh.setColorAt(i, color.copy(green).lerp(straw, 0.25 + tuft.tone * 0.45 + ((i * 0.618) % 1) * 0.2));
+      const jitter = ((i * 0.618) % 1) * 0.2;
+      bladeMesh.setColorAt(
+        i,
+        tuft.rush
+          ? color.copy(rushGreen).lerp(green, 0.2 + tuft.tone * 0.3).lerp(straw, jitter * 0.6)
+          : color.copy(green).lerp(straw, 0.25 + tuft.tone * 0.45 + jitter),
+      );
     });
 
     const plumeGeo = susukiPlumeGeometry();

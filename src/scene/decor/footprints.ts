@@ -27,6 +27,7 @@ import { placeAt, type FaunaAct } from '@/scene/systems/fauna/behaviors';
 
 import { groveCulms } from './bamboo';
 import { areaU, objectToWorld, SHRUB_SIZE, stationDecorLayout, type PlacedObject } from './placement';
+import { stationPebbles } from './pebbles';
 
 /**
  * Margen que pide cada huella a la fauna, en fracción del cuerpo del animal.
@@ -37,6 +38,8 @@ import { areaU, objectToWorld, SHRUB_SIZE, stationDecorLayout, type PlacedObject
 const SOLID_MARGIN = 0.5;
 /** Una caña es delgada: basta con que el cuerpo no la atraviese de lleno. */
 const CULM_MARGIN = 0.25;
+/** Una piedra de río es baja: lo que anda la rodea sin el margen de un pilar. */
+const PEBBLE_MARGIN = 0.3;
 
 export interface CircleFootprint {
   readonly kind: 'circulo';
@@ -92,6 +95,8 @@ export interface ObjectBase extends CircleFootprint {
 /** Lo que pisa un objeto colocado: un círculo por pilar, por arbusto, por farol. */
 export function objectBases(o: PlacedObject): ObjectBase[] {
   const item = o.item;
+  // Un corro no tiene base: sus piedras publican su propia huella (`stationPebbles`).
+  if (item.kind === 'corro') return [];
   if (item.kind === 'torii') {
     const point = { x: 0, z: 0 };
     return RYOBU_FOOTPRINTS.map((f) => {
@@ -245,6 +250,11 @@ export function decorFootprints(portrait: boolean): readonly Footprint[] {
       list.push(...objectBases(o));
       if (o.item.kind === 'maqueta') list.push(trayFootprint(o));
       if (o.item.kind === 'kosatsu') list.push(kosatsuFootprint(o));
+    }
+
+    // Las piedras de río al pie de faroles y postes (5B): bajas, pero sólidas.
+    for (const p of stationPebbles(index, portrait)) {
+      list.push({ kind: 'circulo', x: p.x, z: p.z, r: p.radius, top: p.y + p.height, faunaMargin: PEBBLE_MARGIN });
     }
 
     for (const g of layout.groves) {

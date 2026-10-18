@@ -12,6 +12,7 @@ import { stationIndex } from '@/scene/path/journeyPath';
 import type { QualityProfile } from '@/scene/quality/tiers';
 import { BambooGrove } from '@/scene/systems/BambooGrove';
 import { ContactShadows } from '@/scene/systems/ContactShadows';
+import { Pebbles } from '@/scene/systems/Pebbles';
 import { MossPatches } from '@/scene/systems/MossPatches';
 import { SusukiField } from '@/scene/systems/SusukiField';
 
@@ -105,6 +106,7 @@ function DecorSet({ index, portrait, palette, profile }: DecorSetProps) {
       {lanterns.length > 0 && <StoneLanterns lanterns={lanterns} palette={palette} profile={profile} />}
       {layout.groves.length > 0 && <BambooGrove groves={layout.groves} palette={palette} profile={profile} />}
       {layout.susuki.length > 0 && <SusukiField patches={layout.susuki} palette={palette} profile={profile} />}
+      <Pebbles index={index} portrait={portrait} palette={palette} profile={profile} />
       <ContactShadows index={index} portrait={portrait} palette={palette} profile={profile} />
       <MossPatches index={index} portrait={portrait} palette={palette} profile={profile} />
     </>

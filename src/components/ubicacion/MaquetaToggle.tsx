@@ -1,6 +1,7 @@
 'use client';
 
 import { CaminoFace, useCaminoHover } from '@/components/ui/CaminoButton';
+import { getStation } from '@/config/journey';
 import { useKyotoStore } from '@/store/useKyotoStore';
 
 /**
@@ -15,7 +16,8 @@ export function MaquetaToggle({ zoomIn, zoomOut }: { zoomIn: string; zoomOut: st
   const zoom = useKyotoStore((state) => state.mapZoom);
   const setMapZoom = useKyotoStore((state) => state.setMapZoom);
   const zoomed = zoom === 'kyoto';
-  const hover = useCaminoHover();
+  // El zoom es de Ubicación: su verde.
+  const hover = useCaminoHover(getStation('ubicacion').palette.accent);
 
   return (
     <button

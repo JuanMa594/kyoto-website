@@ -62,7 +62,8 @@ export function PathTramo({ station }: { station: StationSlug }) {
   useKosatsuFit(section, motionAllowed);
   // Y tocando la tabla se leen de cerca, con el mapa en grande.
   const [reading, setReading] = useState<number | null>(null);
-  const onward = useCaminoHover();
+  // La tinta del hover, del color de la estación a la que lleva.
+  const onward = useCaminoHover(next?.palette.accent);
 
   // La última estación no tiene tramo, pero su scroll sí mueve la cámara (el
   // avance de lectura): por eso el hook va antes de este return.

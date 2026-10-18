@@ -358,6 +358,24 @@ geografía ya la dice la ficha de 5A): la capital de mil años, Heian-kyō y el 
   arbusto y un yukimi suelto, y **tres cerezos** en los últimos 25 u (`scene/objects/cerezo/`,
   el árbol base de la Fase 7: crecimiento por semilla, copa de flores instanciadas, se mece
   entero con un muelle lento).
+- **El acabado orgánico** (pulido de la 5B, sin saturar el cuadro):
+  - **Juncos** en los costados lejanos (16–25 u del camino): la variante `junco` de la susuki,
+    hojas finas, rectas y verdes, sin espigas, que se mecen con el viento. Comparten las
+    instancias de la susuki (sin draw calls de más) y empiezan pasada la vista inicial.
+  - **Piedras de río** en grupos asimétricos al pie de cada farol y de cada poste de kōsatsu
+    (`environment.pebbles`, `scene/decor/pebbles.ts`). No se declaran una a una: crecen
+    alrededor de las bases, como el musgo, sobre todo hacia fuera del camino. Una draw call;
+    nunca junto a una piedra del camino, y la fauna las rodea.
+  - **Fundido de base**: un halo de tierra oscura, de borde irregular, al pie de los postes de
+    madera y de los troncos (en la draw call de las sombras de contacto), y más musgo en ellos.
+  - **Corros** (`kind: 'corro'` en `decor`): grupos sueltos de musgo y piedras de río en el
+    terreno abierto, declarados como un arbusto. A la derecha del camino, entre el cartel y el
+    primer kōsatsu, donde el valle quedaba pelado; tan bajos que no cargan el fondo de la vista
+    de Ichi, y **lejos de ella** (≥ 33 u de su cámara): desde Ichi sólo se ve algo de musgo al
+    fondo —los más lejanos, más grandes, al lado del texto y no detrás—; caminando, aparecen.
+  - **Musgo en la susuki**: corros en algunos tramos de cada mancha, en su borde hacia el camino,
+    desde d = 20 (nada en el primer plano de Ichi). Los juncos lejanos no llevan. Allí los juncos van **bien lejos** (24–32 u): desde Ichi son una línea fina sobre el
+    horizonte.
 - **Los pétalos caídos**: el suelo se va cubriendo de rosa al acercarse a Eventos
   (`environment.petalCarpet` en Eventos). Empiezan sueltos hacia el segundo kōsatsu, son
   la mitad del suelo en el tercero y bajo los cerezos, en Eventos y su llano casi todo, y se
@@ -369,7 +387,9 @@ geografía ya la dice la ficha de 5A): la capital de mil años, Heian-kyō y el 
   de color: llevan el ícono de su estación, que al pasar por encima se desliza al centro, crece
   y hace su microanimación mientras el texto se desvanece (`CaminoButton`). Fondo **gofun**
   (`--surface-boton`, ni blanco puro ni el washi del fondo), la mano al pasar y una **tinta
-  diluida que empapa** el botón de izquierda a derecha (`--soak`). Los demás botones del sitio
+  diluida que empapa** el botón de izquierda a derecha (`--soak`), **del color de la estación a
+  la que lleva** (`accent` de `journey.ts`, sólo al pasar): rosa sakura hacia Eventos,
+  bermellón de torii hacia Fushimi, el verde de Ubicación en su zoom. Los demás botones del sitio
   pasarán a este patrón más adelante, en otra tanda.
 
 Medido por CDP (tier alto): de 41 a 59–81 draw calls en las paradas y de 62 a 94 en el
@@ -824,6 +844,7 @@ buena medida rellenar contenido sobre una plantilla que ya funciona.
 | Carpa koi | ⏳ Aplazada hasta que haya agua: un estanque en alguno de los templos o en la home. El koi que había es un asset de Animal Crossing y **no se puede publicar**; se hará uno propio (los peces son el caso de libro de la deformación en el shader) |
 | **Créditos de los modelos** | ⚠️ Garza y gorrión son CC BY: **antes de publicar tiene que existir una sección de créditos visible**. Detalle en `assets/models/LICENSES.md` (Fase 9) |
 | **Créditos de KanjiVG** | ⚠️ Los trazos de los kanji son CC BY-SA 3.0 (© Ulrich Apel): entran en la misma sección de créditos. El «compartir igual» afecta sólo a `strokes.generated.ts`. Detalle en `assets/kanji/LICENSES.md` |
+| Acabado orgánico | ✅ En el pulido de la 5B, en Ubicación: juncos en los costados lejanos, piedras de río al pie de faroles y postes, tierra oscura y musgo al pie de postes y troncos. **Se aplica también en las fases siguientes** (6–8): cada estación con faroles o carteles declara `environment.pebbles` y sus juncos lejanos, y todo lo de madera o tronco que sale de la tierra lleva su halo (`contact.ts`). Sutil siempre: nunca debe cargar el cuadro |
 | Faroles de piedra | ✅ En la revisión de la Fase 4: tres en el tramo de la Home (un yukimi y un par de kasuga), fuera del cartel. **Los dos tipos se reparten por el resto del camino en sus fases**, pensando en el modo noche, y **no siempre igual**: en pareja, mezclados (un kasuga junto a un yukimi, a veces con un arbusto) o solos (decidido en la 5B) |
 | Faroles encendidos | ⏳ **A la fase de la noche.** Las ventanas de papel ya son un material propio (`StoneLanterns`, `DAY_GLOW`); de noche subirá su brillo y se sumará la luz al sendero desde la cámara del fuego (`LANTERN_SIZE.fireY`), con presupuesto de luces: no una luz por farol |
 | Profundidad de campo en la Home | ✅ Se queda como está (decidido al cerrar la Fase 4): estrecharla desenfocaría también las piedras cercanas de todas las estaciones |

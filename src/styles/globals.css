@@ -724,6 +724,9 @@
      ícono se queda donde está y la tinta llega sin recorrido. */
   .camino-button {
     --soak: 0;
+    /* La tinta: usuzumi por defecto; con `data-accent`, la de la estación de
+       destino (`--camino-tinta`, de journey.ts), diluida sobre el gofun. */
+    --camino-ink: var(--ink-boton);
     position: relative;
     display: inline-flex;
     align-items: center;
@@ -734,7 +737,7 @@
     background:
       linear-gradient(
         90deg,
-        var(--ink-boton) calc(var(--soak) * 160% - 60%),
+        var(--camino-ink) calc(var(--soak) * 160% - 60%),
         transparent calc(var(--soak) * 160%)
       ),
       var(--surface-boton);
@@ -746,6 +749,10 @@
   .camino-button:hover,
   .camino-button:focus-visible {
     --soak: 1;
+  }
+
+  .camino-button[data-accent] {
+    --camino-ink: color-mix(in srgb, var(--camino-tinta) 26%, var(--surface-boton));
   }
 
   .camino-button[data-motion='off'] {

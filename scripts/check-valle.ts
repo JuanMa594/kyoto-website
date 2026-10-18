@@ -29,6 +29,8 @@ import { rocaGeometry } from '../src/scene/objects/roca/rocaGeometry';
 import { pathX, STATION_DEPTHS, stationIndex } from '../src/scene/path/journeyPath';
 import { mulberry32 } from '../src/lib/procedural';
 import { PETAL_CARPET, petalCarpetAt } from '../src/scene/systems/petalCarpet';
+import { stationContacts } from '../src/scene/decor/contact';
+import { stationPebbles } from '../src/scene/decor/pebbles';
 import { speciesSpec } from '../src/scene/systems/fauna/bestiary';
 import { clearOfDecor, createAct, DECOR_RETRIES, type CameraState } from '../src/scene/systems/fauna/casting';
 import { check, finish, section } from './check-kit';
@@ -506,7 +508,8 @@ section('El valle de Ubicación');
       if (o.item.kind === 'kosatsu' || o.item.kind === 'maqueta' || o.item.kind === 'cerezo') continue;
       const distance = Math.hypot(o.x - camera.position.x, o.z - camera.position.z);
       if (distance >= boardDistance) continue;
-      const height = o.item.kind === 'roca' ? ROCA_SIZE.height : o.item.kind === 'farol' ? 2.3 : 1.4;
+      // Un corro es musgo y piedras de río: 0,3 u como mucho, no tapa una tabla.
+      const height = o.item.kind === 'roca' ? ROCA_SIZE.height : o.item.kind === 'farol' ? 2.3 : o.item.kind === 'corro' ? 0.3 : 1.4;
       const box = screenBox(camera, boxCorners(o, 1.6, height, 1.6));
       if (overlaps(box, board)) blockers.push(`${o.item.kind} delante de «${cards[sign.item.card]!.id}»`);
     }
@@ -586,6 +589,75 @@ section('Los pétalos caídos');
     check('en Eventos y su llano, casi todo el suelo (≥ 90 %)', petalCarpetAt(eventos) >= 0.9 && petalCarpetAt(eventos + (getStation('eventos').tramo.flat ?? 0)) >= 0.9);
     check('nada en Fushimi Inari', petalCarpetAt(STATION_DEPTHS[stationIndex('fushimi-inari')]!) === 0);
   }
+}
+
+/* ── 10. Rocas de río, juncos y bases ─────────────────────────────────── */
+
+section('Rocas de río, juncos y el pie de lo plantado');
+
+{
+  for (const portrait of [false, true]) {
+    const tag = portrait ? 'vertical' : 'horizontal';
+    const pebbles = stationPebbles(UBI, portrait);
+    const layout = stationDecorLayout(UBI, portrait);
+    let bare = 0;
+    let ringed = 0;
+    for (const o of layout.objects) {
+      if (o.item.kind !== 'farol' && o.item.kind !== 'kosatsu') continue;
+      for (const base of objectBases(o)) {
+        const group = pebbles.filter((q) => Math.hypot(q.x - base.x, q.z - base.z) < base.foot + 0.75);
+        if (group.length < 2) bare += 1;
+        // Asimétrico: las piedras a un costado, no un anillo (la media de sus
+        // direcciones desde la base no se anula).
+        let mx = 0;
+        let mz = 0;
+        for (const q of group) {
+          const len = Math.hypot(q.x - base.x, q.z - base.z) || 1;
+          mx += (q.x - base.x) / len;
+          mz += (q.z - base.z) / len;
+        }
+        if (group.length > 0 && Math.hypot(mx, mz) / group.length < 0.45) ringed += 1;
+      }
+    }
+    check(`${tag}: cada farol y cada poste de kōsatsu tiene su grupo de piedras (≥ 2)`, bare === 0, `${bare} sin grupo`);
+    check(`${tag}: los grupos van a un costado, no en anillo`, ringed === 0, `${ringed} en anillo`);
+    let onPath = 0;
+    for (const q of pebbles) {
+      for (const stone of stoneLayout()) if (Math.hypot(stone.x - q.x, stone.z - q.z) - q.radius < 0.5) onPath += 1;
+    }
+    check(`${tag}: ninguna piedra de río junto a una del camino (≥ 0,5 u)`, onPath === 0, `${onPath}`);
+    check(`${tag}: pequeñas (radio ≤ 0,3 u)`, pebbles.every((q) => q.radius <= 0.3));
+  }
+  check('sólo donde se declaran: la Home no lleva', stationPebbles(stationIndex('inicio'), false).length === 0);
+
+  const rush = ubiLayout.susuki.filter((patch) => patch.item.variant === 'junco');
+  const rushTufts = rush.flatMap((patch) => susukiTufts(patch, 1));
+  check('hay juncos en los costados lejanos', rushTufts.length >= 40, `${rushTufts.length} matas`);
+  const nearest = Math.min(...rushTufts.map((t) => Math.abs(t.x - pathX(-t.z))));
+  check('los juncos, a 15 u o más del camino', nearest >= 15, `${nearest.toFixed(1)} u`);
+  // Cerca de la vista inicial (d < 30), sólo los de muy lejos: no la cargan.
+  const early = rushTufts.filter((t) => -t.z - STATION_DEPTHS[UBI]! < 30);
+  const earlyNear = early.filter((t) => Math.abs(t.x - pathX(-t.z)) < 24).length;
+  check('junto a la vista inicial (d < 30), sólo juncos muy lejanos (≥ 24 u)', earlyNear === 0, `${early.length} matas, ${earlyNear} cerca`);
+  check('los juncos no llevan espigas', rushTufts.every((t) => t.plumes === 0 && t.rush));
+
+  // Los corros de la derecha (entre el cartel y el primer kōsatsu): bajos, para
+  // no cargar el fondo de la vista de Ichi, y con algo de musgo y de piedra.
+  const corros = ubiLayout.objects.filter((o) => o.item.kind === 'corro');
+  check('hay corros a la derecha del camino', corros.length >= 4 && corros.every((o) => o.x - pathX(-o.z) > 4), `${corros.length}`);
+  const corroPebbles = stationPebbles(UBI, false).filter((q) => corros.some((o) => Math.hypot(q.x - o.x, q.z - o.z) < 1.2));
+  check('los corros llevan piedras de río', corroPebbles.length >= 8, `${corroPebbles.length}`);
+  check('y son bajos: ninguna piedra de un corro pasa de 0,3 u', corroPebbles.every((q) => q.height <= 0.3));
+  const farRight = rushTufts.filter((t) => t.x - pathX(-t.z) > 0 && -t.z - STATION_DEPTHS[UBI]! < 62);
+  check('a la derecha, antes de d = 62, los juncos van bien lejos (≥ 24 u)', farRight.length > 0 && farRight.every((t) => t.x - pathX(-t.z) >= 24), `${farRight.length} matas`);
+
+  const contacts = stationContacts(UBI, false, 1);
+  const earthy = ubiLayout.objects
+    .filter((o) => o.item.kind === 'kosatsu' || o.item.kind === 'cerezo')
+    .flatMap((o) => objectBases(o))
+    .filter((base) => contacts.some((c) => c.earth > 0 && Math.hypot(c.x - base.x, c.z - base.z) < 0.01));
+  const wooden = ubiLayout.objects.filter((o) => o.item.kind === 'kosatsu' || o.item.kind === 'cerezo').flatMap((o) => objectBases(o)).length;
+  check('cada poste y cada tronco tiene su halo de tierra oscura', earthy.length === wooden, `${earthy.length}/${wooden}`);
 }
 
 finish('El valle de Ubicación, en orden.');

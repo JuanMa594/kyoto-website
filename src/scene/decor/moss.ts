@@ -40,13 +40,21 @@ export interface MossPatch {
 }
 
 /** Parches al pie de cada clase de objeto (con musgo 1 y tier alto). */
-const PER_BASE = { torii: 3, farol: 6, arbusto: 4, maqueta: 6, kosatsu: 4, roca: 5, cerezo: 5 } as const;
+// Los postes y los troncos (5B), más: los funde con el suelo junto a su tierra oscura.
+// Un corro no tiene base: su musgo va aparte, con la cuenta que declara.
+const PER_BASE = { torii: 3, farol: 6, arbusto: 4, maqueta: 6, kosatsu: 7, roca: 5, cerezo: 9, corro: 0 } as const;
 
 /** Probabilidad de que una piedra tenga musgo al lado (con musgo 1). */
 const STONE_CHANCE = 0.25;
 
 /** Cada cuánto, a lo largo del borde de un macizo, se intenta un parche. */
 const GROVE_STEP = 1.2;
+
+/** La susuki (5B): cada cuánto, a lo largo de su borde, se intenta un corro, y con qué probabilidad. */
+const SUSUKI_STEP = 2.6;
+const SUSUKI_CHANCE = 0.3;
+/** Desde dónde (d desde la estación): lo de delante del cartel no lleva, para no acercarlo a su vista. */
+const SUSUKI_FROM = 20;
 
 /** Probabilidad de que una caña tenga musgo al pie (con musgo 1). */
 const CULM_CHANCE = 0.5;
@@ -112,6 +120,15 @@ export function stationMoss(index: number, portrait: boolean, densityScale: numb
     }
   }
 
+  // Los corros declarados (5B): su musgo, alrededor de su punto. No los aclara
+  // el musgo de la estación —son una decisión de composición—, sólo el tier.
+  for (const o of layout.objects) {
+    if (o.item.kind !== 'corro') continue;
+    // La escala del corro agranda también sus manchas: lejos, una mancha plana
+    // se ve de canto y, pequeña, se pierde en la niebla.
+    drift(o.x, o.z, count(o.item.moss * densityScale), 1.1 * o.scale, 0.6 * o.scale, 1.4 * o.scale);
+  }
+
   // El borde interior de los macizos: sobre todo hacia dentro, donde hay sombra.
   for (const grove of layout.groves) {
     const [u0, u1] = areaU(grove.area);
@@ -136,6 +153,27 @@ export function stationMoss(index: number, portrait: boolean, densityScale: numb
   // antes de la siguiente, que tendrá el suyo.
   const next = STATION_DEPTHS[index + 1] ?? stationD + 64;
   const stones = stoneLayout().filter((s) => -s.z >= stationD - 22 && -s.z <= next);
+
+  // Algunos tramos de la susuki (5B): corros en su borde hacia el camino, que
+  // es donde se ven entre las matas, y alguno ya dentro. Los juncos lejanos,
+  // no. Como los corros declarados, no los aclara el musgo de la estación.
+  for (const patch of layout.susuki) {
+    if (patch.item.variant === 'junco') continue;
+    const [u0, u1] = areaU(patch.area);
+    const left = patch.area.side === 'izquierda';
+    const edge = left ? u1 : u0;
+    const into = left ? -1 : 1;
+    const length = patch.area.to - patch.area.from;
+    for (let along = 0; along <= 1; along += SUSUKI_STEP / length) {
+      if (random() > SUSUKI_CHANCE * densityScale) continue;
+      const d = patch.stationD + patch.area.from + along * length + (random() - 0.5) * SUSUKI_STEP;
+      if (d < patch.stationD + SUSUKI_FROM) continue;
+      const x = pathX(d) + edge + into * lerp(-0.6, 2.4, random());
+      const z = -d;
+      if (stones.some((s) => Math.hypot(s.x - x, s.z - z) < 1.1)) continue;
+      drift(x, z, 2 + Math.floor(random() * 2), 1, 0.6, 1.3);
+    }
+  }
 
   // El terreno abierto entre el camino y el bambú, a los dos lados: corros
   // sueltos, más cerca del camino que del bambú (donde la orilla ya tiene el

@@ -219,6 +219,12 @@ export interface DecorSusuki {
   /** Alto de las matas, de las más bajas a las más altas. */
   readonly height: readonly [number, number];
   readonly seed: number;
+  /**
+   * `susuki` (por defecto): hojas que se abren en abanico y espigas plateadas.
+   * `junco`: hierba alta silvestre de los costados lejanos, más fina, recta y
+   * verde, sin espigas. Comparte las instancias de la susuki.
+   */
+  readonly variant?: 'susuki' | 'junco';
 }
 
 /**
@@ -233,8 +239,22 @@ export interface DecorCerezo extends DecorObjectBase {
   readonly seed: number;
 }
 
+/**
+ * Un corro (5B, pulido): un grupo natural pegado al suelo —unas manchas de
+ * musgo y algunas piedras de río— para que el terreno abierto no quede
+ * pelado. Es bajo: no tapa nada ni carga el fondo de un cartel. Lo dibujan
+ * `moss.ts` y `pebbles.ts`; las piedras cuentan como obstáculo para la fauna.
+ */
+export interface DecorCorro extends DecorObjectBase {
+  readonly kind: 'corro';
+  /** Manchas de musgo (con el tier alto) y piedras de río del corro. */
+  readonly moss: number;
+  readonly pebbles: number;
+}
+
 export type DecorItem =
   | DecorTorii
+  | DecorCorro
   | DecorShrub
   | DecorLantern
   | DecorGrove
@@ -278,6 +298,13 @@ export interface StationEnvironment {
    * (`scene/decor/moss.ts`). Sin él, ninguno.
    */
   readonly moss?: number;
+  /**
+   * Cuántas piedras de río hay al pie de los faroles y de los postes de los
+   * carteles, 0–1 (`scene/decor/pebbles.ts`). Como el musgo, no se declaran
+   * una a una: crecen en grupos asimétricos alrededor de cada base. Sin él,
+   * ninguna.
+   */
+  readonly pebbles?: number;
   /**
    * La alfombra de pétalos caídos alrededor de la estación (5B): el suelo y lo
    * alto de las piedras se van cubriendo de rosa. La pinta el shader del
@@ -541,6 +568,44 @@ const SUSUKI_UBICACION: readonly DecorSusuki[] = [
 ];
 
 /**
+ * Los juncos del valle (5B, pulido): hierba alta silvestre en los costados
+ * lejanos, a 16–25 u del camino, que da textura vertical y movimiento con el
+ * viento sin acercarse a nada. Empiezan pasada la vista inicial (a la derecha,
+ * pasada también la franja que cae bajo el título) para no cargarla, y se
+ * acaban antes de los cerezos.
+ */
+const JUNCOS_UBICACION: readonly DecorSusuki[] = [
+  {
+    kind: 'susuki',
+    variant: 'junco',
+    area: { side: 'izquierda', from: 34, to: 95, inner: 16, outer: 24 },
+    density: 0.14,
+    taper: 0.6,
+    height: [1.3, 2.1],
+    seed: 61,
+  },
+  // A la derecha, antes, **bien lejos** (24–32 u): desde la vista de Ichi
+  // quedan fuera del cuadro o, al fondo, como una línea fina sobre el horizonte.
+  {
+    kind: 'susuki',
+    variant: 'junco',
+    area: { side: 'derecha', from: 12, to: 62, inner: 24, outer: 32 },
+    density: 0.08,
+    height: [1.1, 1.7],
+    seed: 63,
+  },
+  {
+    kind: 'susuki',
+    variant: 'junco',
+    area: { side: 'derecha', from: 62, to: 95, inner: 17, outer: 25 },
+    density: 0.14,
+    taper: 0.7,
+    height: [1.3, 2.1],
+    seed: 62,
+  },
+];
+
+/**
  * Ubicación: el cartel de `2.png` en espejo respecto de la Home —la maqueta
  * de Japón a la izquierda del camino, el texto a la derecha—. Girada hacia la
  * cámara (`yaw`), que la ve desde la derecha. Calibrado con `bun run
@@ -556,6 +621,24 @@ const DECOR_UBICACION: readonly DecorItem[] = [
   // La susuki (5B): manchas por los dos costados, nunca entre la cámara de una
   // parada y su kōsatsu; se aclara al final y no llega a los cerezos.
   ...SUSUKI_UBICACION,
+  ...JUNCOS_UBICACION,
+  // Corros de musgo y piedras de río (5B, pulido) a la derecha del camino, entre
+  // el cartel y el primer kōsatsu: el terreno abierto ya no queda pelado, y son
+  // tan bajos que no cargan el fondo de la vista de Ichi. **Lejos de ella**
+  // (≥ 33 u de su cámara): desde Ichi se ve algo de musgo al fondo, nada cerca;
+  // caminando, van apareciendo.
+  // Los más lejanos, más grandes: de lejos, una mancha pequeña no se ve.
+  { kind: 'corro', at: { d: 21, u: 6.5 }, moss: 3, pebbles: 3 },
+  { kind: 'corro', at: { d: 26, u: 10.5 }, moss: 3, pebbles: 2, scale: 1.2 },
+  { kind: 'corro', at: { d: 28, u: 7 }, moss: 3, pebbles: 3, scale: 1.3 },
+  { kind: 'corro', at: { d: 30, u: 14 }, moss: 3, pebbles: 2, scale: 1.4 },
+  { kind: 'corro', at: { d: 38, u: 14.5 }, moss: 4, pebbles: 0, scale: 1.7 },
+  { kind: 'corro', at: { d: 45, u: 13 }, moss: 4, pebbles: 2, scale: 1.7 },
+  { kind: 'corro', at: { d: 50, u: 16 }, moss: 4, pebbles: 0, scale: 1.9 },
+  // Y dos más a la derecha, que desde Ichi caen al lado del texto, no detrás:
+  // el musgo que se ve al fondo de la vista inicial.
+  { kind: 'corro', at: { d: 31, u: 20 }, moss: 4, pebbles: 0, scale: 1.8 },
+  { kind: 'corro', at: { d: 42, u: 23 }, moss: 4, pebbles: 0, scale: 2 },
   // Faroles y arbustos (5B): un kasuga y un yukimi juntos, otro yukimi solo
   // más allá; los arbustos acompañan a la roca y rellenan el final.
   { kind: 'farol', variant: 'kasuga', at: { d: 47.5, u: -4.6 } },
@@ -625,6 +708,8 @@ export const JOURNEY: readonly Station[] = [
       lateral: -8,
       decor: DECOR_UBICACION,
       moss: 0.5,
+      // Las piedras de río al pie de los faroles y de los postes de los kōsatsu.
+      pebbles: 1,
     },
     tramo: TRAMO_UBICACION,
     ambient: {

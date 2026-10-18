@@ -8,6 +8,10 @@
  * pocas espigas plateadas por encima. Hojas y espigas se instancian; se mecen
  * con el viento de siempre (`windSway`, modo hoja: giran sobre su base y se
  * tienden a sotavento con la flexión de su mata).
+ *
+ * Los juncos (`variant: 'junco'`, el pulido de la 5B) son la misma mata con
+ * otro porte: hojas más finas y casi rectas, verdes, sin espigas. Van en las
+ * mismas instancias: no suman draw calls.
  */
 
 import { BufferGeometry, Euler, Float32BufferAttribute, Matrix4, Quaternion, Vector3 } from 'three';
@@ -39,6 +43,8 @@ export interface Tuft {
   /** 0 = verde; 1 = pajiza. */
   readonly tone: number;
   readonly plumes: number;
+  /** Un junco: hojas finas, rectas y verdes, sin espigas. */
+  readonly rush: boolean;
 }
 
 export function susukiTufts(patch: PlacedSusuki, densityScale: number): Tuft[] {
@@ -48,6 +54,7 @@ export function susukiTufts(patch: PlacedSusuki, densityScale: number): Tuft[] {
   const length = area.to - area.from;
   const width = u1 - u0;
   const taper = item.taper ?? 1;
+  const rush = item.variant === 'junco';
   const expected = Math.round((length * width * item.density * densityScale * (1 + taper)) / 2);
 
   const tufts: Tuft[] = [];
@@ -66,7 +73,8 @@ export function susukiTufts(patch: PlacedSusuki, densityScale: number): Tuft[] {
       height: lerp(item.height[0], item.height[1], random() ** 0.7),
       phase: random(),
       tone: random(),
-      plumes: PLUMES[0] + Math.floor(random() * (PLUMES[1] - PLUMES[0] + 1)),
+      plumes: rush ? 0 : PLUMES[0] + Math.floor(random() * (PLUMES[1] - PLUMES[0] + 1)),
+      rush,
     });
   }
   return tufts;
@@ -85,14 +93,15 @@ export function tuftBlades(tufts: readonly Tuft[], seed: number): BladePlacement
   const euler = new Euler(0, 0, 0, 'YXZ');
   tufts.forEach((tuft, index) => {
     for (let k = 0; k < SUSUKI_BLADES; k += 1) {
-      const outward = lerp(0.12, 0.75, random() ** 1.4);
+      // El junco, casi recto y fino; la susuki, abierta en abanico.
+      const outward = tuft.rush ? lerp(0.03, 0.32, random() ** 1.6) : lerp(0.12, 0.75, random() ** 1.4);
       euler.set(outward, random() * Math.PI * 2, (random() - 0.5) * 0.2);
       const length = tuft.height * lerp(0.55, 0.95, 1 - outward / 0.9 + random() * 0.2);
       out.push({
         matrix: new Matrix4().compose(
           new Vector3(tuft.x + (random() - 0.5) * 0.14, tuft.y, tuft.z + (random() - 0.5) * 0.14),
           new Quaternion().setFromEuler(euler),
-          new Vector3(1, length, 1),
+          new Vector3(tuft.rush ? 0.55 : 1, length, 1),
         ),
         tuft: index,
       });

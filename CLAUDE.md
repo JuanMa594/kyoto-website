@@ -125,6 +125,7 @@ src/
 │   │   ├─ placement.ts        ← descriptor → mundo, por aspecto (puro)
 │   │   ├─ footprints.ts       ← huellas: piedras, cámara y fauna (puro)
 │   │   ├─ moss.ts             ← dónde crece el musgo (puro)
+│   │   ├─ pebbles.ts          ← las piedras de río al pie de faroles y postes (puro, 5B)
 │   │   ├─ contact.ts          ← las sombras de contacto: pilares, faroles, arbustos, cañas (puro)
 │   │   ├─ ground.ts           ← altura y normal para lo que se tiende en el suelo (puro)
 │   │   ├─ bamboo.ts shrub.ts  ← cañas, hojas y masas (puro, three)
@@ -143,6 +144,7 @@ src/
 │   ├─ systems/sway.ts         ← ★ los muelles del bambú y los arbustos (CPU → uBend)
 │   ├─ systems/BambooGrove.tsx ← el bambú de una estación, instanciado
 │   ├─ systems/MossPatches.tsx ← el musgo: parches planos, el dibujo y su halo en el shader
+│   ├─ systems/Pebbles.tsx     ← las piedras de río, instanciadas (forma en objects/pebbleGeometry.ts)
 │   ├─ systems/ContactShadows.tsx ← la penumbra al pie de lo plantado, una draw call
 │   ├─ systems/intro.ts        ← `INTRO`: la bruma de la entrada de la Home
 │   ├─ systems/PetalSystem.tsx ← ★ pétalos: posición calculada en el shader
@@ -208,7 +210,7 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   el texto vuelve a ser la tarjeta de papel.
 - **Lo que hay a los lados del camino se declara en `journey.ts`**
   (`environment.decor`, Fase 4): objetos sueltos (`torii`, `arbusto`, `farol`
-  kasuga o yukimi, la `maqueta` de Ubicación, la `roca` pintada y el `cerezo` de la 5B) y macizos (`bambu`, `susuki`), en coordenadas del camino —`d` desde la estación, `u` desde
+  kasuga o yukimi, la `maqueta` de Ubicación, la `roca` pintada, el `cerezo` y el `corro` de musgo y piedras de la 5B) y macizos (`bambu`, `susuki`), en coordenadas del camino —`d` desde la estación, `u` desde
   el eje—, con otra colocación opcional para pantallas verticales
   (`portrait`). **La decoración de una estación incluye su tramo de salida.**
   `scene/decor/placement.ts` la lleva al mundo y `footprints.ts` publica sus
@@ -219,7 +221,10 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   de cada caña, en el borde de los macizos, en corros por el terreno abierto y
   junto a las piedras, en la cantidad que diga
   `environment.moss`. Cada base y cada caña lleva además su sombra de
-  contacto. Todo lo comprueba `check:path` (`scripts/check-decor.ts`).
+  contacto, y lo de madera que sale de la tierra (postes, troncos), un halo de
+  tierra oscura. Igual que el musgo crecen las piedras de río al pie de
+  faroles y postes (`environment.pebbles`), y la susuki tiene una variante
+  `junco` para los costados lejanos. Todo lo comprueba `check:path` (`scripts/check-decor.ts`).
 - **La posición de la cámara decide qué se ve y qué se oye**, no la ruta. Vive
   en `PATH` (`scene/path/journeyPath.ts`), con un único escritor, `CameraRig`;
   el store guarda sólo `zone`, que leen el ambiente, el audio y la fauna. La
