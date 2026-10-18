@@ -689,10 +689,13 @@ llega en las fases 4–8 y se cuelga de ese mismo objeto.
 | 3B | · La fauna en el camino (anclada al mundo, cercanía por estación) | ✅ |
 | 3C | · La navegación (sidebar radial, íconos por código, móvil, teclado) | ✅ |
 | 4 | Home 京都: torii, bambú, arbusto, cartel, entrada, tramo hacia Ubicación, faroles y musgo | ✅ |
-| 5 | Ubicación 位置, en dos bloques: | 🔎 |
+| 5 | Ubicación 位置, en dos bloques: | ✅ |
 | 5A | · El cartel: la maqueta de Japón, hover, zoom a Kinki, el pin, Ichi / 位置 y la ficha | ✅ |
-| 5B | · El tramo hacia Eventos: kōsatsu con la historia y los mapas antiguos, la roca pintada, susuki, cerezos | 🔎 en revisión |
-| 6 | Lugares | ⏸ |
+| 5B | · El tramo hacia Eventos: kōsatsu con la historia y los mapas antiguos, la roca pintada, susuki, cerezos | ✅ |
+| 6 | Lugares, en tres bloques: | 🔎 |
+| 6A | · Fushimi Inari: la plantilla, 伏見稲荷, el torii inari, la subida escalonada con toriis y el kitsune | 🔎 en diseño |
+| 6B | · Kiyomizu-dera: el bosque de bambú, el puente sobre la vaguada y la plataforma | ⏸ |
+| 6C | · Gion: la bajada, las calzadas y los faroles | ⏸ |
 | 7 | Eventos 桜 | ⏸ |
 | 8 | Gastronomía 京料理 | ⏸ |
 | 9 | Pulido, rendimiento, a11y, deploy | ⏸ |
