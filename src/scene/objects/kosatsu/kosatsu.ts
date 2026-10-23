@@ -220,6 +220,13 @@ export const KOSATSU = {
    * desplegados. Lo lee `unrollOf`.
    */
   unrollFor: null as StationSlug | 'todas' | null,
+  /**
+   * El tramo cuyos tableros se proyectan en `rects`. Los índices son de
+   * tarjeta y la escena monta también las estaciones vecinas: sin esto, las
+   * ema de Eventos (tarjetas 0–2) pisaban las tablas de Ubicación (0–2) y su
+   * texto se iba. Lo pone `useKosatsuFit`, que sabe qué tramo se lee.
+   */
+  tramo: null as StationSlug | null,
   /** Pide un frame (con movimiento reducido el canvas pinta a demanda). */
   wake: () => {},
   /**

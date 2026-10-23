@@ -17,6 +17,7 @@ import {
   Matrix4,
   Mesh,
   PerspectiveCamera,
+  PlaneGeometry,
   Quaternion,
   Raycaster,
   Sphere,
@@ -33,13 +34,23 @@ import {
   blendByZone,
   dominantZone,
   PATH,
+  pathX,
   STATION_DEPTHS,
   stationIndex,
 } from '../src/scene/path/journeyPath';
 import { stoneGeometry } from '../src/scene/objects/stoneGeometry';
 import { stoneTopY } from '../src/scene/path/stoneSurface';
 import { STONE_VARIANTS, stoneLayout, stoneSeed } from '../src/scene/path/stones';
-import { groundY, walkY } from '../src/scene/systems/elevation';
+import {
+  groundY,
+  TERRAIN_GRID,
+  TERRAIN_MESH,
+  TERRAIN_SPACING,
+  terrainHeight,
+  terrainMeshHeight,
+  terrainSegments,
+  walkY,
+} from '../src/scene/systems/elevation';
 import {
   CAMERA_Z,
   createTrack,
@@ -68,7 +79,10 @@ import {
 } from '../src/scene/systems/fauna/anchoring';
 import {
   createPose,
+  FOOT_REACH,
+  FOOT_SPAN,
   kiteFit,
+  onFourFeet,
   OVERTIME_FADE,
   OVERTIME_LIMIT,
   placeAt,
@@ -531,7 +545,7 @@ for (const { act } of bodies) {
       poseFor(act, m, seconds, pose);
       if (pose.airborne > 0) continue;
       localToWorld(act.anchor, pose.x, pose.y, pose.z, WORLD);
-      const expected = faunaFloor(WORLD.x, WORLD.z) + act.spec.ride * act.spec.size;
+      const expected = faunaFloor(WORLD.x, WORLD.z) + act.spec.ride * act.spec.size + pose.groundLift;
       groundSamples += 1;
       if (Math.abs(WORLD.y - expected) > GROUND_CONTACT) {
         floating += 1;
@@ -545,6 +559,123 @@ check(
   floating === 0,
   `${floating} de ${groundSamples} muestras${firstFloat ? `; ${firstFloat}` : ''}`,
 );
+
+// El suelo que pisa la fauna es la malla que se dibuja, no la función: al pie
+// de las colinas de Fushimi, los triángulos de la malla quedan hasta casi 1 u
+// por encima de `terrainHeight` y las patas se metían en la tierra. Se
+// comprueba contra un PlaneGeometry de verdad, con sus índices.
+{
+  let worst = 0;
+  const random = mulberry32(611);
+  for (const spacing of Object.values(TERRAIN_SPACING)) {
+    TERRAIN_MESH.spacing = spacing;
+    const [sx, sz] = terrainSegments(spacing);
+    const depth = TERRAIN_GRID.nearZ - TERRAIN_GRID.farZ;
+    const plane = new PlaneGeometry(TERRAIN_GRID.width, depth, sx, sz);
+    const position = plane.attributes.position!;
+    const index = plane.index!;
+    const centerZ = (TERRAIN_GRID.nearZ + TERRAIN_GRID.farZ) / 2;
+    // Como `Terrain`: girada −90° en X, la y local es la −z del mundo.
+    const vertex = (k: number) => {
+      const x = position.getX(k);
+      const z = centerZ - position.getY(k);
+      return { x, z, h: terrainHeight(x, z) };
+    };
+    const fushimi = STATION_DEPTHS[stationIndex('fushimi-inari')]!;
+    for (let n = 0; n < 4000; n += 1) {
+      // Alrededor de Fushimi y su colina, y en cualquier punto del camino.
+      const d = n % 2 ? fushimi + (random() - 0.5) * 60 : random() * PATH_LENGTH;
+      const x = pathX(d) + (random() - 0.5) * 60;
+      const ix = Math.floor((x + TERRAIN_GRID.width / 2) / (TERRAIN_GRID.width / sx));
+      const iy = Math.floor((-d - TERRAIN_GRID.farZ) / (depth / sz));
+      // La celda (ix, iy): sus dos triángulos, en el índice. La primera fila del
+      // PlaneGeometry (y local = +alto/2) es la más lejana.
+      const cell = (ix + sx * iy) * 6;
+      for (const t of [0, 3]) {
+        const [a, b, c] = [0, 1, 2].map((j) => vertex(index.getX(cell + t + j)));
+        const det = (b!.z - c!.z) * (a!.x - c!.x) + (c!.x - b!.x) * (a!.z - c!.z);
+        const wa = ((b!.z - c!.z) * (x - c!.x) + (c!.x - b!.x) * (-d - c!.z)) / det;
+        const wb = ((c!.z - a!.z) * (x - c!.x) + (a!.x - c!.x) * (-d - c!.z)) / det;
+        const wc = 1 - wa - wb;
+        if (Math.min(wa, wb, wc) < -1e-6) continue;
+        const drawn = wa * a!.h + wb * b!.h + wc * c!.h;
+        worst = Math.max(worst, Math.abs(drawn - terrainMeshHeight(x, -d)));
+      }
+    }
+    plane.dispose();
+  }
+  TERRAIN_MESH.spacing = TERRAIN_SPACING.high;
+  check('la fauna pisa la malla del terreno tal como se dibuja, en los tres tiers', worst < 1e-3, `${worst.toExponential(1)} u`);
+}
+
+// Lo que anda a cuatro patas se inclina con el suelo bajo ellas
+// (`settleOnGround`): ninguna pata dentro de la tierra —en las laderas de
+// Fushimi se hundían hasta 0,4 u— y ninguna en el aire más de lo justo.
+{
+  const FOOT_TOLERANCE = 0.03;
+  // Sobre una cresta —el pliegue convexo de dos triángulos de la malla de 4 u
+  // del tier bajo— un cuerpo rígido no apoya las cuatro: el suelo cae a los
+  // dos lados. Sin hundirse, lo justo es esto.
+  const FOOT_HOVER = 0.15;
+  let sunk = 0;
+  let deepest = 0;
+  let firstSunk = '';
+  let hover = 0;
+  let hoverAt = '';
+  let samples = 0;
+  for (const spacing of Object.values(TERRAIN_SPACING)) {
+    TERRAIN_MESH.spacing = spacing;
+    for (const { act } of bodies) {
+      if (isAerial(act.behavior) || !onFourFeet(act.spec)) continue;
+      const reach = FOOT_REACH * act.spec.size;
+      const span = FOOT_SPAN * act.spec.size;
+      for (const m of members(act)) {
+        const pose = createPose();
+        for (const seconds of range(0, act.duration + 3, 0.5)) {
+          pose.heading = 0;
+          poseFor(act, m, seconds, pose);
+          if (pose.airborne > 0) continue;
+          const fx = Math.cos(pose.heading);
+          const fz = -Math.sin(pose.heading);
+          const rx = Math.sin(pose.heading);
+          const rz = Math.cos(pose.heading);
+          let lowest = Number.POSITIVE_INFINITY;
+          for (const a of [-reach, reach]) {
+            for (const b of [-span, span]) {
+              const y = pose.y + a * Math.tan(pose.groundPitch) + b * Math.tan(pose.groundRoll);
+              localToWorld(act.anchor, pose.x + fx * a + rx * b, y, pose.z + fz * a + rz * b, WORLD);
+              const gap = WORLD.y - faunaFloor(WORLD.x, WORLD.z);
+              lowest = Math.min(lowest, gap);
+            }
+          }
+          samples += 1;
+          if (lowest < -FOOT_TOLERANCE) {
+            sunk += 1;
+            if (-lowest > deepest) {
+              deepest = -lowest;
+              firstSunk = `${label(act)} a los ${seconds} s (malla de ${spacing} u)`;
+            }
+          }
+          if (lowest > hover) {
+            hover = lowest;
+            hoverAt = `${label(act)} a los ${seconds} s (malla de ${spacing} u, alzada ${pose.groundLift.toFixed(3)})`;
+          }
+        }
+      }
+    }
+  }
+  TERRAIN_MESH.spacing = TERRAIN_SPACING.high;
+  check(
+    'a cuatro patas, ninguna pata dentro de la tierra, también en las laderas',
+    sunk === 0,
+    `${sunk} de ${samples} muestras${firstSunk ? `; la peor, ${deepest.toFixed(3)} u: ${firstSunk}` : ''}`,
+  );
+  check(
+    `…y la pata más baja nunca a más de ${FOOT_HOVER} u del suelo`,
+    hover <= FOOT_HOVER,
+    `${hover.toFixed(3)} u: ${hoverAt}`,
+  );
+}
 
 // El milano planea: entra y sale a su ritmo de crucero, nunca a un acelerón.
 // Entraba y salía por un costado recorriendo ~40 u en un quinto del acto, a
@@ -697,7 +828,7 @@ for (const { act } of bodies) {
       poseFor(act, m, seconds, pose);
       if (pose.airborne > 0) continue;
       localToWorld(act.anchor, pose.x, pose.y, pose.z, WORLD);
-      const feet = WORLD.y - act.spec.ride * act.spec.size;
+      const feet = WORLD.y - pose.groundLift - act.spec.ride * act.spec.size;
       let worst = Number.NEGATIVE_INFINITY;
       for (const [ox, oz] of [[0, 0], [STONE_FOOT, 0], [-STONE_FOOT, 0], [0, STONE_FOOT], [0, -STONE_FOOT]] as const) {
         worst = Math.max(worst, stoneTopProbe(WORLD.x + ox, WORLD.z + oz) - feet);
@@ -1007,7 +1138,7 @@ function simulateJourney(aspect: number, seed: number): JourneyStats {
         }
         // «En el suelo» como para la propia conducta: airborne 0, a menos de 5 cm.
         if (!isAerial(act.behavior) && pose.airborne === 0) {
-          const expected = faunaFloor(world.x, world.z) + act.spec.ride * act.spec.size;
+          const expected = faunaFloor(world.x, world.z) + act.spec.ride * act.spec.size + pose.groundLift;
           if (Math.abs(world.y - expected) > GROUND_CONTACT) stats.floating.add(name);
         }
       }

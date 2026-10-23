@@ -59,7 +59,7 @@ export function PathTramo({ station }: { station: StationSlug }) {
   });
 
   // Las tarjetas con cartel se leen sobre la tabla de su kōsatsu (Fase 5B).
-  useKosatsuFit(section, motionAllowed);
+  useKosatsuFit(section, station, motionAllowed);
   // Y tocando la tabla se leen de cerca, con el mapa en grande.
   const [reading, setReading] = useState<number | null>(null);
   // La tinta del hover, del color de la estación a la que lleva.

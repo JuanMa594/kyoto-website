@@ -76,6 +76,15 @@ export interface FaunaPose {
   pitch: number;
   /** Alabeo hacia el interior de la curva. */
   bank: number;
+  /**
+   * La inclinación del suelo bajo las cuatro patas, a lo largo (positiva,
+   * subiendo) y a lo ancho (positiva, la derecha más alta), y lo que se sube el
+   * cuerpo para que ninguna pata quede dentro (ya sumado a `y`). Sólo en lo que
+   * anda a cuatro patas, y sólo pisando (`settleOnGround`); si no, 0.
+   */
+  groundPitch: number;
+  groundRoll: number;
+  groundLift: number;
   /** Unidades por segundo. */
   speed: number;
   /** 0 quieto, 1 a tope. Alimenta el aleteo y la zancada. */
@@ -113,6 +122,9 @@ export function createPose(): FaunaPose {
     heading: Number.NaN,
     pitch: 0,
     bank: 0,
+    groundPitch: 0,
+    groundRoll: 0,
+    groundLift: 0,
     speed: 0,
     effort: 0,
     airborne: 1,
@@ -1099,4 +1111,67 @@ export function poseFor(act: FaunaAct, member: number, seconds: number, out: Fau
   out.scale = smoothstep(0, 0.03, t) * (1 - smoothstep(overtime, overtime + OVERTIME_FADE, s));
 
   behavior.decorate?.(act, member, clock, out);
+  settleOnGround(act, out);
+}
+
+/** Hasta dónde llegan las patas desde el centro, en largos de cuerpo: a lo largo y a lo ancho. */
+export const FOOT_REACH = 0.3;
+export const FOOT_SPAN = 0.1;
+/** Lo más que se inclina un cuerpo con el suelo; lo que falte, lo sube `groundLift`. */
+export const GROUND_TILT_MAX = 1;
+
+/** Anda a cuatro patas: lo que se apoya en un rectángulo, no en un punto. */
+export function onFourFeet(spec: SpeciesSpec): boolean {
+  const gait = spec.deform?.gait;
+  return gait === 'trote' || gait === 'galope';
+}
+
+/**
+ * Asienta en el suelo a lo que anda a cuatro patas. El cabeceo que sale de la
+ * trayectoria es el del centro, y el cuerpo sólo se inclina un 60 % de él
+ * (`animate`): en una ladera empinada —las colinas de Fushimi suben 9 u en
+ * 11— las patas de arriba quedaban dentro de la tierra hasta 0,4 u. Aquí se
+ * mide el suelo bajo las cuatro patas: el cuerpo se inclina con él, a lo largo
+ * (`groundPitch`) y a lo ancho (`groundRoll`), y si aun así alguna pata queda
+ * dentro —un escalón entre las de delante y las de detrás, el pliegue de dos
+ * triángulos de la malla, una cuesta más empinada que el tope— se sube lo justo
+ * (`groundLift`, ya sumado a `y`). En el aire no cuenta: se desvanece con
+ * `airborne`.
+ */
+function settleOnGround(act: FaunaAct, out: FaunaPose): void {
+  out.groundPitch = 0;
+  out.groundRoll = 0;
+  out.groundLift = 0;
+  const grounded = 1 - out.airborne;
+  if (grounded <= 0 || !onFourFeet(act.spec) || Number.isNaN(out.heading)) return;
+  const reach = FOOT_REACH * act.spec.size;
+  const span = FOOT_SPAN * act.spec.size;
+  // El +X local del cuerpo va a (cos, 0, −sen); su derecha (+Z local), a (sen, 0, cos).
+  const fx = Math.cos(out.heading);
+  const fz = -Math.sin(out.heading);
+  const rx = Math.sin(out.heading);
+  const rz = Math.cos(out.heading);
+  const center = groundAt(act, out.x, out.z);
+  const front = groundAt(act, out.x + fx * reach, out.z + fz * reach);
+  const back = groundAt(act, out.x - fx * reach, out.z - fz * reach);
+  const right = groundAt(act, out.x + rx * span, out.z + rz * span);
+  const left = groundAt(act, out.x - rx * span, out.z - rz * span);
+  const pitch = clamp(Math.atan2(front - back, 2 * reach), -GROUND_TILT_MAX, GROUND_TILT_MAX);
+  const roll = clamp(Math.atan2(right - left, 2 * span), -GROUND_TILT_MAX, GROUND_TILT_MAX);
+  const along = Math.tan(pitch);
+  const across = Math.tan(roll);
+  // Lo que se hunde la pata más hundida bajo el plano del cuerpo, que pasa por
+  // el suelo del centro.
+  let sink = 0;
+  for (const a of [-reach, reach]) {
+    for (const b of [-span, span]) {
+      const foot = groundAt(act, out.x + fx * a + rx * b, out.z + fz * a + rz * b);
+      sink = Math.max(sink, foot - (center + a * along + b * across));
+    }
+  }
+  sink = Math.max(sink, front - (center + reach * along), back - (center - reach * along));
+  out.groundPitch = pitch * grounded;
+  out.groundRoll = roll * grounded;
+  out.groundLift = sink * grounded;
+  out.y += out.groundLift;
 }

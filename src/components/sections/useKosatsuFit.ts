@@ -2,6 +2,7 @@
 
 import { useEffect, type RefObject } from 'react';
 
+import type { StationSlug } from '@/config/journey';
 import { KOSATSU } from '@/scene/objects/kosatsu/kosatsu';
 import { PATH } from '@/scene/path/journeyPath';
 
@@ -28,10 +29,13 @@ import { boardFit, boardInk, boardVisible } from './kosatsuFit';
 /** Por debajo de esto la letra apenas se ve: la tabla todavía no se toca. */
 const HIT_FROM = 0.35;
 
-export function useKosatsuFit(section: RefObject<HTMLElement | null>, enabled: boolean): void {
+export function useKosatsuFit(section: RefObject<HTMLElement | null>, station: StationSlug, enabled: boolean): void {
   useEffect(() => {
     const root = section.current;
     if (!root) return;
+    // Los tableros que se proyectan son los de este tramo, no los de las vecinas.
+    KOSATSU.tramo = station;
+    KOSATSU.wake();
     const nodes = new Map<number, HTMLElement>();
     for (const node of root.querySelectorAll<HTMLElement>('[data-sign]')) nodes.set(Number(node.dataset.sign), node);
     if (nodes.size === 0) return;
@@ -152,8 +156,9 @@ export function useKosatsuFit(section: RefObject<HTMLElement | null>, enabled: b
     return () => {
       alive = false;
       if (KOSATSU.place === place) KOSATSU.place = null;
+      if (KOSATSU.tramo === station) KOSATSU.tramo = null;
       window.removeEventListener('resize', measure);
       clear();
     };
-  }, [section, enabled]);
+  }, [section, station, enabled]);
 }

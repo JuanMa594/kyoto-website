@@ -44,12 +44,14 @@ export function useBoardProjection(placed: PlacedObject, card: number, station: 
     if (card < 0) return;
     KOSATSU.wake = () => invalidate();
     return () => {
+      // Sólo limpia lo suyo: el de una vecina no toca las tablas del tramo que se lee.
+      if (station !== KOSATSU.tramo) return;
       KOSATSU.rects[card]!.on = false;
       KOSATSU.rects[card]!.stop.on = false;
       KOSATSU.place?.(card);
       KOSATSU.wake = () => {};
     };
-  }, [card, invalidate]);
+  }, [card, station, invalidate]);
 
   /** Del sistema local del tablero al mundo. */
   const toWorld = useMemo(() => {
@@ -132,7 +134,8 @@ export function useBoardProjection(placed: PlacedObject, card: number, station: 
 
   useFrame(({ camera, size }) => {
     const rect = KOSATSU.rects[card];
-    if (!rect) return;
+    // Los índices son de tarjeta: sólo escribe el tramo que se está leyendo.
+    if (!rect || station === null || station !== KOSATSU.tramo) return;
     project(camera, size.width, size.height, rect);
     // El mismo tablero visto desde su parada, con la lente y el aspecto de ahora.
     const fov = (camera as PerspectiveCamera).fov;

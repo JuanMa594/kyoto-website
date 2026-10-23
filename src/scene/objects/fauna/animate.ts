@@ -297,14 +297,19 @@ export function animate(
     windRock = gust * 0.12 * Math.sin(seconds * 1.4 + member * 2.3);
   }
 
+  // Pisando, lo que anda a cuatro patas se inclina con el suelo bajo ellas
+  // (`settleOnGround`), no con un 60 % del cabeceo de su centro: en las
+  // laderas de Fushimi las patas de arriba se le metían en la tierra.
+  const trajectoryPitch = clamp(pose.pitch * 0.6, -0.5, 0.5);
   return {
     pitch:
-      clamp(pose.pitch * 0.6, -0.5, 0.5) +
+      (quadruped ? trajectoryPitch * air + pose.groundPitch : trajectoryPitch) +
       air * (spec.flightPitch ?? 0) +
       rock +
       windPitch +
       posturePitch,
-    bank: pose.bank + windRock,
+    // La derecha más alta (`groundRoll` > 0) es un giro negativo en X.
+    bank: pose.bank + windRock - pose.groundRoll,
     lift: lift + memory.windLift + postureLift,
     squash: landing + breath,
   };

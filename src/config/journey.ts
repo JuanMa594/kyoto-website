@@ -736,6 +736,20 @@ const JUNCOS_UBICACION: readonly DecorSusuki[] = [
 ];
 
 /**
+ * Del principio de la subida (el final del llano de Eventos) a la profundidad
+ * de la estación: los macizos de la subida se escriben desde ahí. Si la Fase 7
+ * alarga el llano (`TRAMO_EVENTOS.flat`) y aleja Fushimi lo mismo (`pathT`),
+ * la subida entera —gradas, galerías, ema y bambú— se va con él sin tocar nada
+ * más. Si lo que cambia es el largo de la subida, las paradas de las ema se
+ * reparten de nuevo y los claros del dosel tendrán que seguirlas (`check:path`,
+ * «Fushimi Inari», lo dice).
+ */
+function fromClimb(spans: readonly (readonly [number, number])[]): [number, number][] {
+  const climb = TRAMO_EVENTOS.flat ?? 0;
+  return spans.map(([from, to]) => [climb + from, climb + to]);
+}
+
+/**
  * La subida a Fushimi Inari (Fase 6A), del tramo de Eventos: galerías de
  * toriis entre los rellanos de las ema. Abierta / densa / abierta / densa: la
  * primera anuncia la subida y deja ver la fauna; la última, densa, termina de
@@ -751,30 +765,53 @@ const SUBIDA_FUSHIMI: readonly DecorItem[] = [
   // hojas asoman sobre los dinteles y arrojan el komorebi. Más cerrado a la
   // izquierda, que es por donde entra el sol. Con un claro delante de cada ema
   // —en su costado, de 12 u antes de su parada a 3 u después—: si no, desde la
-  // cámara de la parada las cañas taparían la tabla.
-  ...canopyBamboo('izquierda', 0.22, 300, [
-    [52, 73.5],
-    [89, 146],
-    [161.5, 177],
-  ]),
-  ...canopyBamboo('derecha', 0.14, 310, [
-    [52, 110],
-    [125, 177],
-  ]),
+  // cámara de la parada las cañas taparían la tabla. Desde el principio de
+  // la subida (`fromClimb`).
+  ...canopyBamboo(
+    'izquierda',
+    0.22,
+    300,
+    fromClimb([
+      [2, 23.5],
+      [39, 96],
+      [111.5, 127],
+    ]),
+  ),
+  ...canopyBamboo(
+    'derecha',
+    0.14,
+    310,
+    fromClimb([
+      [2, 60],
+      [75, 127],
+    ]),
+  ),
   // Detrás, el bosque: bosquetes ralos con claros, como el fondo de la Home.
-  ...backdropBamboo('izquierda', 12.5, 21, 320, [
-    [50, 64],
-    [72, 96],
-    [104, 130],
-    [138, 160],
-    [166, 182],
-  ]),
-  ...backdropBamboo('derecha', 12, 20, 330, [
-    [54, 78],
-    [86, 112],
-    [120, 140],
-    [148, 176],
-  ]),
+  ...backdropBamboo(
+    'izquierda',
+    12.5,
+    21,
+    320,
+    fromClimb([
+      [0, 14],
+      [22, 46],
+      [54, 80],
+      [88, 110],
+      [116, 132],
+    ]),
+  ),
+  ...backdropBamboo(
+    'derecha',
+    12,
+    20,
+    330,
+    fromClimb([
+      [4, 28],
+      [36, 62],
+      [70, 90],
+      [98, 126],
+    ]),
+  ),
 ];
 
 /**

@@ -3,14 +3,14 @@
 import { useEffect, useMemo } from 'react';
 import { Color, Float32BufferAttribute, MeshStandardMaterial, PlaneGeometry, type BufferAttribute } from 'three';
 
-import { JOURNEY, PATH_LENGTH } from '@/config/journey';
+import { JOURNEY } from '@/config/journey';
 import type { ScenePalette } from '@/lib/css-vars';
 import type { QualityProfile } from '@/scene/quality/tiers';
 import { zoneBlend } from '@/scene/path/journeyPath';
 import { withKomorebi } from '@/scene/shaders/komorebi';
 import { CARPET_LAYERS, withPetalCarpet } from '@/scene/shaders/petalCarpet';
 
-import { GROUND_Y, terrainHeight } from './elevation';
+import { GROUND_Y, TERRAIN_GRID, TERRAIN_MESH, TERRAIN_SPACING, terrainHeight, terrainSegments } from './elevation';
 
 /**
  * El suelo del camino entero, de antes de la Home a después de Gastronomía.
@@ -29,21 +29,13 @@ import { GROUND_Y, terrainHeight } from './elevation';
 /** Qué parte del tinte de suelo de cada estación llega al color final. */
 const GROUND_TINT = 0.3;
 
-/** Cobertura: el ancho de todo lo que la niebla deja ver, y todo el largo. */
-const WIDTH = 360;
-const NEAR_Z = 60;
-const FAR_Z = -(PATH_LENGTH + 240);
-const DEPTH = NEAR_Z - FAR_Z;
-const CENTER_Z = (NEAR_Z + FAR_Z) / 2;
-
-/** Unidades de mundo por segmento: ~2 en alto, ~2,5 en medio, ~4 en bajo. */
-const SPACING: Record<QualityProfile['tier'], number> = { high: 2, medium: 2.5, low: 4 };
-
-/** Segmentos en X y en Z, con el mismo espaciado en los dos ejes. */
-function segmentsFor(tier: QualityProfile['tier']): [number, number] {
-  const spacing = SPACING[tier];
-  return [Math.round(WIDTH / spacing), Math.round(DEPTH / spacing)];
-}
+/**
+ * Cobertura y espaciado: en `elevation.ts` (`TERRAIN_GRID`), porque la fauna
+ * pisa esta misma malla (`terrainMeshHeight`), no la función.
+ */
+const WIDTH = TERRAIN_GRID.width;
+const DEPTH = TERRAIN_GRID.nearZ - TERRAIN_GRID.farZ;
+const CENTER_Z = (TERRAIN_GRID.nearZ + TERRAIN_GRID.farZ) / 2;
 
 interface TerrainProps {
   palette: ScenePalette;
@@ -51,9 +43,12 @@ interface TerrainProps {
 }
 
 export function Terrain({ palette, profile }: TerrainProps) {
-  const [segmentsX, segmentsZ] = segmentsFor(profile.tier);
+  const spacing = TERRAIN_SPACING[profile.tier];
+  const [segmentsX, segmentsZ] = terrainSegments(spacing);
 
   const geometry = useMemo(() => {
+    // Lo que pisa la fauna es esta malla: con este espaciado.
+    TERRAIN_MESH.spacing = spacing;
     const geo = new PlaneGeometry(WIDTH, DEPTH, segmentsX, segmentsZ);
     const position = geo.attributes.position as BufferAttribute;
     const colors = new Float32Array(position.count * 3);
@@ -81,7 +76,7 @@ export function Terrain({ palette, profile }: TerrainProps) {
     position.needsUpdate = true;
     geo.computeVertexNormals();
     return geo;
-  }, [segmentsX, segmentsZ, palette.washi]);
+  }, [spacing, segmentsX, segmentsZ, palette.washi]);
 
   useEffect(() => () => geometry.dispose(), [geometry]);
 

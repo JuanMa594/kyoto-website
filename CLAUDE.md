@@ -689,6 +689,20 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   ruta de Windows al pasarla a un script: `MSYS_NO_PATHCONV=1`. Y con
   `127.0.0.1` el servidor de desarrollo bloquea los chunks
   (`allowedDevOrigins`): `localhost`.
+- **Los índices de `KOSATSU.rects` son de tarjeta, y la escena monta también
+  las estaciones vecinas.** Desde Ubicación están montadas las ema de Eventos
+  (tarjetas 0–2), que se proyectaban en los mismos huecos que las tablas de
+  Ubicación (0–2) y les borraban el texto. Sólo proyecta el tramo que se lee
+  (`KOSATSU.tramo`, que pone `useKosatsuFit`).
+- **La fauna pisa la malla que se dibuja, no la función.** El terreno es de
+  triángulos planos cada 2–4 u (según el tier), y al pie de las colinas de
+  Fushimi —9 u en 11— la malla queda hasta casi 1 u por encima de
+  `terrainHeight`: los animales andaban con las patas dentro. `walkY` lee
+  `terrainMeshHeight` (mismos vértices y misma diagonal que el `PlaneGeometry`,
+  con el espaciado que publica `Terrain` en `TERRAIN_MESH`). Y como el cuerpo
+  sólo se inclinaba un 60 % de la cuesta, lo que anda a cuatro patas se asienta
+  con el suelo bajo sus cuatro patas (`settleOnGround`: cabeceo, alabeo y lo
+  justo de alzada). `check:path` mide cada pata en los tres tiers.
 
 ---
 

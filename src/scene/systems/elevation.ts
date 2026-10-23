@@ -1,6 +1,7 @@
-import { JOURNEY, type HillProfile, type Side } from '@/config/journey';
+import { JOURNEY, PATH_LENGTH, type HillProfile, type Side } from '@/config/journey';
 import { lerp, smoothstep } from '@/lib/procedural';
 import { pathX, pathY, zoneBlend } from '@/scene/path/journeyPath';
+import type { QualityTier } from '@/scene/quality/tiers';
 import { stairTop, stairWalk } from '@/scene/path/stairs';
 
 /**
@@ -104,11 +105,84 @@ export function groundY(x: number, z: number): number {
   return GROUND_Y + Math.max(terrainHeight(x, z), stairTop(x, z));
 }
 
+/** La malla del terreno (`Terrain`): todo lo que la niebla deja ver de ancho, y todo el largo. */
+export const TERRAIN_GRID = {
+  width: 360,
+  nearZ: 60,
+  farZ: -(PATH_LENGTH + 240),
+} as const;
+
+/** Unidades de mundo por segmento de la malla: ~2 en alto, ~2,5 en medio, ~4 en bajo. */
+export const TERRAIN_SPACING: Record<QualityTier, number> = { high: 2, medium: 2.5, low: 4 };
+
+/** Segmentos en X y en Z de la malla, con el mismo espaciado en los dos ejes. */
+export function terrainSegments(spacing: number): [number, number] {
+  const depth = TERRAIN_GRID.nearZ - TERRAIN_GRID.farZ;
+  return [Math.round(TERRAIN_GRID.width / spacing), Math.round(depth / spacing)];
+}
+
 /**
- * Lo que pisa la fauna: el suelo, con cada contrahuella de las gradas
- * convertida en una rampa corta (`stairWalk`). Nunca por debajo de `groundY`
- * salvo en esa rampa, que sube por encima de la huella de abajo.
+ * El espaciado de la malla que se está dibujando. Un solo escritor, `Terrain`,
+ * al construirla; lo lee `terrainMeshHeight`.
+ */
+export const TERRAIN_MESH = { spacing: TERRAIN_SPACING.high };
+
+/** Las alturas de los vértices ya calculadas, para el espaciado de `TERRAIN_MESH`. */
+let vertexCache: { spacing: number; heights: Float32Array } | null = null;
+
+function vertexHeight(ix: number, iz: number, sx: number, stepX: number, stepZ: number): number {
+  const cache = vertexCache!;
+  const k = ix + (sx + 1) * iz;
+  let h = cache.heights[k]!;
+  if (Number.isNaN(h)) {
+    h = terrainHeight(-TERRAIN_GRID.width / 2 + ix * stepX, TERRAIN_GRID.farZ + iz * stepZ);
+    cache.heights[k] = h;
+  }
+  return h;
+}
+
+/**
+ * La altura del terreno **tal como se dibuja**, relativa a `GROUND_Y`: la malla
+ * es de triángulos planos cada 2–4 u, y donde la ladera se curva —al pie de las
+ * colinas de Fushimi, que suben 9 u en 11— la malla queda hasta casi 1 u por
+ * encima de `terrainHeight` (en el tier bajo). Lo que se apoya en el suelo y es
+ * pequeño (la fauna) pisa esta, no la función: si no, se le hunden las patas.
+ * Mismos vértices y misma diagonal que el `PlaneGeometry` de `Terrain`.
+ */
+export function terrainMeshHeight(x: number, z: number): number {
+  const spacing = TERRAIN_MESH.spacing;
+  const [sx, sz] = terrainSegments(spacing);
+  const stepX = TERRAIN_GRID.width / sx;
+  const stepZ = (TERRAIN_GRID.nearZ - TERRAIN_GRID.farZ) / sz;
+  const fx = (x + TERRAIN_GRID.width / 2) / stepX;
+  const fz = (z - TERRAIN_GRID.farZ) / stepZ;
+  const ix = Math.floor(fx);
+  const iz = Math.floor(fz);
+  // Fuera de la malla no hay nada que pisar: la función.
+  if (ix < 0 || iz < 0 || ix >= sx || iz >= sz) return terrainHeight(x, z);
+  if (vertexCache?.spacing !== spacing) {
+    vertexCache = { spacing, heights: new Float32Array((sx + 1) * (sz + 1)).fill(Number.NaN) };
+  }
+  const tx = fx - ix;
+  const tz = fz - iz;
+  // Las dos mitades de cada celda del PlaneGeometry: (a, b, d) y (b, c, d),
+  // con a en (ix, iz), b en (ix, iz + 1), c en (ix + 1, iz + 1) y d en (ix + 1, iz);
+  // las filas van de lo lejano (farZ, la primera del PlaneGeometry) a lo cercano.
+  const hb = vertexHeight(ix, iz + 1, sx, stepX, stepZ);
+  const hd = vertexHeight(ix + 1, iz, sx, stepX, stepZ);
+  if (tx + tz <= 1) {
+    const ha = vertexHeight(ix, iz, sx, stepX, stepZ);
+    return ha + tz * (hb - ha) + tx * (hd - ha);
+  }
+  const hc = vertexHeight(ix + 1, iz + 1, sx, stepX, stepZ);
+  return hc + (1 - tx) * (hb - hc) + (1 - tz) * (hd - hc);
+}
+
+/**
+ * Lo que pisa la fauna: el terreno dibujado (`terrainMeshHeight`) o, en las
+ * gradas, cada huella, con cada contrahuella convertida en una rampa corta
+ * (`stairWalk`), que sube por encima de la huella de abajo.
  */
 export function walkY(x: number, z: number): number {
-  return GROUND_Y + Math.max(terrainHeight(x, z), stairWalk(x, z));
+  return GROUND_Y + Math.max(terrainMeshHeight(x, z), stairWalk(x, z));
 }
