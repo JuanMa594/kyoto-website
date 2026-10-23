@@ -24,7 +24,9 @@ abre su tarjeta.
 - La subida se lee como **subida por gradas**, no como rampa, y la cámara
   sube sin saltos ni mareo.
 - Dentro de una galería se tiene la sensación de `5.png`: toriis que se
-  repiten en profundidad, pasando **por debajo**.
+  repiten en profundidad, pasando **por debajo**. En las **densas** casi se
+  tocan y se nota el bambú de arriba (luz que se cuela, sombra de hojas); las
+  **abiertas** dejan ver el ritmo y cruzar a la fauna.
 - Las ema se leen sobre la madera (como los kōsatsu) y se tocan para leer.
 - La llegada es una **revelación**: la galería termina y se abre la plaza con
   el rōmon a la izquierda y el título a la derecha, como `6.png`.
@@ -42,6 +44,7 @@ abre su tarjeta.
 | El edificio | El **rōmon** de `6.png`, a la **izquierda** de la explanada; el título a la derecha | Usuario + `6.png` |
 | El suelo de la plaza | **Losas grandes y sueltas** (ishidatami) que se funden con el fondo, no un pavimento gris continuo: el suelo no debe leerse como un piso | Propuesta aceptada |
 | Toriis | Del tamaño necesario para que la cámara **pase por debajo** (más grandes que los reales, como en `5.png`), instanciados | Propuesta aceptada |
+| Galerías | **Unas densas** (toriis apeñuscados, sin fauna, con la luz y la sombra del bambú de arriba) **y otras abiertas** con huecos por donde cruza la fauna | Usuario (2026-10-22) |
 | Kitsune | **Los dos**: estatuas de piedra con **babero rojo** a los lados de la escalinata del rōmon, y el **zorro vivo** (`fox_realistic.glb`) cruzando por la senda de toriis | Usuario |
 | Tocar el rōmon | **Híbrido**: paneo de cámara **muy suave y corto** + tarjeta de lectura + **los faroles del templo se encienden** | Usuario |
 | Ema | Las tarjetas del tramo de subida son **ema** colgadas de un ema-kake, con el texto encajado sobre la madera (el mecanismo de los kōsatsu); se tocan para leer | Propuesta aceptada |
@@ -68,13 +71,13 @@ de Fushimi.
 |---|---|
 | 192–242 | El llano de los cerezos (Fase 7). Al fondo, la primera galería anuncia la subida |
 | ~242 | Empiezan las gradas; bambú denso a los dos lados |
-| — | **Galería 1** de toriis |
+| — | **Galería 1**, abierta (la entrada) |
 | rellano | **Ema 1** |
-| — | **Galería 2** |
+| — | **Galería 2**, densa |
 | rellano | **Ema 2** |
-| — | **Galería 3** |
+| — | **Galería 3**, abierta |
 | rellano | **Ema 3** |
-| — | **Galería 4**, la última: termina poco antes de la plaza |
+| — | **Galería 4**, densa y la última: termina poco antes de la plaza |
 | ~366–400 | **La explanada**: losas, nobori, faroles; el rōmon a la izquierda con sus dos zorros |
 | 386 | Fushimi: el cartel |
 
@@ -125,13 +128,31 @@ medidas puras en `inari.ts` junto a `ryobu.ts`:
 
 ### 4.3 Las galerías
 
-- **Cuatro galerías** de toriis apretados (de partida 8–14 cada una, a
-  ~1,4 u entre sí), **separadas por rellanos abiertos**: así hay ritmo
-  (dentro / fuera / dentro), la fauna encuentra por dónde cruzar y las ema
-  tienen un cuadro despejado. Una galería continua de 144 u sería un túnel
-  sin respiro y le cerraría el paso a toda la fauna.
+- **Cuatro galerías, de dos tipos**, **separadas por rellanos abiertos**: así
+  hay ritmo (dentro / fuera / dentro), la fauna encuentra por dónde cruzar y
+  las ema tienen un cuadro despejado. Una galería continua de 144 u sería un
+  túnel sin respiro y le cerraría el paso a toda la fauna.
+  - **Densa** (*apeñuscada*): los toriis casi se tocan, como en los tramos
+    más famosos del monte. Con pilares de ~0,7 u de diámetro, van a
+    **~1,0 u entre sí** (hueco de ~0,3 u): desde la cámara los pilares se
+    solapan y la galería se lee como un túnel bermellón continuo, de `5.png`.
+    **Aquí no se pide fauna**: nada cruza una pared de pilares, y está bien.
+    Lo que se nota en su lugar es el **bambú de arriba** (§4.5): la luz que se
+    cuela entre los dinteles y la sombra de las hojas sobre el suelo y los
+    pilares. De partida 20–28 toriis.
+  - **Abierta**: toriis a **~3,2 u entre sí** (hueco de ~2,5 u, de partida
+    6–9 toriis): el ritmo se ve, la luz entra a franjas y **los animales
+    pueden cruzar por los huecos**.
+  - Reparto de partida: **1 abierta** (la entrada: anuncia la subida y deja
+    ver fauna), **2 densa**, **3 abierta**, **4 densa** (la última y la más
+    larga, que termina de golpe en la plaza: el contraste con la explanada es
+    la revelación). Cada galería declara su tipo; no se infiere.
+  - Dentro de una galería el paso de un tipo a otro no es brusco: los
+    primeros y últimos toriis de una densa se separan en 3–4 pasos hasta el
+    ritmo abierto, para que no se lea como un corte.
 - Las galerías se colocan solas a partir de las paradas (como los kōsatsu): si
-  cambia el largo del tramo o el número de ema, se mueven con ellas.
+  cambia el largo del tramo o el número de ema, se mueven con ellas (el
+  número de toriis de una galería sale de su largo y su tipo).
 - Cada torii sigue el rumbo del camino en su d.
 - Para la fauna, cada pilar es un obstáculo (como cada caña); la cámara y las
   piedras ven la galería entera como franja.
@@ -154,9 +175,28 @@ comprueba.
 - **Juncos lejanos**, piedras de río en las bases y tierra oscura al pie de lo
   de madera, como en cada estación (acabado orgánico).
 - **La luz de la subida**: el cielo y la niebla se calientan hacia Fushimi
-  (`skyTint`), y en tier alto unos pocos **haces de luz** —planos aditivos,
-  muy tenues, entre el bambú de los rellanos— sugieren el sol filtrado. Si en
-  la revisión no aportan, se quitan: son lo más prescindible del bloque.
+  (`skyTint`).
+- **El bambú sobre las galerías (*komorebi*, 木漏れ日)**. En las densas, el
+  tercio de arriba lo ocupan los dinteles y no se ve fauna; lo que cuenta la
+  escena es el bambú que se asoma por encima. Tres capas, de más barata a
+  más cara:
+  1. **Dosel**: macizos de `bambu` a los lados de las galerías **más altos que
+     los toriis** (hasta ~12 u) y *inclinados hacia el eje*, con las hojas
+     colgando sobre los dinteles. Se ven por encima del último dintel y por
+     los huecos de las abiertas. Es la misma decoración de siempre, sólo que
+     colocada para cubrir; las hojas se mecen con `WIND`.
+  2. **Sombra proyectada**: el sol ya proyecta sombra (la caja de sombras
+     sigue al encuadre): con el dosel como emisor, las hojas dejan manchas
+     sobre el suelo y los pilares, y los propios toriis dejan franjas de luz
+     entre dinteles. Es la parte gratuita: sólo hay que **colocar el dosel
+     del lado del que viene el sol**.
+  3. **Moteado y haces** (sólo tier alto): un moteado de luz —manchas de hoja
+     que se desplazan despacio con el viento— en el shader del suelo y de los
+     pilares **dentro de los tramos de galería** (un peso por d, con
+     fundido en los extremos), y unos pocos **haces de luz** —planos
+     aditivos, muy tenues, entre los pilares de las densas y el bambú de los
+     rellanos—.
+  Si la capa 3 no aporta en la revisión, se quita; las capas 1 y 2 se quedan.
 
 ## 5. Las ema (絵馬)
 
@@ -316,7 +356,9 @@ el rōmon ni el título:
 - **La conducta, `senda`**: el zorro **entra desde un costado por un
   rellano**, fuera de cuadro, sale al camino, **sube unas gradas por delante
   de la cámara**, se para un instante a mirar atrás y **se va por el otro
-  lado** en el siguiente claro, o por la galería hasta perderse en la niebla.
+  lado** en el siguiente claro, o **subiendo por el eje de una galería**
+  (en las densas es la única forma: el eje está libre) hasta perderse en la
+  niebla.
   Empieza y termina fuera de cuadro (o tras la niebla), como toda conducta.
   Una sola conducta (cada conducta suma el peso de la especie).
 - **Dónde**: en la zona de Fushimi (su `ambient.fauna` gana `kitsune`), es
@@ -337,7 +379,7 @@ bajo `lugares.fushimi-inari` (o donde lo pida la plantilla, §10). Cada ema
 **1 · `inari` — el origen**
 
 - *ES* — **El arroz que se hizo pájaro.** Cuenta la crónica de Yamashiro que
-  Hata no Irogu, rico en arroz, usó un pastel de mochi como diana. Al herirlo,
+  **Hata no Irogu**, rico en arroz, usó un pastel de mochi como diana. Al herirlo,
   el pastel se volvió un ave blanca que voló a este monte, y donde se posó
   brotó el arroz: *ine-nari*, «el arroz crece». En 711 su clan levantó aquí el
   santuario de Inari.
@@ -438,8 +480,13 @@ propósito.
   pequeñas instanciados por material, ema-kake, bambú) y en la plaza (rōmon,
   estatuas, nobori, losas). Lo nuevo se instancia desde el principio (la 5B
   se pasó del presupuesto por no hacerlo con los kōsatsu).
-- Tier bajo: menos toriis por galería (más separados), menos ema pequeñas y
-  sin haces de luz; el rōmon, las estatuas y las ema grandes no cambian.
+- Los toriis de las densas son la mayor parte del recuento (~50 de ~80), pero
+  van instanciados: el coste es de vértices, no de draw calls. Las sombras de
+  contacto, el musgo y las piedras de río al pie de cada pilar se limitan en
+  las densas a **uno de cada dos** pilares (apenas se ven entre ellos).
+- Tier bajo: las densas pasan a ~1,4 u entre toriis (la mitad de toriis), menos
+  ema pequeñas y sin moteado ni haces de luz (quedan el dosel y la sombra del
+  sol); el rōmon, las estatuas y las ema grandes no cambian.
 - El zorro optimizado, ≤ ~1 MB.
 - La decoración se monta con `StationDecor` (la estación y sus vecinas): lo
   pesado, en diferido, fuera del primer JS de la página.
@@ -455,6 +502,13 @@ propósito.
 - **Las piedras** caen sobre las huellas, nunca sobre un canto.
 - **Los toriis**: el *nuki* ≥ 1,5 u sobre la cámara y los pilares ≥ 1,5 u de
   ella en toda la subida, **caminando y en los viajes** (ida y vuelta).
+- **Las galerías por tipo**: la separación de las densas y de las abiertas cae
+  en su rango (con el hueco entre pilares mínimo de ~0,25 u, para que no se
+  fundan en una pared de geometría que parpadee); las densas se separan en los
+  extremos sin saltos de más de un paso; ninguna galería pisa un rellano ni
+  una parada de ema.
+- **El dosel**: los macizos de bambú de las galerías son más altos que el
+  dintel, nunca a menos de 1,5 u de la cámara ni sobre las piedras.
 - **Las paradas en la subida**: con `flat`, ninguna parada cae en el llano;
   sin `flat` (Ubicación), las paradas no cambian.
 - **Las ema**: delante de su parada, en un rellano, sin galería ni bambú entre
@@ -463,8 +517,11 @@ propósito.
   izquierda, enteros, sin tapar la zona del título.
 - **El paneo**: dentro de sus topes y de `RIG_LIMITS`; vuelve a cero.
 - **El kitsune**: `senda` empieza y termina fuera de cuadro con los cuatro
-  aspectos; la fauna sigue saliendo en la subida (las galerías no le cierran
-  el paso) y en la plaza.
+  aspectos; la fauna sigue saliendo en la subida y en la plaza. Con dos
+  galerías densas, el mínimo del reparto se mide **sobre toda la subida**
+  (de partida ≥ 20 % de los sorteos, contra el 31 % de la Home); dentro de
+  una densa, que no salga fauna que cruce no es un fallo (sí lo es que
+  atraviese un pilar).
 - Los textos existen en los dos idiomas y caben.
 
 **Shaders:** el torii inari (si tiene uno propio), las ema de zorro, el
@@ -485,7 +542,8 @@ Nuevos:
 
 - `src/scene/objects/torii/inari.ts` — medidas del torii inari (puro).
 - `src/scene/systems/ToriiGallery.tsx` (y su colocación pura en
-  `scene/decor/`) — las galerías instanciadas.
+  `scene/decor/`) — las galerías instanciadas, con su tipo (`densa` /
+  `abierta`) y el peso de «dentro de una galería» por d, que lee el moteado.
 - `src/scene/objects/ema/` — el ema-kake, las ema de zorro y la ema grande.
 - `src/scene/objects/romon/` — el rōmon: medidas (puro), geometría,
   componente, los chōchin.
@@ -556,9 +614,33 @@ Para el plan; cada bloque se puede revisar por separado:
 | La cámara en la cuesta | La inclinación está acotada a 3,5°–8,7° hacia abajo: mirando cuesta arriba, las gradas pueden llenar la mitad de arriba del cuadro. Si pasa, subir la cámara en la subida antes que inclinarla |
 | La galería y el tercio superior | Dentro de una galería los dinteles ocupan el tercio de arriba, que es la excepción buscada (`5.png`); en los rellanos, el tercio superior vuelve a quedar libre |
 | El tamaño de los toriis | Con ~7 u de luz y ~7 de alto son monumentales: que la galería no parezca de gigantes. Se compensa con el ritmo apretado y el bambú alto |
-| Fauna y galerías | Que la fauna siga encontrando líneas: los rellanos son sus pasos |
+| Fauna y galerías | Las densas la apartan por diseño; que la fauna siga encontrando líneas en los rellanos y las abiertas. Si el reparto cae por debajo del mínimo, se acorta una densa antes que abrir sus huecos |
+| Las densas | A ~1,0 u los pilares de un torii vecino se solapan casi del todo en perspectiva: vigilar el z-fighting entre dinteles, el moiré de las franjas de sombra y el recuento de vértices. Si se ven como una pared plana, subir la separación a ~1,2 u |
+| El bambú de arriba | Que el dosel se lea como bambú y no como una mancha verde sobre los dinteles; que no tape el cielo del tercio superior en los rellanos (donde debe quedar libre) |
 | El zorro | 12,8 MB y sin conocer su esqueleto: puede necesitar `headTurn` o retoques como el gato. Si la postura sentada no convence, estatuas de pie |
 | El paneo | Aunque esté acotado, es el primer movimiento de cámara que no pide el scroll: medirlo en la revisión y bajarlo si se nota |
 | El rōmon en el cuadro | Que quepa en la mitad izquierda con aire arriba sin quedar pequeño: alejarlo antes que achicarlo |
-| Los haces de luz | Lo más prescindible: fuera si no aportan |
+| El moteado y los haces de luz (capa 3) | Lo más prescindible: fuera si no aportan; el dosel y la sombra del sol son la base |
 | 伏見稲荷大社 | Seis kanji con `<InkKanji>`: que el título no se haga largo de dibujar ni de ancho |
+
+## 18. Correcciones al planificar e implementar
+
+Del plan (`docs/superpowers/plans/2026-10-22-fase-6a-fushimi-inari.md`) y de
+la calibración con capturas:
+
+| Spec | Corrección | Por qué |
+|---|---|---|
+| §4.1 «las gradas son del terreno» | Malla aparte (`systems/Stairs.tsx`) sobre el terreno liso; `groundY` las incluye, la cámara sigue `terrainY` y la fauna `walkY` (cada contrahuella con una rampa de 0,3 u) | La rejilla del terreno es de 2 u: un escalón de 0,35 se dibujaba como una rampa |
+| §4.1 rellanos «huellas más largas» | Mesetas en `pathY` en cada parada con cartel (de 6 u antes a 2 u después, bordes de 2,5 u); las paradas, en un módulo aparte (`path/tramoStops.ts`) | Una meseta del camino es un rellano de verdad. La subida llega a 11,3° |
+| §4.2 *nuki* a ~6,8 u | Alzada por torii: los pilares se estiran en el shader lo justo para que el nuki quede 1,5 u sobre la cámara, con una envolvente de pendiente ≤ 0,12 u/u | Cuesta arriba el tope de inclinación sube la cámara hasta ~8 u sobre la ladera. En lo empinado los toriis miden hasta ~3,5 u más |
+| §4.2 luz «~7 u» | Pilares a |u| = 4 (luz de 8 u), diámetro 0,64 | Caminando, la cámara se aparta del eje hasta ~1 u en las curvas |
+| §4.3 «la cámara y las piedras ven la galería entera como franja» | Una franja por hilera de pilares | La cámara pasa por dentro |
+| §4.3 zona libre de cada parada | `[parada − 16, parada + 3]` | Los pilares entre ~9 y 20 u delante de la cámara de la parada tapan la ema; y la cámara llega desde atrás |
+| — (nuevo) | En un viaje rápido, lo que queda a < 1,8 u de la cámara se disuelve en un tramado (`uNearFade`, de 30 a 60 u/s) | En los viajes el encuadre recorta las curvas (topes anti-mareo) y puede pasar a ~5 u del eje: rozaría pilares un fotograma |
+| §4.5 haces de luz | **No se hicieron**: el dosel inclinado, la sombra de sus hojas (tier alto) y el moteado (tiers alto y medio) dan la luz. Si en la revisión falta, se añaden | Eran lo más prescindible (§17) |
+| §4.5 moteado sólo en tier alto | También en tier medio, y sólo bajo el dosel (|u| < 9–13 del eje) | Es una cuenta en el fragmento; sin él, el tier medio (sin sombras) no tendría luz en las densas |
+| §5.3 «si el nombre `kosatsu` se queda corto, se renombra» | Se queda: `KOSATSU` es el puente de todos los tableros del tramo; la proyección, común en `useBoardProjection` | Renombrar tocaba la 5B entera sin ganar nada |
+| §6.3 estatuas | Sentadas, con la postura de la deformación del gato calibrada para el zorro, en granito con musgo al pie | La postura sentada sale bien con el modelo |
+| §6.4 nobori en la plaza | Dos, en los bordes del cuadro (no tapan ni el rōmon ni la columna del título); faroles abajo a la izquierda | Calibrado con capturas |
+| §8 conducta `senda` | Sube por el eje de la galería cuando no puede salir de lado | En las densas el eje está libre |
+| Fushimi `fog` | 22 / 110 (antes 12 / 95) | El rōmon, a ~40 u de la cámara, no se leía en el cartel |

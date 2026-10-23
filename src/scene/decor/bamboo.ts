@@ -48,6 +48,9 @@ export function groveCulms(grove: PlacedGrove, densityScale: number): Culm[] {
   const width = u1 - u0;
   const taper = item.taper ?? 1;
   const expected = Math.round((length * width * item.density * densityScale * (1 + taper)) / 2);
+  // El dosel de Fushimi (6A) se inclina hacia el camino: un giro en z lleva +y
+  // hacia −x, así que a la izquierda (u < 0) va con signo negativo.
+  const lean = (item.lean ?? 0) * (area.side === 'izquierda' ? -1 : 1);
 
   const culms: Culm[] = [];
   for (let attempt = 0; culms.length < expected && attempt < expected * 40; attempt += 1) {
@@ -68,7 +71,8 @@ export function groveCulms(grove: PlacedGrove, densityScale: number): Culm[] {
       height,
       radius: (0.03 + 0.0065 * height) * (0.85 + random() * 0.3),
       tiltX: (random() - 0.5) * 0.12,
-      tiltZ: (random() - 0.5) * 0.12,
+      // Sin inclinación no se sortea nada más: el bambú de la Home sigue igual.
+      tiltZ: (random() - 0.5) * 0.12 + (lean === 0 ? 0 : lean * (0.75 + random() * 0.5)),
       phase: random(),
       spring: culmSpring(height, random()),
       tone: random(),

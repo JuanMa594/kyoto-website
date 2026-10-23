@@ -13,6 +13,7 @@ import {
   readingProgress,
   resetScrollPath,
   SCROLL_PATH,
+  stationTrechos,
   tramoCardOpacity,
   tramoFraction,
   tramoSignOpacity,
@@ -134,6 +135,8 @@ export function useJourneyScroll({
     });
 
     const gate = createArrivalGate();
+    // Lo que avanza cada trecho: con el llano de salida (Eventos) el primero es más largo.
+    const shares = stationTrechos(station);
 
     const walk = section
       ? ScrollTrigger.create({
@@ -142,16 +145,16 @@ export function useJourneyScroll({
           end: 'bottom bottom',
           onUpdate: (self) => {
             const progress = unit(self.progress);
-            SCROLL_PATH.tramo = tramoFraction(progress, cards, walkVh);
+            SCROLL_PATH.tramo = tramoFraction(progress, cards, walkVh, shares);
             // Los índices son de tarjeta: cuentan sólo para el tramo de esta estación.
             KOSATSU.unrollFor = station;
             cardNodes.forEach((node, index) => {
-              node.style.setProperty('--card', tramoCardOpacity(progress, cards, index, walkVh).toFixed(3));
+              node.style.setProperty('--card', tramoCardOpacity(progress, cards, index, walkVh, shares).toFixed(3));
               // El rollo del mapa del kōsatsu de esta tarjeta (Fase 5B).
-              KOSATSU.unroll[index] = tramoUnroll(progress, cards, index, walkVh);
+              KOSATSU.unroll[index] = tramoUnroll(progress, cards, index, walkVh, shares);
             });
             KOSATSU.wake();
-            section.style.setProperty('--llegada', tramoSignOpacity(progress, cards, walkVh).toFixed(3));
+            section.style.setProperty('--llegada', tramoSignOpacity(progress, cards, walkVh, shares).toFixed(3));
             if (passTramo(gate, progress, self.direction)) arrive.current();
           },
         })

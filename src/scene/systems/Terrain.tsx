@@ -7,6 +7,7 @@ import { JOURNEY, PATH_LENGTH } from '@/config/journey';
 import type { ScenePalette } from '@/lib/css-vars';
 import type { QualityProfile } from '@/scene/quality/tiers';
 import { zoneBlend } from '@/scene/path/journeyPath';
+import { withKomorebi } from '@/scene/shaders/komorebi';
 import { CARPET_LAYERS, withPetalCarpet } from '@/scene/shaders/petalCarpet';
 
 import { GROUND_Y, terrainHeight } from './elevation';
@@ -84,14 +85,14 @@ export function Terrain({ palette, profile }: TerrainProps) {
 
   useEffect(() => () => geometry.dispose(), [geometry]);
 
-  // Con los pétalos caídos de la estación que los declare (cerca de Eventos).
-  const material = useMemo(
-    () =>
-      withPetalCarpet(new MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 }), palette, {
-        layers: CARPET_LAYERS[profile.tier],
-      }),
-    [palette, profile.tier],
-  );
+  // Con los pétalos caídos de la estación que los declare (cerca de Eventos) y,
+  // bajo las galerías de toriis de Fushimi, la luz que cuela el bambú (6A).
+  const material = useMemo(() => {
+    const carpet = withPetalCarpet(new MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 }), palette, {
+      layers: CARPET_LAYERS[profile.tier],
+    });
+    return profile.tier === 'low' ? carpet : withKomorebi(carpet);
+  }, [palette, profile.tier]);
   useEffect(() => () => material.dispose(), [material]);
 
   return (

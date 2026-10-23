@@ -41,6 +41,7 @@ export type BehaviorName =
   | 'perseguir'
   | 'deambular'
   | 'callejear'
+  | 'senda'
   | 'revolotear'
   | 'titilar';
 
@@ -115,8 +116,7 @@ export interface SpeciesSpec {
 
 /**
  * `null` = declarada en el camino pero **todavía sin cuerpo**. No es un olvido:
- * el kitsune necesita el túnel de toriis de la Fase 6 para que su aparición
- * signifique algo, y la carpa necesita agua en escena. El director las salta.
+ * la carpa necesita agua en escena. El director la salta.
  * Tenerlas aquí en vez de borrarlas es lo que hace que el día que se
  * implementen no haya que acordarse de nada.
  *
@@ -379,7 +379,50 @@ export const BESTIARY: Record<FaunaKind, SpeciesSpec | null> = {
     weight: 1,
   },
 
-  kitsune: null,
+  // El zorro rojo de Fushimi Inari (Fase 6A): el mensajero de Inari. Sale de
+  // un costado por un rellano, sube unas gradas por el camino, se para a mirar
+  // atrás y se va (`senda`). El mismo modelo, en piedra y sentado, guarda la
+  // escalinata del rōmon (`objects/kitsune/`): por eso lleva posturas.
+  kitsune: {
+    rig: 'modelo',
+    model: 'kitsune',
+    deform: {
+      hipY: 0.22,
+      splitX: 0,
+      legMinX: -0.28,
+      gait: 'trote',
+      legSwing: 0.6,
+      stride: 0.6,
+      hop: 0,
+      // Al trote ligero; si se lanza, galopa.
+      run: { from: 2.6, to: 3.2, stride: 1, hop: 0.07 },
+      // La cola cuelga baja desde la grupa hasta la punta blanca.
+      tail: { baseX: -0.28, tipX: -0.5, minY: 0.05, pivotY: 0.34 },
+      neck: { baseX: 0.22, baseY: 0.42, dirX: 0.8, dirY: 0.6, reach: 0.22 },
+      postures: {
+        sitTilt: 0.5,
+        sitDrop: 0.06,
+        sitFold: 1.55,
+        lieFront: 1.5,
+        lieHind: 1.5,
+        lieDrop: 0.2,
+        reachFront: 1.6,
+        reachTilt: 0.3,
+        reachDrop: 0.1,
+        kickHind: 0.8,
+        kickTilt: 0.09,
+        kickDrop: 0.02,
+      },
+      pivotY: 0.3,
+    },
+    size: 0.9,
+    body: 'shu',
+    accent: 'washi',
+    ride: 0,
+    behaviors: ['senda'],
+    depth: [-9, -4],
+    weight: 1.2,
+  },
   carpa: null,
 };
 
@@ -452,6 +495,8 @@ export function durationFor(behavior: BehaviorName, random: () => number): numbe
     deambular: [32, 42],
     // Sólo el rango total: el reparto real está abajo.
     callejear: [19, 62],
+    // El zorro: entra, sube, mira atrás y se va, sin prisa.
+    senda: [24, 30],
     revolotear: [11, 18],
     titilar: [22, 34],
   };

@@ -76,6 +76,7 @@ export const SLIDE: Readonly<Record<BehaviorName, Slide>> = {
   perseguir: NEVER,
   deambular: NEVER,
   callejear: NEVER,
+  senda: NEVER,
   titilar: NEVER,
 };
 

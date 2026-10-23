@@ -200,7 +200,8 @@ export function stoneTopY(x: number, z: number): number {
     const lx = (dx * cos - dz * sin) / stone.scale;
     const lz = (dx * sin + dz * cos) / stone.scale;
     const local = sample(shapes[stone.variant]!, lx, lz);
-    if (local !== null) top = Math.max(top, stone.y + local * stone.scale);
+    // Las losas de una explanada (6A), aplanadas: su alto, también.
+    if (local !== null) top = Math.max(top, stone.y + local * stone.scale * (stone.flatten ?? 1));
   }
 
   return top;

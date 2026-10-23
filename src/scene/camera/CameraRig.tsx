@@ -10,8 +10,9 @@ import { JOURNEY, PATH_LENGTH, type StationSlug } from '@/config/journey';
 import { readCssNumber } from '@/lib/css-vars';
 import { clamp, damp } from '@/lib/procedural';
 import { VIEW } from '@/scene/camera/framing';
+import { PAN, PAN_SHIFT, PAN_YAW, stepPan } from '@/scene/camera/pan';
 import { CAMERA_BACK, createRig, snapRig, stepRig } from '@/scene/camera/pathRig';
-import { dominantZone, PATH } from '@/scene/path/journeyPath';
+import { dominantZone, PATH, stationDepth } from '@/scene/path/journeyPath';
 import { selectMotionAllowed, useKyotoStore } from '@/store/useKyotoStore';
 
 /**
@@ -142,15 +143,21 @@ export function CameraRig() {
         PARALLAX.y = 0;
       }
 
+      // El paneo hacia el monumento de un lugar (6A): sólo con la cámara
+      // asentada en su estación y con movimiento; si no, vuelve a cero.
+      const settled =
+        motion && !snap && Math.abs(rig.d - stationDepth(store.activeStation)) < 1 && Math.abs(PATH.velocity) < 0.5;
+      PAN.value = motion ? stepPan(PAN.value, PAN.wanted, settled, dt) : 0;
+
       // El eje X local de la cámara, en mundo: (cos, 0, −sen) del rumbo.
       const cos = Math.cos(rig.yaw);
       const sin = Math.sin(rig.yaw);
-      perspective.position.set(
-        rig.camera.x + PARALLAX.x * cos,
-        rig.camera.y + PARALLAX.y,
-        rig.camera.z - PARALLAX.x * sin,
-      );
-      perspective.lookAt(rig.focus.x, rig.focus.y, rig.focus.z);
+      const side = PARALLAX.x + PAN.value * PAN_SHIFT;
+      perspective.position.set(rig.camera.x + side * cos, rig.camera.y + PARALLAX.y, rig.camera.z - side * sin);
+      // El paneo gira la mirada alrededor de la cámara: el punto de interés se
+      // desplaza de lado lo que pide el ángulo a su distancia.
+      const swing = Math.tan(PAN.value * PAN_YAW) * CAMERA_BACK;
+      perspective.lookAt(rig.focus.x + swing * cos, rig.focus.y, rig.focus.z - swing * sin);
     },
     [rig, config],
   );

@@ -39,7 +39,7 @@ import {
   stationIndex,
   zoneWeight,
 } from '../src/scene/path/journeyPath';
-import { STONE_MEANDER, STONE_SINK, STONE_VARIANTS, stoneLayout } from '../src/scene/path/stones';
+import { plazas, STONE_MEANDER, STONE_SINK, STONE_VARIANTS, stoneLayout } from '../src/scene/path/stones';
 import {
   petalCountsAt,
   petalDrawCount,
@@ -321,25 +321,31 @@ for (const [name, run, deviationLimit] of runs) {
 section('Las piedras');
 
 const stones = stoneLayout();
-// Una piedra cada ~1,45 u, de 30 u antes de la Home a 20 u después de Gastronomía.
-const expectedStones = (PATH_LENGTH + 50) / 1.45;
+// Una piedra cada ~1,45 u, de 30 u antes de la Home a 20 u después de
+// Gastronomía. Las explanadas (6A) llevan losas, que no cuentan.
+const pathStones = stones.filter((s) => !s.flatten);
+const plazaLength = plazas().reduce((sum, p) => sum + p.to - p.from, 0);
+const expectedStones = (PATH_LENGTH + 50 - plazaLength) / 1.45;
 check(
   'una piedra cada ~1,45 u en todo el recorrido',
-  Math.abs(stones.length - expectedStones) <= expectedStones * 0.03,
-  `${stones.length}`,
+  Math.abs(pathStones.length - expectedStones) <= expectedStones * 0.03,
+  `${pathStones.length}`,
 );
 check(
   'cubren de antes de la Home a después de Gastronomía',
   Math.max(...stones.map((s) => s.z)) >= 25 && Math.min(...stones.map((s) => s.z)) <= -(PATH_LENGTH + 15),
 );
 check('se usan las 12 formas', new Set(stones.map((s) => s.variant)).size === STONE_VARIANTS);
-const worstLane = Math.max(...stones.map((s) => Math.abs(s.x - pathX(-s.z))));
+// Las losas de las explanadas (6A) se abren más: van aparte, en check-fushimi.
+const worstLane = Math.max(...stones.filter((s) => !s.flatten).map((s) => Math.abs(s.x - pathX(-s.z))));
 check(
   'todas dentro del pasillo, serpenteando alrededor del eje',
   worstLane <= STONE_MEANDER + 0.3 && worstLane < CENTER_CLEAR,
   `máx ${worstLane.toFixed(2)} del eje`,
 );
-const worstRest = Math.max(...stones.map((s) => Math.abs(s.y + STONE_SINK * s.scale - groundY(s.x, s.z))));
+const worstRest = Math.max(
+  ...stones.map((s) => Math.abs(s.y + STONE_SINK * s.scale * (s.flatten ?? 1) - groundY(s.x, s.z))),
+);
 check('todas apoyan en el terreno', worstRest < 1e-9);
 
 section('El scroll');

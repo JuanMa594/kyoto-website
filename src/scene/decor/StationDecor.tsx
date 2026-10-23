@@ -24,6 +24,13 @@ const Maqueta = lazy(() => import('@/scene/objects/maqueta/MaquetaJapon'));
 const Kosatsu = lazy(() => import('@/scene/objects/kosatsu/KosatsuSign'));
 const Roca = lazy(() => import('@/scene/objects/roca/RocaPintada'));
 const Cerezo = lazy(() => import('@/scene/objects/cerezo/CerezoArbol'));
+/** Las galerías de toriis de la subida a Fushimi (Fase 6A). */
+const ToriiGallery = lazy(() => import('@/scene/systems/ToriiGallery'));
+/** Los ema-kake de los rellanos de la subida (Fase 6A). */
+const EmaKake = lazy(() => import('@/scene/objects/ema/EmaKake'));
+/** La explanada de Fushimi (Fase 6A): el rōmon con sus zorros y los nobori. */
+const Romon = lazy(() => import('@/scene/objects/romon/RomonGate'));
+const Nobori = lazy(() => import('@/scene/objects/nobori/NoboriBanners'));
 
 interface StationDecorProps {
   /** La estación de la **zona** (la de la cámara), no la de la ruta. */
@@ -67,6 +74,7 @@ interface DecorSetProps {
 function DecorSet({ index, portrait, palette, profile }: DecorSetProps) {
   const layout = useMemo(() => stationDecorLayout(index, portrait), [index, portrait]);
   const lanterns = useMemo(() => layout.objects.filter((o) => o.item.kind === 'farol'), [layout]);
+  const banners = useMemo(() => layout.objects.filter((o) => o.item.kind === 'nobori'), [layout]);
 
   return (
     <>
@@ -94,6 +102,20 @@ function DecorSet({ index, portrait, palette, profile }: DecorSetProps) {
             </Suspense>
           );
         }
+        if (placed.item.kind === 'romon') {
+          return (
+            <Suspense key={k} fallback={null}>
+              <Romon placed={placed} palette={palette} profile={profile} />
+            </Suspense>
+          );
+        }
+        if (placed.item.kind === 'ema') {
+          return (
+            <Suspense key={k} fallback={null}>
+              <EmaKake placed={placed} palette={palette} profile={profile} />
+            </Suspense>
+          );
+        }
         if (placed.item.kind === 'maqueta') {
           return (
             <Suspense key={k} fallback={null}>
@@ -104,8 +126,18 @@ function DecorSet({ index, portrait, palette, profile }: DecorSetProps) {
         return null;
       })}
       {lanterns.length > 0 && <StoneLanterns lanterns={lanterns} palette={palette} profile={profile} />}
+      {banners.length > 0 && (
+        <Suspense fallback={null}>
+          <Nobori banners={banners} palette={palette} profile={profile} />
+        </Suspense>
+      )}
       {layout.groves.length > 0 && <BambooGrove groves={layout.groves} palette={palette} profile={profile} />}
       {layout.susuki.length > 0 && <SusukiField patches={layout.susuki} palette={palette} profile={profile} />}
+      {layout.galleries.length > 0 && (
+        <Suspense fallback={null}>
+          <ToriiGallery galleries={layout.galleries} palette={palette} profile={profile} />
+        </Suspense>
+      )}
       <Pebbles index={index} portrait={portrait} palette={palette} profile={profile} />
       <ContactShadows index={index} portrait={portrait} palette={palette} profile={profile} />
       <MossPatches index={index} portrait={portrait} palette={palette} profile={profile} />

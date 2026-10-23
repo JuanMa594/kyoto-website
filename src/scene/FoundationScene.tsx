@@ -7,6 +7,7 @@ import { Atmosphere, Sun } from '@/scene/systems/Atmosphere';
 import { FaunaDirector } from '@/scene/systems/fauna/FaunaDirector';
 import { StationDecor } from '@/scene/decor/StationDecor';
 import { PetalZones } from '@/scene/systems/PetalSystem';
+import { Stairs } from '@/scene/systems/Stairs';
 import { StonePath } from '@/scene/systems/StonePath';
 import { Terrain } from '@/scene/systems/Terrain';
 
@@ -44,6 +45,8 @@ export function FoundationScene({ station, palette, profile }: FoundationScenePr
       <Sun palette={palette} profile={profile} />
 
       <Terrain palette={palette} profile={profile} />
+      {/* Las gradas de la subida a Fushimi Inari (6A), sobre el terreno liso. */}
+      <Stairs palette={palette} profile={profile} />
       <StonePath color={palette.ishi} palette={palette} profile={profile} />
 
       {/* Lo que hay a los lados del camino: el torii y el bambú de la Home, y lo

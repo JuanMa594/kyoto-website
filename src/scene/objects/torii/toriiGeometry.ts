@@ -14,6 +14,7 @@ import { BufferGeometry, CylinderGeometry, ExtrudeGeometry, Float32BufferAttribu
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
+import { INARI, inariSori } from './inari';
 import { kasagiLift, RYOBU } from './ryobu';
 
 export interface ToriiParts {
@@ -202,4 +203,103 @@ let cached: ToriiParts | null = null;
 export function ryobuToriiGeometry(): ToriiParts {
   cached ??= build();
   return cached;
+}
+
+/* ── El torii inari (Fase 6A) ──────────────────────────────────────────── */
+
+export interface InariParts {
+  /** Bermellón: pilares, daiwa, nuki, cuñas, gakuzuka, shimaki y la viga del kasagi. */
+  readonly shu: BufferGeometry;
+  /** Sumi: el pie (nemaki) y la tapa del kasagi. */
+  readonly sumi: BufferGeometry;
+}
+
+/** Un pilar del inari: cónico, con su uchikorobi y un solo tramo (la alzada lo estira en el shader). */
+function inariPillar(x: number, inward: 1 | -1): BufferGeometry {
+  const { baseHeight, shimakiBottom, daiwaHeight, pillarRadius, lean } = INARI;
+  // Hasta el shimaki, que en el pilar ya se levanta un poco con la curva.
+  const top = shimakiBottom + inariSori(x + inward * lean) - daiwaHeight * 0.5;
+  const height = top - baseHeight;
+  const geometry = new CylinderGeometry(pillarRadius[1], pillarRadius[0], height, 18, 1, true);
+  geometry.translate(0, baseHeight + height / 2, 0);
+  const position = geometry.getAttribute('position');
+  for (let i = 0; i < position.count; i += 1) {
+    const t = (position.getY(i) - baseHeight) / height;
+    position.setX(i, position.getX(i) + x + inward * lean * t);
+  }
+  geometry.computeVertexNormals();
+  return prepared(geometry);
+}
+
+function buildInari(): InariParts {
+  const { span, baseHeight, baseRadius, shimakiBottom, lean } = INARI;
+  const shu: BufferGeometry[] = [];
+  const sumi: BufferGeometry[] = [];
+  const half = span / 2;
+
+  for (const [x, inward] of [
+    [-half, 1],
+    [half, -1],
+  ] as const) {
+    shu.push(inariPillar(x, inward));
+    // El pie negro, con su tapa.
+    const foot = new CylinderGeometry(baseRadius[1], baseRadius[0], baseHeight, 18, 1, false);
+    foot.translate(x, baseHeight / 2, 0);
+    sumi.push(prepared(foot));
+    // El daiwa: el anillo en lo alto del pilar, bajo el shimaki.
+    const ring = new CylinderGeometry(INARI.daiwaRadius, INARI.daiwaRadius, INARI.daiwaHeight, 18, 1, false);
+    ring.translate(x + inward * lean, shimakiBottom + inariSori(x + inward * lean) - INARI.daiwaHeight / 2, 0);
+    shu.push(prepared(ring));
+  }
+
+  // El nuki, pasante, con sus cuñas por fuera de cada pilar.
+  shu.push(box(span + 2 * INARI.nukiOverhang, INARI.nukiHeight, INARI.nukiDepth, 0, INARI.nukiY, 0, 0.025));
+  const wedge = INARI.pillarRadius[1] + 0.09;
+  shu.push(box(0.1, 0.32, 0.44, -half - wedge + lean * 0.8, INARI.nukiY, 0, 0.015));
+  shu.push(box(0.1, 0.32, 0.44, half + wedge - lean * 0.8, INARI.nukiY, 0, 0.015));
+
+  // El gakuzuka, del nuki al shimaki.
+  const strutBottom = INARI.nukiY + INARI.nukiHeight / 2;
+  shu.push(box(INARI.strut, shimakiBottom - strutBottom, INARI.strut * 0.8, 0, (strutBottom + shimakiBottom) / 2, 0, 0.02));
+
+  // Shimaki y kasagi con la misma curva: las puntas se levantan juntas.
+  const shimakiTop = shimakiBottom + INARI.shimakiHeight;
+  shu.push(
+    loftBeam(-half - INARI.shimakiOverhang, half + INARI.shimakiOverhang, INARI.shimakiDepth, INARI.shimakiHeight, (x) =>
+      shimakiBottom + inariSori(x),
+    ),
+  );
+  shu.push(
+    loftBeam(-half - INARI.kasagiOverhang, half + INARI.kasagiOverhang, INARI.kasagiDepth, INARI.kasagiHeight, (x) =>
+      shimakiTop + inariSori(x) - 0.02,
+      24,
+    ),
+  );
+  sumi.push(
+    loftBeam(
+      -half - INARI.kasagiOverhang - 0.05,
+      half + INARI.kasagiOverhang + 0.05,
+      INARI.kasagiDepth + 0.06,
+      INARI.kasagiCap,
+      (x) => shimakiTop + inariSori(x) + INARI.kasagiHeight - 0.02,
+      24,
+    ),
+  );
+
+  const merge = (parts: BufferGeometry[]): BufferGeometry => {
+    const merged = mergeGeometries(parts);
+    for (const part of parts) part.dispose();
+    if (!merged) throw new Error('torii inari: no se pudo fusionar la geometría');
+    return merged;
+  };
+
+  return { shu: merge(shu), sumi: merge(sumi) };
+}
+
+let cachedInari: InariParts | null = null;
+
+/** La geometría del torii inari, calculada una vez y compartida por las galerías. */
+export function inariToriiGeometry(): InariParts {
+  cachedInari ??= buildInari();
+  return cachedInari;
 }

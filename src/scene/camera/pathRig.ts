@@ -25,7 +25,7 @@
 
 import { clamp, damp, lerp, smoothstep } from '@/lib/procedural';
 import { pathX, pathY, type PathFrame, type Point3 } from '@/scene/path/journeyPath';
-import { GROUND_Y, groundY } from '@/scene/systems/elevation';
+import { GROUND_Y, terrainY } from '@/scene/systems/elevation';
 
 import { CAMERA_BASE } from './framing';
 
@@ -149,7 +149,8 @@ function place(rig: RigState): void {
   const highest = focusY + CAMERA_BACK * Math.tan(RIG_LIMITS.pitchMax);
 
   rig.camera.x = cameraX;
-  rig.camera.y = clamp(groundY(cameraX, cameraZ) + CAMERA_HEIGHT, lowest, highest);
+  // Sobre el terreno liso, nunca sobre las gradas: sube la cuesta sin saltos.
+  rig.camera.y = clamp(terrainY(cameraX, cameraZ) + CAMERA_HEIGHT, lowest, highest);
   rig.camera.z = cameraZ;
 
   // El origen local es el punto que hace coincidir el objetivo de CAMERA_BASE

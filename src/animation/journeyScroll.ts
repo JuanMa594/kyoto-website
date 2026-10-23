@@ -15,12 +15,12 @@
  * donde estaba en vez de volver a cero.
  */
 
-import { getStation, type StationSlug } from '@/config/journey';
+import type { StationSlug } from '@/config/journey';
 import { clamp, smoothstep } from '@/lib/procedural';
 import { STATION_DEPTHS, stationIndex } from '@/scene/path/journeyPath';
+import { cardStopDepth, READING_DRIFT, STOP_DRIFT, trechoShares, tramoTrechos } from '@/scene/path/tramoStops';
 
-/** Cuánto avanza la cámara mientras se lee el contenido de una estación. */
-export const READING_DRIFT = 4;
+export { READING_DRIFT };
 
 export interface ScrollPath {
   station: StationSlug | null;
@@ -82,12 +82,6 @@ const WALK_VH_PER_UNIT = 3.3;
 /** Lo que suma cada tarjeta del tramo: su parada de lectura. */
 export const TRAMO_STOP_VH = 80;
 
-/**
- * Lo que avanza la cámara mientras se lee una tarjeta, en fracción del tramo.
- * Casi nada, pero algo: con la cámara clavada el scroll se sentiría muerto.
- */
-const STOP_DRIFT = 0.008;
-
 /** En cuántos vh entra una tarjeta antes de su parada, y sale después. */
 const CARD_FADE_VH = 30;
 
@@ -115,34 +109,61 @@ export function walkEase(t: number): number {
   return u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2;
 }
 
-function tramoLayout(cards: number, walkVh: number) {
+/**
+ * El reparto de un tramo. `shares` es lo que avanza cada trecho, en fracción
+ * del tramo (`tramoStops.ts`); sin él, todos iguales. **El vh de cada trecho es
+ * proporcional a lo que avanza**: la cámara camina igual de rápido en todos,
+ * también en el primero, que con un llano de salida (`tramo.flat`) es más
+ * largo que los demás.
+ */
+function tramoLayout(cards: number, walkVh: number, shares?: readonly number[]) {
   const count = Math.max(0, Math.floor(cards));
-  return {
-    count,
-    /** vh de cada trecho de caminar: el caminar se reparte entre tarjetas. */
-    walk: walkVh / (count + 1),
-    height: tramoHeightVh(count, walkVh),
-    /** Fracción del tramo que avanza cada trecho. */
-    distance: (1 - count * STOP_DRIFT) / (count + 1),
+  const parts = shares && shares.length === count + 1 ? shares : trechoShares(count);
+  const total = parts.reduce((sum, share) => sum + share, 0) || 1;
+  const walks = parts.map((share) => (walkVh * share) / total);
+  /** Dónde empieza la parada `index`, en vh. */
+  const stopStart = (index: number) => {
+    let at = index * TRAMO_STOP_VH;
+    for (let k = 0; k <= index; k += 1) at += walks[k]!;
+    return at;
   };
+  return { count, walks, shares: parts, height: tramoHeightVh(count, walkVh), stopStart };
+}
+
+/** Lo que avanza cada trecho del tramo que sale de `station`: para pasarlo a las funciones de abajo. */
+export function stationTrechos(station: StationSlug): number[] {
+  return tramoTrechos(stationIndex(station));
 }
 
 /**
  * Cuánto del tramo lleva recorrido la cámara (0–1) para un progreso de scroll
- * (0–1). El caminar se parte en `cards + 1` trechos iguales y, entre ellos, una
- * parada por tarjeta en la que la cámara casi se detiene. Sin tarjetas es la
- * curva del caminar de punta a punta.
+ * (0–1). El caminar se parte en `cards + 1` trechos y, entre ellos, una parada
+ * por tarjeta en la que la cámara casi se detiene. Sin tarjetas es la curva del
+ * caminar de punta a punta.
  */
-export function tramoFraction(progress: number, cards: number, walkVh = TRAMO_WALK_VH): number {
-  const { count, walk, height, distance } = tramoLayout(cards, walkVh);
-  const x = unit(progress) * height;
-  const period = walk + TRAMO_STOP_VH;
-  const k = Math.min(count, Math.floor(x / period));
-  const into = x - k * period;
-  const before = k * (distance + STOP_DRIFT);
-
-  if (k === count || into <= walk) return before + distance * walkEase(into / walk);
-  return before + distance + STOP_DRIFT * smoothstep(0, 1, (into - walk) / TRAMO_STOP_VH);
+export function tramoFraction(
+  progress: number,
+  cards: number,
+  walkVh = TRAMO_WALK_VH,
+  shares?: readonly number[],
+): number {
+  const layout = tramoLayout(cards, walkVh, shares);
+  const x = unit(progress) * layout.height;
+  let cursor = 0;
+  let before = 0;
+  for (let k = 0; k <= layout.count; k += 1) {
+    const walk = layout.walks[k]!;
+    const share = layout.shares[k]!;
+    if (k === layout.count || x <= cursor + walk) {
+      return before + share * walkEase(walk > 0 ? (x - cursor) / walk : 1);
+    }
+    cursor += walk;
+    before += share;
+    if (x <= cursor + TRAMO_STOP_VH) return before + STOP_DRIFT * smoothstep(0, 1, (x - cursor) / TRAMO_STOP_VH);
+    cursor += TRAMO_STOP_VH;
+    before += STOP_DRIFT;
+  }
+  return 1;
 }
 
 /**
@@ -155,12 +176,13 @@ export function tramoCardOpacity(
   cards: number,
   index: number,
   walkVh = TRAMO_WALK_VH,
+  shares?: readonly number[],
 ): number {
-  const { count, walk, height } = tramoLayout(cards, walkVh);
-  if (index < 0 || index >= count) return 0;
+  const layout = tramoLayout(cards, walkVh, shares);
+  if (index < 0 || index >= layout.count) return 0;
 
-  const x = unit(progress) * height;
-  const start = (index + 1) * walk + index * TRAMO_STOP_VH;
+  const x = unit(progress) * layout.height;
+  const start = layout.stopStart(index);
   const end = start + TRAMO_STOP_VH;
   return smoothstep(start - CARD_FADE_VH, start, x) * (1 - smoothstep(end, end + CARD_FADE_VH, x));
 }
@@ -175,12 +197,18 @@ const UNROLL_TO_VH = 10;
  * subir al irse. Continua y monótona a cada lado de la parada: al desandar el
  * tramo, sube por el mismo camino.
  */
-export function tramoUnroll(progress: number, cards: number, index: number, walkVh = TRAMO_WALK_VH): number {
-  const { count, walk, height } = tramoLayout(cards, walkVh);
-  if (index < 0 || index >= count) return 0;
+export function tramoUnroll(
+  progress: number,
+  cards: number,
+  index: number,
+  walkVh = TRAMO_WALK_VH,
+  shares?: readonly number[],
+): number {
+  const layout = tramoLayout(cards, walkVh, shares);
+  if (index < 0 || index >= layout.count) return 0;
 
-  const x = unit(progress) * height;
-  const start = (index + 1) * walk + index * TRAMO_STOP_VH;
+  const x = unit(progress) * layout.height;
+  const start = layout.stopStart(index);
   const end = start + TRAMO_STOP_VH;
   const down = smoothstep(start - UNROLL_FROM_VH, start - UNROLL_TO_VH, x);
   const up = 1 - smoothstep(end + UNROLL_TO_VH, end + UNROLL_FROM_VH, x);
@@ -189,20 +217,12 @@ export function tramoUnroll(progress: number, cards: number, index: number, walk
 
 /**
  * La d (absoluta) del punto de interés de la cámara en mitad de la parada
- * `index` del tramo que sale de `station`. Los kōsatsu se plantan respecto de
- * ella (`scene/decor/placement.ts`): si el tramo cambia de largo o de
- * tarjetas, los tablones se mueven solos.
+ * `index` del tramo que sale de `station`. Los kōsatsu y las ema se plantan
+ * respecto de ella (`scene/decor/placement.ts`), y los rellanos de las gradas
+ * caen en ella: si el tramo cambia de largo o de tarjetas, todo se mueve solo.
  */
 export function cardStopD(station: StationSlug, index: number): number {
-  const i = stationIndex(station);
-  const here = STATION_DEPTHS[i]!;
-  const next = STATION_DEPTHS[i + 1];
-  if (next === undefined) return here;
-
-  const { distance } = tramoLayout(getStation(station).tramo.cards.length, tramoWalkVh(station));
-  const fraction = (index + 1) * distance + index * STOP_DRIFT + STOP_DRIFT / 2;
-  const reading = here + READING_DRIFT;
-  return reading + (next - reading) * fraction;
+  return cardStopDepth(stationIndex(station), index);
 }
 
 /**
@@ -210,13 +230,18 @@ export function cardStopD(station: StationSlug, index: number): number {
  * gana nitidez desde el 30 % del tramo; con tarjetas, sólo después de la
  * última: primero se lee lo de aquí, y luego se ve lo que viene.
  */
-export function tramoSignOpacity(progress: number, cards: number, walkVh = TRAMO_WALK_VH): number {
-  const { count, walk, height } = tramoLayout(cards, walkVh);
+export function tramoSignOpacity(
+  progress: number,
+  cards: number,
+  walkVh = TRAMO_WALK_VH,
+  shares?: readonly number[],
+): number {
+  const layout = tramoLayout(cards, walkVh, shares);
   const p = unit(progress);
-  if (count === 0) return clamp((p - 0.3) * 2.2, 0, 1);
+  if (layout.count === 0) return clamp((p - 0.3) * 2.2, 0, 1);
 
-  const from = count * (walk + TRAMO_STOP_VH) + CARD_FADE_VH;
-  return smoothstep(from, from + walk * 0.6, p * height);
+  const from = layout.stopStart(layout.count - 1) + TRAMO_STOP_VH + CARD_FADE_VH;
+  return smoothstep(from, from + layout.walks[layout.count]! * 0.6, p * layout.height);
 }
 
 /* ── La llegada automática ─────────────────────────────────────────────── */

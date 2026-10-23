@@ -32,6 +32,8 @@
 import { JOURNEY, PATH_LENGTH, type Station, type StationSlug } from '@/config/journey';
 import { lerp, smoothstep } from '@/lib/procedural';
 
+import { cardStopDepth } from './tramoStops';
+
 /** Fracción de cada tramo que ocupa el fundido entre sus dos estaciones. */
 const BLEND_WIDTH = 0.5;
 
@@ -124,18 +126,111 @@ export function blendByZone(d: number, value: (station: Station) => number): num
 /* ── Altura del camino ─────────────────────────────────────────────────── */
 
 /**
+ * Los rellanos de un tramo con gradas (Fase 6A): de cuánto antes a cuánto
+ * después de cada parada con cartel es llano, y en cuántas unidades se funde
+ * con la cuesta. La ema se planta 2 u antes de la parada: queda dentro.
+ */
+const LANDING_BEFORE = 6;
+const LANDING_AFTER = 2;
+const LANDING_EDGE = 2.5;
+/** Paso de la tabla de la cuesta con rellanos, en unidades. */
+const PROFILE_STEP = 0.05;
+
+/** Un rellano: el tramo llano, sin los bordes en que se funde. */
+export interface Landing {
+  readonly from: number;
+  readonly to: number;
+}
+
+/** Los rellanos del tramo que sale de la estación `i`: uno por parada con cartel. Vacío sin gradas. */
+export function tramoLandings(i: number): Landing[] {
+  const station = JOURNEY[i];
+  if (!station?.tramo.stairs) return [];
+  return station.tramo.cards.flatMap((card, k) => {
+    if (!card.sign) return [];
+    const stop = cardStopDepth(i, k);
+    return [{ from: stop - LANDING_BEFORE, to: stop + LANDING_AFTER }];
+  });
+}
+
+interface CuestaProfile {
+  readonly from: number;
+  /** La fracción subida (0–1) en cada paso de la tabla. */
+  readonly values: Float64Array;
+}
+
+const PROFILES = new Map<number, CuestaProfile | null>();
+
+/**
+ * La cuesta de un tramo con rellanos, como tabla. Su pendiente es la del
+ * `smoothstep` de siempre —la derivada, `6u(1 − u)`— apagada en cada rellano
+ * con bordes suaves, e integrada y normalizada: llega exacta a la altura de la
+ * siguiente estación, la pendiente es continua (sin escalones de inclinación
+ * al entrar o salir de un rellano) y es nula en los dos extremos.
+ */
+function cuestaProfile(i: number): CuestaProfile | null {
+  if (PROFILES.has(i)) return PROFILES.get(i)!;
+  const landings = tramoLandings(i);
+  if (landings.length === 0) {
+    PROFILES.set(i, null);
+    return null;
+  }
+  const s0 = segmentStart(i);
+  const s1 = STATION_DEPTHS[i + 1]!;
+  const count = Math.ceil((s1 - s0) / PROFILE_STEP);
+  const density = (d: number) => {
+    const u = (d - s0) / (s1 - s0);
+    let flat = 0;
+    for (const landing of landings) {
+      flat = Math.max(
+        flat,
+        smoothstep(landing.from - LANDING_EDGE, landing.from, d) * (1 - smoothstep(landing.to, landing.to + LANDING_EDGE, d)),
+      );
+    }
+    return 6 * u * (1 - u) * (1 - flat);
+  };
+  const values = new Float64Array(count + 1);
+  let previous = density(s0);
+  for (let k = 1; k <= count; k += 1) {
+    const d = Math.min(s1, s0 + k * PROFILE_STEP);
+    const current = density(d);
+    values[k] = values[k - 1]! + ((previous + current) / 2) * (d - Math.min(s1, s0 + (k - 1) * PROFILE_STEP));
+    previous = current;
+  }
+  const total = values[count]!;
+  for (let k = 0; k <= count; k += 1) values[k] = values[k]! / total;
+  const profile = { from: s0, values };
+  PROFILES.set(i, profile);
+  return profile;
+}
+
+/** La fracción subida de un tramo en `d`: el `smoothstep` de siempre o, con gradas, su cuesta con rellanos. */
+function climbFraction(i: number, d: number): number {
+  const s0 = segmentStart(i);
+  const s1 = STATION_DEPTHS[i + 1]!;
+  const profile = cuestaProfile(i);
+  if (!profile) return smoothstep(s0, s1, d);
+  if (d <= s0) return 0;
+  if (d >= s1) return 1;
+  const at = (d - s0) / PROFILE_STEP;
+  const k = Math.min(profile.values.length - 2, Math.floor(at));
+  return lerp(profile.values[k]!, profile.values[k + 1]!, at - k);
+}
+
+/**
  * Altura del eje del camino en `d`, relativa a la Home.
  *
  * Cada estación declara su altura y el camino va de una a otra con el mismo
  * `smoothstep` que el desvío lateral: las cuestas —la subida a Fushimi Inari,
  * la bajada a Gion— ocurren **en los tramos**, y en cada estación el camino
- * queda llano, con la vista frontal de cartel.
+ * queda llano, con la vista frontal de cartel. En un tramo con gradas
+ * (`tramo.stairs`) la cuesta se detiene en un rellano en cada parada.
  */
 export function pathY(d: number): number {
   const i = segmentAt(d);
   const from = JOURNEY[i]!.environment.altitude;
   const to = JOURNEY[i + 1]!.environment.altitude;
-  return lerp(from, to, smoothstep(segmentStart(i), STATION_DEPTHS[i + 1]!, d));
+  return lerp(from, to, climbFraction(i, d));
 }
 
 /* ── Dónde está la cámara ──────────────────────────────────────────────── */

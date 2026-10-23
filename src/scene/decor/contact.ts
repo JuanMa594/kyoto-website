@@ -16,7 +16,7 @@
 import { JOURNEY } from '@/config/journey';
 
 import { groveCulms } from './bamboo';
-import { objectBases } from './footprints';
+import { galleryBases, objectBases } from './footprints';
 import { stationPebbles } from './pebbles';
 import { groundPose } from './ground';
 import { stationDecorLayout } from './placement';
@@ -36,11 +36,15 @@ export interface ContactShadow {
 
 /** Cuánto más ancha que lo que toca el suelo, y cuán oscura, según qué la proyecta. */
 // Un corro no tiene base (`objectBases` no devuelve ninguna): sus valores no se usan.
-const SPREAD = { torii: 1.6, farol: 1.9, arbusto: 1.75, maqueta: 1.7, kosatsu: 1.9, roca: 1.5, cerezo: 2.4, corro: 0 } as const;
-const STRENGTH = { torii: 0.7, farol: 0.85, arbusto: 0.95, maqueta: 0.85, kosatsu: 0.8, roca: 0.9, cerezo: 0.75, corro: 0 } as const;
+const SPREAD = { torii: 1.6, farol: 1.9, arbusto: 1.75, maqueta: 1.7, kosatsu: 1.9, ema: 1.9, romon: 1.6, nobori: 2.2, roca: 1.5, cerezo: 2.4, corro: 0 } as const;
+const STRENGTH = { torii: 0.7, farol: 0.85, arbusto: 0.95, maqueta: 0.85, kosatsu: 0.8, ema: 0.8, romon: 0.8, nobori: 0.7, roca: 0.9, cerezo: 0.75, corro: 0 } as const;
 
 /** El halo de tierra: cuánto más ancho que el pie, y cuán marcado. */
-const EARTH = { kosatsu: { spread: 6, strength: 0.85 }, cerezo: { spread: 4, strength: 0.8 } } as const;
+const EARTH = { kosatsu: { spread: 6, strength: 0.85 }, ema: { spread: 6, strength: 0.85 }, cerezo: { spread: 4, strength: 0.8 } } as const;
+
+/** Los pilares de las galerías de toriis (6A): la penumbra y el halo de tierra, en radios de su pie. */
+const GALLERY_SPREAD = 1.7;
+const GALLERY_EARTH = 3.2;
 
 /** Por debajo del musgo: se dibuja antes y él la cubre. */
 const CONTACT_LIFT = 0.008;
@@ -60,8 +64,16 @@ export function stationContacts(index: number, portrait: boolean, densityScale: 
     const kind = o.item.kind;
     for (const base of objectBases(o)) {
       // La tierra va primero: la penumbra, más pequeña, se dibuja encima.
-      if (kind === 'kosatsu' || kind === 'cerezo') add(base.x, base.z, base.foot * EARTH[kind].spread, EARTH[kind].strength, 1);
+      if (kind === 'kosatsu' || kind === 'ema' || kind === 'cerezo') add(base.x, base.z, base.foot * EARTH[kind].spread, EARTH[kind].strength, 1);
       add(base.x, base.z, base.foot * SPREAD[kind], STRENGTH[kind]);
+    }
+  }
+  // Los pilares de las galerías (6A), con su halo de tierra: salen de la tierra
+  // como los postes. En las densas, uno de cada dos.
+  for (const gallery of layout.galleries) {
+    for (const base of galleryBases(gallery, true)) {
+      add(base.x, base.z, base.foot * GALLERY_EARTH, 0.7, 1);
+      add(base.x, base.z, base.foot * GALLERY_SPREAD, 0.75);
     }
   }
   for (const p of stationPebbles(index, portrait)) {

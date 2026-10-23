@@ -21,9 +21,9 @@
 import type { FaunaKind } from '@/config/journey';
 import { clamp, lerp, mulberry32, smoothstep } from '@/lib/procedural';
 import { bandCenterY, halfWidthAt, screenBandY } from '@/scene/camera/framing';
-import { frameToWorld, type PathFrame, type Point3 } from '@/scene/path/journeyPath';
+import { frameToWorld, pathX, type PathFrame, type Point3 } from '@/scene/path/journeyPath';
 import { stoneTopY } from '@/scene/path/stoneSurface';
-import { groundY } from '@/scene/systems/elevation';
+import { walkY } from '@/scene/systems/elevation';
 
 import { catPlan, isAerial, type BehaviorName, type SpeciesSpec } from './bestiary';
 
@@ -137,12 +137,14 @@ const WORLD = { x: 0, z: 0 };
  * suelo se lee en su posición real, del mismo terreno que se dibuja, así que
  * nada flota ni se hunde en las cuestas, tampoco después de deslizarse. Y el
  * suelo de lo que pisa incluye las piedras del camino (`stoneTopY`): quien
- * cruza el camino pasa por encima de ellas, no a través.
+ * cruza el camino pasa por encima de ellas, no a través. En las gradas de
+ * Fushimi (6A) pisa cada huella, y sube cada contrahuella por una rampa corta
+ * (`walkY`): un escalón de golpe sería un salto.
  */
 export function groundAt(act: FaunaAct, x: number, z: number): number {
   const frame = act.anchor;
   frameToWorld(frame, x, z, WORLD);
-  return Math.max(groundY(WORLD.x, WORLD.z), stoneTopY(WORLD.x, WORLD.z)) - frame.y;
+  return Math.max(walkY(WORLD.x, WORLD.z), stoneTopY(WORLD.x, WORLD.z)) - frame.y;
 }
 
 /**
@@ -771,6 +773,66 @@ const callejear: Behavior = {
   },
 };
 
+/** Cuánto sube el zorro por el camino antes de pararse a mirar atrás, y cuánto más se aleja al irse (u). */
+const SENDA_CLIMB = 7;
+const SENDA_LEAVE = 5;
+/** Cuándo llega arriba y cuándo vuelve a echar a andar (fracción del acto). */
+const SENDA_ARRIVE = 0.55;
+const SENDA_LEAVE_AT = 0.68;
+
+/** Un punto de una curva de Bézier cuadrática. */
+function bezier(a: number, control: number, b: number, s: number): number {
+  return (1 - s) * (1 - s) * a + 2 * (1 - s) * s * control + s * s * b;
+}
+
+/**
+ * La x local del eje del camino a la profundidad local `z` del acto: el
+ * camino de verdad, que en una curva se aparta de la recta del encuadre.
+ */
+function axisX(act: FaunaAct, z: number): number {
+  const frame = act.origin;
+  frameToWorld(frame, 0, z, WORLD);
+  const d = -WORLD.z;
+  const dx = pathX(d) - frame.x;
+  const dz = -d - frame.z;
+  return dx * Math.cos(frame.yaw) - dz * Math.sin(frame.yaw);
+}
+
+/**
+ * El kitsune de Fushimi Inari (Fase 6A): entra por un costado, fuera de
+ * cuadro, y sale al camino describiendo la curva; **sube unas gradas** por el
+ * eje, alejándose de la cámara (pisa cada huella: `walkY`); se para un momento
+ * —mira alrededor, como todo cuadrúpedo parado— y se va por el otro lado, más
+ * arriba, hasta salir de cuadro. Una sola conducta: cada conducta suma el peso
+ * de su especie.
+ */
+const senda: Behavior = {
+  place: (act, _member, s, out) => {
+    const t = s / act.duration;
+    const dir = act.direction;
+    const z0 = act.depth;
+    const top = z0 - SENDA_CLIMB;
+    const end = top - SENDA_LEAVE;
+    const enter = -dir * offscreenX(act, z0, act.spec.size, act.viewAspect);
+    const leave = dir * offscreenX(act, end, act.spec.size, act.viewAspect);
+    if (t <= SENDA_ARRIVE) {
+      // Del costado al eje, y por el eje cuesta arriba: una sola curva.
+      const u = arrive(t / SENDA_ARRIVE);
+      out.x = bezier(enter, axisX(act, z0), axisX(act, top), u);
+      out.z = bezier(z0, z0, top, u);
+    } else if (t < SENDA_LEAVE_AT) {
+      out.x = axisX(act, top);
+      out.z = top;
+    } else {
+      // Arranca suave y se va por el otro lado, aún subiendo un poco.
+      const u = depart((t - SENDA_LEAVE_AT) / (1 - SENDA_LEAVE_AT));
+      out.x = bezier(axisX(act, top), axisX(act, top - 1.5), leave, u);
+      out.z = bezier(top, top - 3, end, u);
+    }
+    out.y = standingY(act, out.x, out.z);
+  },
+};
+
 /** Mariposas y libélulas: cerca de la cámara y sin línea recta que valga. */
 const revolotear: Behavior = {
   place: (act, member, s, out) => {
@@ -835,6 +897,7 @@ const BEHAVIORS: Record<BehaviorName, Behavior> = {
   perseguir,
   deambular,
   callejear,
+  senda,
   revolotear,
   titilar,
 };

@@ -1,6 +1,7 @@
 import { JOURNEY, type HillProfile, type Side } from '@/config/journey';
 import { lerp, smoothstep } from '@/lib/procedural';
 import { pathX, pathY, zoneBlend } from '@/scene/path/journeyPath';
+import { stairTop, stairWalk } from '@/scene/path/stairs';
 
 /**
  * El relieve del terreno, como función pura y **global**.
@@ -85,7 +86,29 @@ export function terrainHeight(x: number, z: number): number {
   return pathY(d) + hills;
 }
 
-/** La y del mundo en la que está el suelo. */
-export function groundY(x: number, z: number): number {
+/**
+ * La y del mundo del terreno liso, sin las gradas. Es lo que sigue la cámara
+ * (`pathRig.ts`): subiendo las gradas de Fushimi, su altura sigue la ladera,
+ * no los escalones, y sube sin saltos.
+ */
+export function terrainY(x: number, z: number): number {
   return GROUND_Y + terrainHeight(x, z);
+}
+
+/**
+ * La y del mundo en la que está el suelo: el terreno o, donde las hay, las
+ * gradas (Fase 6A, `scene/path/stairs.ts`), que nunca quedan por debajo de él.
+ * Lo pisan las piedras y la decoración.
+ */
+export function groundY(x: number, z: number): number {
+  return GROUND_Y + Math.max(terrainHeight(x, z), stairTop(x, z));
+}
+
+/**
+ * Lo que pisa la fauna: el suelo, con cada contrahuella de las gradas
+ * convertida en una rampa corta (`stairWalk`). Nunca por debajo de `groundY`
+ * salvo en esa rampa, que sube por encima de la huella de abajo.
+ */
+export function walkY(x: number, z: number): number {
+  return GROUND_Y + Math.max(terrainHeight(x, z), stairWalk(x, z));
 }

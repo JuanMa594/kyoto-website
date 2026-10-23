@@ -77,6 +77,12 @@ export function BambooGrove({ groves, palette, profile }: BambooGroveProps) {
       leafSway.set([culm.y, culm.height, culm.phase, culm.spring], i * 4);
     });
     leafGeo.setAttribute('aSway', new InstancedBufferAttribute(leafSway, 4));
+    // El dosel de las galerías de Fushimi (6A): sus hojas arrojan la sombra del
+    // komorebi sobre los toriis y las gradas. Sólo donde algún macizo lo pide.
+    if (profile.shadows && groves.some((grove) => grove.item.canopy)) {
+      leafMesh.castShadow = true;
+      leafMesh.customDepthMaterial = createSwayDepthMaterial(true);
+    }
 
     return { culmMesh, leafMesh };
   }, [groves, palette, profile.tier, profile.shadows]);

@@ -130,6 +130,10 @@ const JOBS: Job[] = [
     headTurn: { yaw: 105, center: [0.37, 0.09], inner: 0.14, outer: 0.2, fromY: 0.43, toY: 0.5, shiftZ: -0.07 },
   },
   { kind: 'estatico', source: 'fauna/Milano Negro.glb', output: 'fauna/milano.glb', triangles: 3500, yaw: 90 },
+  // El kitsune de Fushimi Inari (Fase 6A): un zorro rojo sin esqueleto ni
+  // clips —sólo dos mallas con su textura—, con el morro hacia +Z. Sirve para
+  // el zorro vivo y para las estatuas de piedra del rōmon.
+  { kind: 'estatico', source: 'fauna/fox_realistic.glb', output: 'fauna/kitsune.glb', triangles: 5000, yaw: 90 },
   // Un cucarachero de cactus haciendo de gorrión: a 20 px y en bandada no se
   // distinguen, y es el único pájaro pequeño del lote.
   { kind: 'estatico', source: 'fauna/Cactus wren by Poly by Google - 6b7Ul6MeLrJ.glb', output: 'fauna/gorrion.glb', triangles: 1200, yaw: 90 },

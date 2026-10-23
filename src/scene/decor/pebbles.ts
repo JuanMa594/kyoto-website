@@ -39,7 +39,7 @@ export interface Pebble {
 }
 
 /** Cuántas piedras por grupo (de–a) según qué hay plantado, con `pebbles` 1. */
-const PER_GROUP = { farol: [3, 5], kosatsu: [2, 4] } as const;
+const PER_GROUP = { farol: [3, 5], kosatsu: [2, 4], ema: [2, 4] } as const;
 
 /** Lo que se aparta de una piedra del camino: su radio (0,45) y un respiro. */
 const PATH_STONE_CLEAR = 0.55;
@@ -98,7 +98,7 @@ export function stationPebbles(index: number, portrait: boolean): Pebble[] {
 
   for (const o of layout.objects) {
     const kind = o.item.kind;
-    if (kind !== 'farol' && kind !== 'kosatsu') continue;
+    if (kind !== 'farol' && kind !== 'kosatsu' && kind !== 'ema') continue;
     const [least, most] = PER_GROUP[kind];
     for (const base of objectBases(o)) {
       const wanted = Math.round(lerp(least, most, random()) * amount);

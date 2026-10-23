@@ -100,7 +100,7 @@ function StoneBatch({ geometry, material, instances }: StoneBatchProps) {
     instances.forEach((stone, i) => {
       position.set(stone.x, stone.y, stone.z);
       rotation.setFromEuler(euler.set(0, stone.rotation, 0));
-      scale.setScalar(stone.scale);
+      scale.set(stone.scale, stone.scale * (stone.flatten ?? 1), stone.scale);
       node.setMatrixAt(i, matrix.compose(position, rotation, scale));
     });
 

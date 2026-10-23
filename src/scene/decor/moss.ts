@@ -16,10 +16,11 @@
 import { JOURNEY } from '@/config/journey';
 import { lerp, mulberry32 } from '@/lib/procedural';
 import { pathX, STATION_DEPTHS } from '@/scene/path/journeyPath';
+import { riserGap } from '@/scene/path/stairs';
 import { stoneLayout } from '@/scene/path/stones';
 
 import { groveCulms } from './bamboo';
-import { objectBases } from './footprints';
+import { galleryBases, objectBases } from './footprints';
 import { groundPose } from './ground';
 import { areaU, stationDecorLayout } from './placement';
 
@@ -42,7 +43,10 @@ export interface MossPatch {
 /** Parches al pie de cada clase de objeto (con musgo 1 y tier alto). */
 // Los postes y los troncos (5B), más: los funde con el suelo junto a su tierra oscura.
 // Un corro no tiene base: su musgo va aparte, con la cuenta que declara.
-const PER_BASE = { torii: 3, farol: 6, arbusto: 4, maqueta: 6, kosatsu: 7, roca: 5, cerezo: 9, corro: 0 } as const;
+const PER_BASE = { torii: 3, farol: 6, arbusto: 4, maqueta: 6, kosatsu: 7, ema: 7, romon: 6, nobori: 2, roca: 5, cerezo: 9, corro: 0 } as const;
+
+/** Parches al pie de cada pilar de una galería de toriis (6A, con musgo 1). */
+const GALLERY_PER_PILLAR = 2;
 
 /** Probabilidad de que una piedra tenga musgo al lado (con musgo 1). */
 const STONE_CHANCE = 0.25;
@@ -78,7 +82,7 @@ export function stationMoss(index: number, portrait: boolean, densityScale: numb
   const add = (x: number, z: number, size: number) => {
     const pose = groundPose(x, z);
     const aspect = lerp(0.6, 1, random());
-    patches.push({
+    const patch: MossPatch = {
       x,
       y: pose.y,
       z,
@@ -88,7 +92,10 @@ export function stationMoss(index: number, portrait: boolean, densityScale: numb
       normal: pose.normal,
       seed: random(),
       tone: random(),
-    });
+    };
+    // En las gradas (6A), nunca a caballo de un escalón: flotaría sobre el canto.
+    if (riserGap(x, z) < size * 0.55) return;
+    patches.push(patch);
   };
 
   /** Una cuenta fraccionaria: 2,4 son dos parches y un 40 % de tener tres. */
@@ -116,6 +123,18 @@ export function stationMoss(index: number, portrait: boolean, densityScale: numb
         const angle = random() * Math.PI * 2;
         const reach = base.foot * lerp(0.5, 1.4, random());
         add(base.x + Math.cos(angle) * reach, base.z + Math.sin(angle) * reach, lerp(0.5, 1.2, random()) * Math.max(0.7, base.foot * 1.6));
+      }
+    }
+  }
+
+  // Al pie de los pilares de las galerías (6A): en las densas, uno de cada dos.
+  for (const gallery of layout.galleries) {
+    for (const base of galleryBases(gallery, true)) {
+      const n = count(GALLERY_PER_PILLAR * keep);
+      for (let k = 0; k < n; k += 1) {
+        const angle = random() * Math.PI * 2;
+        const reach = base.foot * lerp(0.6, 1.5, random());
+        add(base.x + Math.cos(angle) * reach, base.z + Math.sin(angle) * reach, lerp(0.5, 1.1, random()));
       }
     }
   }
@@ -179,7 +198,9 @@ export function stationMoss(index: number, portrait: boolean, densityScale: numb
   // sueltos, más cerca del camino que del bambú (donde la orilla ya tiene el
   // suyo), nunca encima de una piedra. Empieza en la estación: lo de delante
   // del cartel se queda como 1.png.
-  for (let d = stationD + OPEN_FROM; d <= next - 8; d += OPEN_STEP) {
+  // El llano de salida (los cerezos de Eventos) no: es de su propia fase.
+  const flat = station.tramo.flat ?? 0;
+  for (let d = stationD + Math.max(OPEN_FROM, flat); d <= next - 8; d += OPEN_STEP) {
     for (const side of [-1, 1]) {
       if (random() > OPEN_CHANCE * keep) continue;
       const along = d + random() * OPEN_STEP;
@@ -192,7 +213,7 @@ export function stationMoss(index: number, portrait: boolean, densityScale: numb
 
   for (const stone of stones) {
     const d = -stone.z;
-    if (d < stationD - 20 || d > next - 8) continue;
+    if (d < stationD - 20 || (flat > 0 && d < stationD + flat) || d > next - 8) continue;
     if (random() > STONE_CHANCE * keep) continue;
     const n = random() < 0.4 ? 2 : 1;
     for (let k = 0; k < n; k += 1) {

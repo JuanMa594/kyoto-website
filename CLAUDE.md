@@ -40,7 +40,7 @@ bun run geo          # Natural Earth → el Japón del ícono y las prefecturas 
 bun run palette      # muestrea los colores de docs/referencias/*.png
 bun run kanji        # KanjiVG → components/kanji/strokes.generated.ts (trazos de los kanji)
 bun run maps         # los dos mapas antiguos del tramo de Ubicación → public/maps/{japon,heian}.{svg,webp}
-bun run check:path   # comprobaciones puras del camino, el terreno, la cámara, el scroll, la fauna, la navegación, la decoración y el valle de Ubicación
+bun run check:path   # comprobaciones puras del camino, el terreno, la cámara, el scroll, la fauna, la navegación, la decoración, el valle de Ubicación y Fushimi Inari
 ```
 
 En desarrollo, **`?fauna=<especie>`** en cualquier página (`/es/ubicacion?fauna=libelula`)
@@ -88,7 +88,7 @@ src/
 │       ├─ layout.tsx          ← <html>, fuentes, providers, <SceneRoot> persistente
 │       ├─ page.tsx            ← Home 京都
 │       ├─ ubicacion/ eventos/ gastronomia/
-│       ├─ lugares/[slug]/     ← fushimi-inari · kiyomizu-dera · gion
+│       ├─ lugares/[slug]/     ← fushimi-inari (PlaceCartel) · kiyomizu-dera · gion (andamio)
 │       ├─ tipografia/         ← muestrario (herramienta, se borra tras decidir)
 │       └─ diagnostico/        ← panel de instrumentos (se recicla en Fase 9)
 ├─ config/journey.ts           ← ★ fuente única de verdad
@@ -106,13 +106,19 @@ src/
 │   ├─ SceneRoot.tsx           ← se monta en el layout y NUNCA se desmonta
 │   ├─ SceneCanvas.tsx         ← el único <Canvas>
 │   ├─ FoundationScene.tsx     ← el mundo del camino (terreno, piedras, aire, vida)
-│   ├─ path/journeyPath.ts     ← ★ el sendero: eje, altura, pesos de zona y `PATH`
-│   ├─ path/stones.ts          ← dónde va cada piedra (puro)
+│   ├─ path/journeyPath.ts     ← ★ el sendero: eje, altura (con los rellanos de las gradas), pesos de zona y `PATH`
+│   ├─ path/tramoStops.ts      ← dónde se para la cámara en cada tramo, en d (puro; lo usan journeyPath y journeyScroll)
+│   ├─ path/stairs.ts          ← las gradas de la subida a Fushimi: huellas, contrahuellas, `stairTop` / `stairWalk` (puro)
+│   ├─ path/stones.ts          ← dónde va cada piedra (puro): una por huella en las gradas, losas en las explanadas
 │   ├─ path/stoneSurface.ts    ← lo alto de las piedras, para lo que las pisa
 │   ├─ objects/stoneGeometry.ts← piedra procedural (12 formas instanciadas)
 │   ├─ objects/PetalGeometry.ts← pétalo, arce y hoja de bambú por contorno
 │   ├─ objects/fauna/          ← cuerpos: modelo + deformación, animado, luz
-│   ├─ objects/torii/          ← el torii ryōbu: medidas (puro), geometría y componente
+│   ├─ objects/torii/          ← el torii ryōbu y el inari (6A): medidas (puro), geometría y componente
+│   ├─ objects/ema/            ← el ema-kake (6A): medidas (puro), geometría, EmaKake (ema de zorro y la tabla)
+│   ├─ objects/romon/          ← el rōmon (6A): medidas (puro), geometría, RomonGate, chōchin (lights.ts), proyección (screen.ts)
+│   ├─ objects/kitsune/        ← las estatuas de zorro del rōmon (el modelo del kitsune en granito, sentado)
+│   ├─ objects/nobori/         ← los estandartes de la explanada, con la greca en el shader
 │   ├─ objects/toro/           ← los faroles kasuga y yukimi: medidas (puro), tornos y componente
 │   ├─ objects/Shrub.tsx       ← el arbusto podado en nube (o-karikomi)
 │   ├─ objects/maqueta/        ← ★ la maqueta de Japón de Ubicación (Fase 5A): dato generado,
@@ -123,6 +129,7 @@ src/
 │   ├─ objects/cerezo/         ← el cerezo (5B, base de la Fase 7): crecimiento (puro), tronco, flores
 │   ├─ decor/                  ← ★ la decoración de journey.ts (Fase 4; susuki.ts en la 5B)
 │   │   ├─ placement.ts        ← descriptor → mundo, por aspecto (puro)
+│   │   ├─ gallery.ts          ← ★ las galerías de toriis (6A): tramo, ritmo, alzada (puro)
 │   │   ├─ footprints.ts       ← huellas: piedras, cámara y fauna (puro)
 │   │   ├─ moss.ts             ← dónde crece el musgo (puro)
 │   │   ├─ pebbles.ts          ← las piedras de río al pie de faroles y postes (puro, 5B)
@@ -131,11 +138,13 @@ src/
 │   │   ├─ bamboo.ts shrub.ts  ← cañas, hojas y masas (puro, three)
 │   │   ├─ materials.ts        ← MeshStandardMaterial + cartel + viento
 │   │   └─ StationDecor.tsx    ← monta la zona y sus dos vecinas
-│   ├─ shaders/                ← cartelLook (washi + tinta), windSway (flexión y planeo de las hojas)
-│   │                            y petalCarpet (los pétalos caídos en el suelo y las piedras, 5B)
+│   ├─ shaders/                ← cartelLook (washi + tinta), windSway (flexión y planeo de las hojas),
+│   │                            petalCarpet (los pétalos caídos, 5B) y komorebi (la luz del bambú, 6A)
 │   ├─ PostProcessing.tsx      ← profundidad de campo (sólo tier alto)
 │   ├─ systems/elevation.ts    ← ★ altura del terreno, global (función pura)
 │   ├─ systems/Terrain.tsx     ← una malla para todo el camino, color por zona
+│   ├─ systems/Stairs.tsx      ← las gradas, una malla sobre el terreno liso (6A)
+│   ├─ systems/ToriiGallery.tsx← los toriis de las galerías, instanciados con su alzada (6A)
 │   ├─ systems/petalCarpet.ts  ← dónde cubren el suelo los pétalos caídos (puro, 5B)
 │   ├─ systems/StonePath.tsx   ← las piedras de todo el recorrido, instanciadas
 │   ├─ systems/Atmosphere.tsx  ← niebla, cielo y sol que siguen a la cámara
@@ -153,7 +162,8 @@ src/
 │   ├─ quality/tiers.ts        ← detección de tier + perfiles
 │   ├─ camera/framing.ts       ← ★ encuadre local y regla de tercios en unidades
 │   ├─ camera/pathRig.ts       ← ★ el encuadre sobre el camino, topes anti-mareo (puro)
-│   ├─ camera/CameraRig.tsx    ← único escritor de `PATH` + parallax de cursor
+│   ├─ camera/pan.ts           ← el paneo acotado hacia el monumento de un lugar (puro, 6A)
+│   ├─ camera/CameraRig.tsx    ← único escritor de `PATH` + parallax de cursor + paneo
 ├─ store/useKyotoStore.ts      ← Zustand: estación, zona, calidad, a11y, audio, cursor
 ├─ components/nav/             ← ★ la navegación (Fase 3C)
 │   ├─ JourneyNav.tsx          ← persistente en el layout; estación actual desde la URL
@@ -167,6 +177,7 @@ src/
 │                                 y KosatsuReader (la tarjeta de lectura que abre la tabla)
 ├─ components/ui/CaminoButton  ← los botones del camino: el ícono de la estación va al centro (5B)
 ├─ components/ubicacion/       ← MaquetaInput (la mano), MaquetaToggle, PrefectureLabels, KyotoFicha (5A)
+├─ components/lugares/         ← PlaceCartel (la plantilla de 6.png), TempleCard (botón, zona y tarjeta), greca.ts (6A)
 ├─ components/home/            ← HomeIntro (la entrada), introScript, WalkHint (Fase 4)
 ├─ components/kanji/           ← InkKanji: el kanji dibujado trazo a trazo (KanjiVG)
 ├─ i18n/                       ← routing, request, navigation, params
@@ -208,6 +219,18 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   tarjeta de lectura (`KosatsuReader`), con el texto y el mapa en grande. Si
   en la parada la tabla no se ve entera, o la pantalla es vertical (`boardFit`),
   el texto vuelve a ser la tarjeta de papel.
+- **La subida a Fushimi Inari (6A) se declara en el tramo de Eventos.**
+  `tramo.stairs` la convierte en gradas (`path/stairs.ts`, una malla aparte
+  sobre el terreno liso) con un rellano llano en cada parada con cartel (una
+  meseta de `pathY`). Las tarjetas con `sign.board: 'ema'` se escriben en un
+  ema-kake, con el mismo puente que los kōsatsu (`KOSATSU`,
+  `useBoardProjection`). Las galerías de toriis se declaran por **trecho**
+  (`{ kind: 'galeria', variant: 'densa' | 'abierta', trecho }`) y se colocan
+  solas entre las paradas (`decor/gallery.ts`). **La separación de cada clase
+  está en una línea, `GALLERY_SPACING` en `journey.ts`**: si las densas se ven
+  como una pared, se sube `densa` a 1,2 y nada más. Arriba, la estación
+  declara su `place` (el monumento y su lado: `PlaceCartel`) y su `plaza`
+  (las losas de `path/stones.ts`).
 - **Lo que hay a los lados del camino se declara en `journey.ts`**
   (`environment.decor`, Fase 4): objetos sueltos (`torii`, `arbusto`, `farol`
   kasuga o yukimi, la `maqueta` de Ubicación, la `roca` pintada, el `cerezo` y el `corro` de musgo y piedras de la 5B) y macizos (`bambu`, `susuki`), en coordenadas del camino —`d` desde la estación, `u` desde
@@ -630,6 +653,42 @@ versionan los optimizados de `public/models/`. Créditos y licencias en
   (~80 KB) se cargan con `lazy()` desde `StationDecor`; el DOM, que sólo
   necesita los nombres, lee `names.generated.ts`. Importar `PREFECTURES` desde
   un componente de la página lo metería en el primer JS de Ubicación.
+- **El terreno no se escalona: las gradas son otra malla.** La rejilla del
+  terreno es de 2 u, y un escalón de 0,35 se dibujaba como una rampa. Por eso
+  hay tres alturas: `terrainY` (la ladera lisa, la que sigue la cámara: si
+  siguiera los escalones, subiría a saltos), `groundY` (lo más alto entre la
+  ladera y la grada: piedras, decoración y musgo) y `walkY` (la grada con cada
+  contrahuella convertida en una rampa de 0,3 u: la fauna). Lo que se tiende
+  plano no puede quedar a caballo de un escalón (`riserGap`).
+- **`journeyPath` no puede importar `journeyScroll`.** Los rellanos de las
+  gradas caen en las paradas, y las paradas las calculaba `journeyScroll`, que
+  ya importa `journeyPath`: la parte de distancia vive en `path/tramoStops.ts`,
+  que no importa ninguno de los dos.
+- **Cuesta arriba la cámara va más alta de lo que parece.** Mira a un punto
+  22 u por delante y más alto, y el tope de inclinación la sube hasta ~8 u
+  sobre la ladera (en el llano, 5,2). Todo lo que la cámara cruza por debajo
+  tiene que medirse con la cámara de ese punto: los toriis de la subida llevan
+  su **alzada** (los pilares se estiran en el shader) y `check:path` comprueba
+  el nuki con la cámara real, caminando y viajando.
+- **En un viaje largo el encuadre pasa a varias unidades del eje.** Los
+  filtros contra el mareo (el giro acotado a 12°/s) hacen que, a 150 u/s, la
+  cámara recorte las curvas hasta ~5 u (y más en los viajes de punta a punta).
+  Una galería de pilares a 4 u del eje no puede apartarse tanto: a velocidad de
+  viaje, lo que queda a menos de ~1,8 u de la cámara se disuelve en un tramado
+  (`uNearFade` de `ToriiGallery`). Caminando no se enciende nunca.
+- **En Windows, `romon.ts` y `Romon.tsx` (o `nobori.ts` y `Nobori.tsx`) son el
+  mismo archivo**, como con la maqueta: los componentes se llaman `RomonGate` y
+  `NoboriBanners`.
+- **Una galería densa necesita sitio para cerrarse.** Con los primeros y
+  últimos pasos abriéndose hacia la separación de las abiertas, en un tramo
+  corto casi no quedaba ritmo denso. La que llega a la estación no se abre al
+  final: termina de golpe, que es la revelación.
+- **Las capturas por CDP**: Chrome headless sin GPU (SwiftShader) dibuja a ~1
+  fps y el reloj de la escena avanza 0,1 s por fotograma: la fauna tarda
+  minutos en salir. Desde Git Bash, una ruta como `/es/` se convierte en una
+  ruta de Windows al pasarla a un script: `MSYS_NO_PATHCONV=1`. Y con
+  `127.0.0.1` el servidor de desarrollo bloquea los chunks
+  (`allowedDevOrigins`): `localhost`.
 
 ---
 
@@ -693,7 +752,7 @@ llega en las fases 4–8 y se cuelga de ese mismo objeto.
 | 5A | · El cartel: la maqueta de Japón, hover, zoom a Kinki, el pin, Ichi / 位置 y la ficha | ✅ |
 | 5B | · El tramo hacia Eventos: kōsatsu con la historia y los mapas antiguos, la roca pintada, susuki, cerezos | ✅ |
 | 6 | Lugares, en tres bloques: | 🔎 |
-| 6A | · Fushimi Inari: la plantilla, 伏見稲荷, el torii inari, la subida escalonada con toriis y el kitsune | 🔎 en diseño |
+| 6A | · Fushimi Inari: la plantilla, 伏見稲荷大社, las gradas con galerías densas y abiertas, las ema, el rōmon y el kitsune | 🔎 en revisión |
 | 6B | · Kiyomizu-dera: el bosque de bambú, el puente sobre la vaguada y la plataforma | ⏸ |
 | 6C | · Gion: la bajada, las calzadas y los faroles | ⏸ |
 | 7 | Eventos 桜 | ⏸ |

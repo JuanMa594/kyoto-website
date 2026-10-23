@@ -134,11 +134,43 @@ interface DecorObjectBase {
   readonly scale?: number;
 }
 
-/** Un torii. La Fase 6 añadirá la variante `inari` para Fushimi. */
+/** Un torii suelto. Los de Fushimi no van sueltos: van en galerías (`DecorGallery`). */
 export interface DecorTorii extends DecorObjectBase {
   readonly kind: 'torii';
   readonly variant: 'ryobu';
 }
+
+/**
+ * Una galería de toriis inari (Fase 6A): una fila de toriis bermellón por los
+ * que pasa el camino. **No se coloca a mano**: ocupa el trecho `trecho` del
+ * tramo —el 0, del principio de la subida a la primera parada; el último, de
+ * la última parada a la estación siguiente— y se aparta sola de cada parada,
+ * para no tapar su ema. Si cambia el tramo o sus tarjetas, se mueve con ellas
+ * (`scene/decor/gallery.ts`).
+ *
+ * `densa`: los toriis casi se tocan y la galería se lee como un túnel; no la
+ * cruza ningún animal, y se nota el bambú de arriba. `abierta`: con huecos por
+ * donde cruza la fauna. La separación de cada una, en `GALLERY_SPACING`.
+ */
+export interface DecorGallery {
+  readonly kind: 'galeria';
+  readonly variant: GalleryVariant;
+  readonly trecho: number;
+}
+
+export type GalleryVariant = 'densa' | 'abierta';
+
+/**
+ * ★ La separación entre toriis de cada clase de galería, en unidades (de eje a
+ * eje; el pilar mide ~0,64 de ancho). **Es el mando de la revisión**: si las
+ * densas se leen como una pared plana, se sube `densa` a 1,2 y no hay que
+ * tocar nada más —el número de toriis, sus extremos que se abren, el musgo y
+ * las comprobaciones salen de aquí—.
+ */
+export const GALLERY_SPACING: Record<GalleryVariant, number> = {
+  densa: 1.0,
+  abierta: 3.2,
+};
 
 /**
  * Un arbusto podado en nube (o-karikomi). Le cierra el paso a la fauna que
@@ -180,6 +212,16 @@ export interface DecorGrove {
    * vuelve sombra, lleva menos: no se distinguen y cuestan triángulos.
    */
   readonly leaves?: number;
+  /**
+   * Cuánto se inclinan las cañas **hacia el camino**, en radianes (Fase 6A):
+   * el dosel de las galerías de Fushimi asoma por encima de los toriis.
+   */
+  readonly lean?: number;
+  /**
+   * Las hojas arrojan sombra (Fase 6A): el *komorebi* sobre las galerías. Sólo
+   * donde hace falta: cuesta una pasada de sombras por hoja.
+   */
+  readonly canopy?: boolean;
 }
 
 /**
@@ -252,8 +294,30 @@ export interface DecorCorro extends DecorObjectBase {
   readonly pebbles: number;
 }
 
+/**
+ * El rōmon de Fushimi Inari (Fase 6A): la puerta de dos pisos, con sus dos
+ * zorros de piedra a los lados de la escalinata. Se planta en tres cuartos,
+ * girado hacia el camino (`yaw`), y no se voltea al otro lado. Le cierra el
+ * paso a la fauna. Medidas: `scene/objects/romon/romon.ts`.
+ */
+export interface DecorRomon extends DecorObjectBase {
+  readonly kind: 'romon';
+}
+
+/**
+ * Un nobori (Fase 6A): un estandarte alto en su mástil, rojo con el borde
+ * blanco y la greca de `6.png`, que se mece con el viento. La tela se aleja
+ * del camino. Medidas: `scene/objects/nobori/nobori.ts`.
+ */
+export interface DecorNobori extends DecorObjectBase {
+  readonly kind: 'nobori';
+}
+
 export type DecorItem =
   | DecorTorii
+  | DecorRomon
+  | DecorNobori
+  | DecorGallery
   | DecorCorro
   | DecorShrub
   | DecorLantern
@@ -311,6 +375,14 @@ export interface StationEnvironment {
    * terreno y del camino, sin geometría (`scene/systems/petalCarpet.ts`).
    */
   readonly petalCarpet?: PetalCarpet;
+  /**
+   * La explanada de la estación (Fase 6A): las piedras del camino se ensanchan
+   * en losas grandes y planas (ishidatami), sueltas, entre `from` y `to`
+   * (d desde la estación) y hasta `half` u del eje: densas cerca de él y más
+   * sueltas hacia el borde, con huecos por los que se ve el suelo
+   * (`scene/path/stones.ts`).
+   */
+  readonly plaza?: { readonly from: number; readonly to: number; readonly half: number };
 }
 
 /**
@@ -338,12 +410,16 @@ export interface TramoCard {
   /** `mapa` lleva un mapa antiguo (`sign.map`); `texto` es sólo lectura. */
   readonly kind: 'texto' | 'mapa';
   /**
-   * Va escrita en un kōsatsu plantado delante de su parada (Fase 5B). El
-   * tablón se deriva de aquí (`scene/decor/placement.ts`): no se declara en
-   * `decor`. Sin `sign`, la tarjeta es de papel.
+   * Va escrita en un tablero plantado delante de su parada: un kōsatsu (Fase
+   * 5B) o una ema colgada de su ema-kake (Fase 6A, `board: 'ema'`). El tablero
+   * se deriva de aquí (`scene/decor/placement.ts`): no se declara en `decor`.
+   * Sin `sign`, la tarjeta es de papel.
    */
-  readonly sign?: { readonly map?: OldMap };
+  readonly sign?: { readonly board?: SignBoard; readonly map?: OldMap };
 }
+
+/** En qué se escribe una tarjeta con cartel. Sin decirlo, en un kōsatsu. */
+export type SignBoard = 'kosatsu' | 'ema';
 
 /** Los mapas antiguos del tramo de Ubicación (Fase 5B), los genera `bun run maps`. */
 export type OldMap = 'japon' | 'heian';
@@ -357,6 +433,13 @@ export interface StationTramo {
    * sigue siendo ésta. Sin él, el tramo empieza a cambiar desde la estación.
    */
   readonly flat?: number;
+  /**
+   * La cuesta del tramo se sube por **gradas** (Fase 6A): huellas de piedra y
+   * tierra con su contrahuella de `riser` u, y un rellano llano en cada
+   * parada con cartel, donde se lee (`scene/path/stairs.ts`). Sin él, la
+   * cuesta es una rampa.
+   */
+  readonly stairs?: { readonly riser: number };
 }
 
 export interface StationPalette {
@@ -407,6 +490,19 @@ export interface Station {
    * su parada de lectura al largo del tramo. La última estación no tiene.
    */
   readonly tramo: StationTramo;
+  /**
+   * El cartel de un lugar (Fase 6A): qué monumento tiene en la escena y a qué
+   * lado del camino; el título va al otro. Con él, `lugares/[slug]` usa la
+   * plantilla del lugar (`PlaceCartel`); sin él, el andamio. Sus textos, en
+   * `messages`, bajo `lugares.<slug>`.
+   */
+  readonly place?: StationPlace;
+}
+
+/** El monumento de un lugar y su lado. */
+export interface StationPlace {
+  readonly landmark: 'romon';
+  readonly side: Side;
 }
 
 /**
@@ -425,9 +521,20 @@ const NO_CARDS: StationTramo = { cards: [] };
 
 /**
  * De la sakura a Fushimi Inari: 50 unidades llanas entre los cerezos antes de
- * que empiece la subida. Sin ellas, al llegar a Eventos ya se veía la cuesta.
+ * que empiece la subida (sin ellas, al llegar a Eventos ya se veía la cuesta)
+ * y, después, **el monte**: gradas entre galerías de toriis y, en cada
+ * rellano, una ema con los mitos del lugar (Fase 6A). Las paradas se reparten
+ * sobre la subida, no sobre el llano (`scene/path/tramoStops.ts`).
  */
-const TRAMO_EVENTOS: StationTramo = { cards: [], flat: 50 };
+const TRAMO_EVENTOS: StationTramo = {
+  flat: 50,
+  stairs: { riser: 0.35 },
+  cards: [
+    { id: 'inari', side: 'izquierda', kind: 'texto', sign: { board: 'ema' } },
+    { id: 'kitsune', side: 'derecha', kind: 'texto', sign: { board: 'ema' } },
+    { id: 'toriis', side: 'izquierda', kind: 'texto', sign: { board: 'ema' } },
+  ],
+};
 
 /**
  * De la Home a Ubicación: cómo se recorre el sitio, a la izquierda (el torii
@@ -469,6 +576,29 @@ function backdropBamboo(
     height: [6, 13],
     leaves: 16,
     area: { side, from, to, inner, outer },
+  }));
+}
+
+/**
+ * El dosel de las galerías de Fushimi (Fase 6A): bambú alto y denso a un
+ * costado, de 6 a 11 u del eje —fuera de los pilares, a 4—, inclinado hacia el
+ * camino y con las hojas arrojando sombra. Un macizo por cada tramo
+ * `[from, to]`, con su semilla.
+ */
+function canopyBamboo(
+  side: Side,
+  density: number,
+  seed: number,
+  spans: readonly (readonly [number, number])[],
+): DecorGrove[] {
+  return spans.map(([from, to], k) => ({
+    kind: 'bambu',
+    seed: seed + k,
+    density,
+    height: [9, 14],
+    lean: 0.14,
+    canopy: true,
+    area: { side, from, to, inner: 6, outer: 11 },
   }));
 }
 
@@ -606,6 +736,76 @@ const JUNCOS_UBICACION: readonly DecorSusuki[] = [
 ];
 
 /**
+ * La subida a Fushimi Inari (Fase 6A), del tramo de Eventos: galerías de
+ * toriis entre los rellanos de las ema. Abierta / densa / abierta / densa: la
+ * primera anuncia la subida y deja ver la fauna; la última, densa, termina de
+ * golpe en la explanada. Cada una se coloca sola en su trecho
+ * (`scene/decor/gallery.ts`); su separación, en `GALLERY_SPACING`.
+ */
+const SUBIDA_FUSHIMI: readonly DecorItem[] = [
+  { kind: 'galeria', variant: 'abierta', trecho: 0 },
+  { kind: 'galeria', variant: 'densa', trecho: 1 },
+  { kind: 'galeria', variant: 'abierta', trecho: 2 },
+  { kind: 'galeria', variant: 'densa', trecho: 3 },
+  // El dosel: bambú alto a los dos lados, inclinado hacia el camino, cuyas
+  // hojas asoman sobre los dinteles y arrojan el komorebi. Más cerrado a la
+  // izquierda, que es por donde entra el sol. Con un claro delante de cada ema
+  // —en su costado, de 12 u antes de su parada a 3 u después—: si no, desde la
+  // cámara de la parada las cañas taparían la tabla.
+  ...canopyBamboo('izquierda', 0.22, 300, [
+    [52, 73.5],
+    [89, 146],
+    [161.5, 177],
+  ]),
+  ...canopyBamboo('derecha', 0.14, 310, [
+    [52, 110],
+    [125, 177],
+  ]),
+  // Detrás, el bosque: bosquetes ralos con claros, como el fondo de la Home.
+  ...backdropBamboo('izquierda', 12.5, 21, 320, [
+    [50, 64],
+    [72, 96],
+    [104, 130],
+    [138, 160],
+    [166, 182],
+  ]),
+  ...backdropBamboo('derecha', 12, 20, 330, [
+    [54, 78],
+    [86, 112],
+    [120, 140],
+    [148, 176],
+  ]),
+];
+
+/**
+ * Fushimi Inari: el cartel de `6.png` (Fase 6A). La última galería se abre a
+ * la explanada; el rōmon, a la izquierda y en tres cuartos, con sus zorros de
+ * piedra; el título, a la derecha. Unos nobori enmarcan la entrada a la plaza
+ * y los faroles la acompañan sin tapar ni el rōmon ni el título. Calibrado con
+ * `bun run check:path` («El cartel de Fushimi»).
+ */
+const DECOR_FUSHIMI: readonly DecorItem[] = [
+  { kind: 'romon', at: { d: 15.5, u: -12.2 }, portrait: { d: 30, u: -10, scale: 0.8 }, yaw: 0.62 },
+  // Los nobori, fuera de las losas, enmarcan la vista por los bordes: fuera
+  // del rōmon y de la columna del título.
+  { kind: 'nobori', at: { d: -8, u: -7.4 } },
+  { kind: 'nobori', at: { d: -7, u: 7.4 } },
+  // Faroles: un kasuga y un yukimi juntos, abajo a la izquierda, delante del rōmon.
+  { kind: 'farol', variant: 'kasuga', at: { d: -2.5, u: -6.9 } },
+  { kind: 'farol', variant: 'yukimi', at: { d: -0.5, u: -8.6 } },
+  { kind: 'arbusto', seed: 41, at: { d: 0.5, u: -10.6 } },
+  // El monte detrás, en bosquetes.
+  ...backdropBamboo('derecha', 12, 22, 340, [
+    [-10, 6],
+    [14, 34],
+  ]),
+  ...backdropBamboo('izquierda', 19, 28, 350, [
+    [-12, 4],
+    [22, 40],
+  ]),
+];
+
+/**
  * Ubicación: el cartel de `2.png` en espejo respecto de la Home —la maqueta
  * de Japón a la izquierda del camino, el texto a la derecha—. Girada hacia la
  * cámara (`yaw`), que la ve desde la derecha. Calibrado con `bun run
@@ -740,7 +940,14 @@ export const JOURNEY: readonly Station[] = [
       altitude: 0,
       lateral: 4,
       skyTint: { color: '#EB81A5', amount: 0.1 },
-      decor: [],
+      // La de la estación llega con la Fase 7; la de su tramo, la subida a
+      // Fushimi (6A).
+      decor: SUBIDA_FUSHIMI,
+      // El musgo de la subida: al pie de los pilares y entre las gradas (el
+      // llano de los cerezos no lleva: es de la Fase 7).
+      moss: 0.6,
+      // Las piedras de río al pie de los postes de los ema-kake.
+      pebbles: 1,
       // Los pétalos caídos: empiezan sueltos a la altura del segundo kōsatsu
       // del tramo de Ubicación, son ya la mitad del suelo en el tercero y bajo
       // los cerezos, y en Eventos el suelo es casi todo rosa.
@@ -767,6 +974,8 @@ export const JOURNEY: readonly Station[] = [
     route: 'lugares/fushimi-inari',
     pathT: 386 / PATH_LENGTH,
     inSidebar: true,
+    // El cartel de 6.png: el rōmon a la izquierda, el título a la derecha.
+    place: { landmark: 'romon', side: 'izquierda' },
     palette: { halo: '#EDE6DD', accent: '#D82609', ground: '#C8BFAF' },
     // El monte Inari: relieve montañoso a ambos lados; el camino llega subiendo.
     environment: {
@@ -775,21 +984,27 @@ export const JOURNEY: readonly Station[] = [
       altitude: 14,
       lateral: -12,
       skyTint: { color: '#D82609', amount: 0.14 },
-      decor: [],
+      decor: DECOR_FUSHIMI,
+      moss: 0.5,
+      pebbles: 1,
+      // La explanada del rōmon: empieza donde termina la última galería.
+      plaza: { from: -15, to: 20, half: 6 },
     },
     tramo: NO_CARDS,
     ambient: {
       petals: 'baja',
       petalKind: 'momiji',
       wind: 0.3,
-      fauna: ['milano', 'ardilla', 'gorrion'],
+      // El kitsune, el mensajero de Inari, sube por las gradas (6A).
+      fauna: ['kitsune', 'milano', 'ardilla', 'gorrion'],
       faunaDistance: 1,
       sounds: ['viento', 'grillos', 'pajaros'],
       // Antes era 8/45 ("túnel"), pero a esa distancia la niebla se tragaba la
-      // montaña por completo. La sensación de subida la da ahora la pendiente
-      // del tramo de llegada (`environment.altitude`) y, en la Fase 6, las
-      // gradas con los toriis repetidos.
-      fog: { near: 12, far: 95 },
+      // montaña por completo. La sensación de subida la dan la pendiente del
+      // tramo de llegada (`environment.altitude`) y las gradas con sus
+      // galerías de toriis (6A); y el rōmon, a ~40 u de la cámara de la
+      // estación, tiene que leerse en el cartel: la niebla empieza más lejos.
+      fog: { near: 22, far: 110 },
     },
   },
   {

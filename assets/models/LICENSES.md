@@ -33,13 +33,13 @@ se distinguen.
 |---|---|---|
 | Mariposa (`fauna/mariposa.glb`) | "CC0 アゲハ Swallowtail Butterfly, Papilio xuthus" | ffish.asia / floraZia.com (Sketchfab). El título dice CC0; los metadatos del archivo dicen «Sketchfab Standard». Se acredita igualmente |
 | Libélula (`fauna/libelula.glb`) | "Dragonfly7687" | Lolnyjkamen (Sketchfab). Metadatos: «Sketchfab Standard» |
+| Kitsune (`fauna/kitsune.glb`, Fase 6A) | "fox_realistic" | locvin (Sketchfab Standard). Simplificado de 230.000 a 5.000 triángulos, color horneado; el mismo modelo hace de estatua de piedra en el rōmon. Se acredita |
 | Ardilla, tanuki, milano, gato | — | Gratuitos sin exigencia de atribución, o generados con herramientas de IA (Meshy, Tripo) |
 
 ## En la carpeta de originales pero sin usar
 
 | Modelo | Por qué |
 |---|---|
-| `fox_realistic.glb` (locvin, Sketchfab Standard) | El kitsune llega en la Fase 6, entre los toriis |
 | `animal_crossing_new_horizons_koi.glb` | **No se puede publicar**: es un asset de Animal Crossing, propiedad de Nintendo, diga lo que diga quien lo subió. La carpa se hará propia cuando haya agua en escena |
 | `butterfly.glb` (assetfactory) | Se prefirió la *Papilio xuthus*, que es la especie japonesa exacta |
 | `Luciernaga3D.glb`, `Luciernaga volando3D.glb` | A su tamaño en pantalla (~8 px) la forma no se ve; la luciérnaga se dibuja como un punto de luz |

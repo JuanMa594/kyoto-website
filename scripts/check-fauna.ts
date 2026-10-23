@@ -39,7 +39,7 @@ import {
 import { stoneGeometry } from '../src/scene/objects/stoneGeometry';
 import { stoneTopY } from '../src/scene/path/stoneSurface';
 import { STONE_VARIANTS, stoneLayout, stoneSeed } from '../src/scene/path/stones';
-import { groundY } from '../src/scene/systems/elevation';
+import { groundY, walkY } from '../src/scene/systems/elevation';
 import {
   CAMERA_Z,
   createTrack,
@@ -105,6 +105,7 @@ const BEHAVIORS = Object.keys({
   perseguir: true,
   deambular: true,
   callejear: true,
+  senda: true,
   revolotear: true,
   titilar: true,
 } satisfies Record<BehaviorName, true>) as BehaviorName[];
@@ -289,7 +290,7 @@ check(
 );
 check(
   'lo que anda y las luciérnagas no se deslizan nunca',
-  (['vadear', 'correrYParar', 'perseguir', 'deambular', 'callejear', 'titilar'] as const).every(
+  (['vadear', 'correrYParar', 'perseguir', 'deambular', 'callejear', 'senda', 'titilar'] as const).every(
     (b) => SLIDE[b].mode === 'nunca',
   ),
 );
@@ -516,7 +517,8 @@ check(
 // que para la propia conducta: `airborne` 0, que es estar a menos de 5 cm (los
 // gorriones que se posan lo deducen de su altura).
 const GROUND_CONTACT = 0.05;
-const faunaFloor = (x: number, z: number) => Math.max(groundY(x, z), stoneTopY(x, z));
+// En las gradas, lo que pisa sube cada contrahuella por su rampa (`walkY`).
+const faunaFloor = (x: number, z: number) => Math.max(walkY(x, z), stoneTopY(x, z));
 let floating = 0;
 let groundSamples = 0;
 let firstFloat = '';
@@ -666,7 +668,7 @@ function stoneTopProbe(x: number, z: number): number {
     stoneMatrix.compose(
       stonePos.set(stone.x, stone.y, stone.z),
       stoneQuat.setFromEuler(stoneEuler.set(0, stone.rotation, 0)),
-      stoneScale.setScalar(stone.scale),
+      stoneScale.set(stone.scale, stone.scale * (stone.flatten ?? 1), stone.scale),
     );
     mesh.matrixWorld.copy(stoneMatrix);
     mesh.matrixWorldAutoUpdate = false;
@@ -702,7 +704,7 @@ for (const { act } of bodies) {
       }
       if (worst === Number.NEGATIVE_INFINITY) continue;
       stoneSamples += 1;
-      const realFloor = Math.max(groundY(WORLD.x, WORLD.z), stoneTopProbe(WORLD.x, WORLD.z));
+      const realFloor = Math.max(walkY(WORLD.x, WORLD.z), stoneTopProbe(WORLD.x, WORLD.z));
       maxLift = Math.max(maxLift, feet - realFloor);
       if (worst > STONE_TOLERANCE) {
         buried += 1;

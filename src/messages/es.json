@@ -102,6 +102,32 @@
       }
     }
   },
+  "lugares": {
+    "greca": "Greca de rayos (raimon) en bermellón",
+    "fushimi-inari": {
+      "romaji": "Fushimi Inari Taisha",
+      "srTitle": "Fushimi Inari Taisha",
+      "tagline": "Diez mil toriis cuesta arriba",
+      "summary": "El santuario de Inari, el de la cosecha y el arroz, al pie del monte que lleva su nombre. Arriba de la escalinata, el rōmon guarda la entrada.",
+      "behold": "Contemplar el rōmon",
+      "beholdLabel": "Contemplar el rōmon: abrir la tarjeta del templo",
+      "close": "Cerrar",
+      "temple": {
+        "kicker": "楼門 · el rōmon",
+        "title": "El rōmon",
+        "body": "La puerta de dos pisos que guarda la entrada la mandó levantar Toyotomi Hideyoshi en 1589, como ofrenda por la curación de su madre. Detrás empieza el santuario que encabeza a todos los de Inari del país.",
+        "fichaLabel": "Fushimi Inari en datos",
+        "ficha": {
+          "fundacion": { "label": "Fundación", "value": "711, por el clan Hata" },
+          "deidad": { "label": "Deidad", "value": "Inari Ōkami: el arroz, la cosecha, la prosperidad y el comercio" },
+          "toriis": { "label": "Toriis", "value": "Unos 10 000" },
+          "santuarios": { "label": "Santuarios", "value": "Cabecera de unos 30 000 santuarios de Inari en Japón" },
+          "romon": { "label": "El rōmon", "value": "Donado por Toyotomi Hideyoshi en 1589" },
+          "monte": { "label": "El monte", "value": "Inari-san, 233 m" }
+        }
+      }
+    }
+  },
   "tramo": {
     "label": "Camino hacia {station}",
     "continue": "Seguir el camino",
@@ -133,6 +159,20 @@
       "kyoto": {
         "title": "De Heian-kyō a Kyoto",
         "body": "Con los siglos, la ciudad pasó a llamarse sencillamente Kyoto, 京都, «la capital». En 1868 el emperador se mudó a Tokio, pero la ciudad guardó lo que había reunido: más de 1.600 templos, unos 400 santuarios y diecisiete monumentos Patrimonio de la Humanidad. Lo milenario y lo cotidiano siguen compartiendo la misma calle."
+      }
+    },
+    "eventos": {
+      "inari": {
+        "title": "El arroz que se hizo pájaro",
+        "body": "Cuenta la crónica de Yamashiro que Hata no Irogu, rico en arroz, usó un pastel de mochi como diana. Al herirlo, el pastel se volvió un ave blanca que voló a este monte, y donde se posó brotó el arroz: ine-nari, «el arroz crece». En 711 su clan levantó aquí el santuario de Inari."
+      },
+      "kitsune": {
+        "title": "Los mensajeros",
+        "body": "Los zorros no son Inari: son sus mensajeros. Por eso los guardianes de piedra llevan algo en la boca —la llave del granero de arroz, una joya, una espiga— y un babero rojo que les ponen los fieles. Las ema de aquí tienen forma de zorro: cada visitante le dibuja la cara y escribe detrás su deseo."
+      },
+      "toriis": {
+        "title": "Senbon torii, uno por promesa",
+        "body": "Desde la época Edo, quien ve cumplido un deseo —o quiere pedirlo— dona un torii. Su nombre y la fecha van escritos en el pilar, por detrás, y por eso sólo se leen al bajar. Los llaman «los mil toriis», pero son unos diez mil hasta la cima, a 233 metros. El bermellón ahuyenta el mal y protege la madera."
       }
     }
   },

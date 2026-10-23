@@ -15,17 +15,22 @@
  */
 
 import { JOURNEY } from '@/config/journey';
+import { EMA_HEIGHT, EMA_SIZE, emaPosts } from '@/scene/objects/ema/ema';
+import { NOBORI, NOBORI_HEIGHT } from '@/scene/objects/nobori/nobori';
+import { PEDESTAL, ROMON_FOOTPRINT, ROMON_FOXES, ROMON_HEIGHT } from '@/scene/objects/romon/romon';
 import { boardWidth, KOSATSU_HEIGHT, KOSATSU_POST_Z, KOSATSU_SIZE, kosatsuPosts } from '@/scene/objects/kosatsu/kosatsu';
 import { MAQUETA_PLAN, MAQUETA_SIZE } from '@/scene/objects/maqueta/maqueta';
 import { growCerezo } from '@/scene/objects/cerezo/cerezo';
 import { ROCA_FOOTPRINTS, ROCA_SIZE } from '@/scene/objects/roca/roca';
 import { LANTERN_SIZE } from '@/scene/objects/toro/toro';
+import { INARI, INARI_HEIGHT, inariLift } from '@/scene/objects/torii/inari';
 import { RYOBU_FOOTPRINTS } from '@/scene/objects/torii/ryobu';
 import { frameToWorld, pathX, type PathFrame, type Point3 } from '@/scene/path/journeyPath';
 import { groundY } from '@/scene/systems/elevation';
 import { placeAt, type FaunaAct } from '@/scene/systems/fauna/behaviors';
 
 import { groveCulms } from './bamboo';
+import { galleryPillars, type PlacedGallery } from './gallery';
 import { areaU, objectToWorld, SHRUB_SIZE, stationDecorLayout, type PlacedObject } from './placement';
 import { stationPebbles } from './pebbles';
 
@@ -142,6 +147,62 @@ export function objectBases(o: PlacedObject): ObjectBase[] {
       };
     });
   }
+  if (item.kind === 'romon') {
+    // Las esquinas de la base y los dos pedestales: ahí crecen el musgo y la
+    // penumbra. Lo que ocupa entero va aparte (`romonFootprint`).
+    const point = { x: 0, z: 0 };
+    const { hx, hz, cz } = ROMON_FOOTPRINT;
+    const corners = [
+      [-hx, cz - hz],
+      [hx, cz - hz],
+      [-hx, cz + hz - 1.6],
+      [hx, cz + hz - 1.6],
+    ] as const;
+    return [
+      ...corners.map(([lx, lz]) => ({ lx, lz, r: 0.7 })),
+      ...ROMON_FOXES.map((fox) => ({ lx: fox.x, lz: fox.z, r: PEDESTAL.half * 1.3 })),
+    ].map(({ lx, lz, r }) => {
+      objectToWorld(o, lx, lz, point);
+      return {
+        kind: 'circulo' as const,
+        x: point.x,
+        z: point.z,
+        r: r * o.scale,
+        foot: r * o.scale,
+        top: o.y + ROMON_HEIGHT * o.scale,
+        faunaMargin: SOLID_MARGIN,
+      };
+    });
+  }
+  if (item.kind === 'nobori') {
+    return [
+      {
+        kind: 'circulo',
+        x: o.x,
+        z: o.z,
+        r: NOBORI.poleRadius * 2.5 * o.scale,
+        foot: 0.18 * o.scale,
+        top: o.y + NOBORI_HEIGHT * o.scale,
+        faunaMargin: SOLID_MARGIN,
+      },
+    ];
+  }
+  if (item.kind === 'ema') {
+    // Los dos postes del ema-kake. Las ema y el tejadillo van aparte (`emaFootprint`).
+    const point = { x: 0, z: 0 };
+    return emaPosts().map((lx) => {
+      objectToWorld(o, lx, 0, point);
+      return {
+        kind: 'circulo',
+        x: point.x,
+        z: point.z,
+        r: EMA_SIZE.postSize * o.scale,
+        foot: EMA_SIZE.postSize * o.scale,
+        top: o.y + EMA_HEIGHT * o.scale,
+        faunaMargin: SOLID_MARGIN,
+      };
+    });
+  }
   if (item.kind === 'cerezo') {
     // El tronco. La copa es blanda: lo que vuela la cruza.
     const tree = growCerezo(item.seed);
@@ -201,6 +262,47 @@ export function objectBases(o: PlacedObject): ObjectBase[] {
   ];
 }
 
+/**
+ * Los pilares de una galería de toriis (Fase 6A), como bases: para la fauna,
+ * cada uno es un obstáculo sólido; al pie de cada uno crecen musgo y sombra de
+ * contacto. Con `sparse`, en las galerías densas sólo uno de cada dos: entre
+ * pilares tan juntos apenas se ve el suelo, y el musgo de todos sería el doble
+ * de parches para lo mismo.
+ */
+export function galleryBases(gallery: PlacedGallery, sparse = false): ObjectBase[] {
+  const bases: ObjectBase[] = [];
+  gallery.toriis.forEach((torii, k) => {
+    if (sparse && gallery.item.variant === 'densa' && k % 2 === 1) return;
+    for (const pillar of galleryPillars(torii)) {
+      bases.push({
+        kind: 'circulo',
+        x: pillar.x,
+        z: pillar.z,
+        r: INARI.baseRadius[0],
+        foot: INARI.baseRadius[0],
+        top: torii.y + inariLift(INARI_HEIGHT, torii.lift),
+        faunaMargin: SOLID_MARGIN,
+      });
+    }
+  });
+  return bases;
+}
+
+/**
+ * Las dos hileras de pilares de una galería, como franjas: lo que miran la
+ * cámara y las piedras. **No el pasillo entero**: por ahí pasa la cámara, bajo
+ * los dinteles. Para la fauna cuentan los pilares uno a uno (`galleryBases`).
+ */
+export function galleryBands(gallery: PlacedGallery): BandFootprint[] {
+  const half = INARI.span / 2;
+  const r = INARI.baseRadius[0];
+  const top = Math.max(...gallery.toriis.map((t) => t.y + inariLift(INARI_HEIGHT, t.lift)));
+  return [
+    { kind: 'franja', d0: gallery.from - r, d1: gallery.to + r, u0: -half - r, u1: -half + r, top, faunaMargin: 0 },
+    { kind: 'franja', d0: gallery.from - r, d1: gallery.to + r, u0: half - r, u1: half + r, top, faunaMargin: 0 },
+  ];
+}
+
 /** La bandeja de la maqueta en planta: un rectángulo que cubre sus dos poses. */
 export function trayFootprint(o: PlacedObject): RectFootprint {
   return {
@@ -234,6 +336,41 @@ export function kosatsuFootprint(o: PlacedObject): RectFootprint {
   };
 }
 
+/**
+ * La planta de un ema-kake (6A): las ema de zorro cuelgan hasta medio metro
+ * del suelo, así que lo que anda no pasa por debajo; y la cámara, al pasar a
+ * su lado, queda a su distancia también del vuelo del tejadillo.
+ */
+export function emaFootprint(o: PlacedObject): RectFootprint {
+  return {
+    kind: 'rectangulo',
+    x: o.x,
+    z: o.z,
+    yaw: o.yaw,
+    hx: (EMA_SIZE.frameWidth / 2 + EMA_SIZE.roofOverhang) * o.scale,
+    hz: (EMA_SIZE.roofDepth / 2) * o.scale,
+    top: o.y + EMA_HEIGHT * o.scale,
+    faunaMargin: SOLID_MARGIN,
+    ground: false,
+  };
+}
+
+/** La base del rōmon con su escalinata, en planta: un rectángulo sólido. */
+export function romonFootprint(o: PlacedObject): RectFootprint {
+  const center = { x: 0, z: 0 };
+  objectToWorld(o, 0, ROMON_FOOTPRINT.cz, center);
+  return {
+    kind: 'rectangulo',
+    x: center.x,
+    z: center.z,
+    yaw: o.yaw,
+    hx: ROMON_FOOTPRINT.hx * o.scale,
+    hz: ROMON_FOOTPRINT.hz * o.scale,
+    top: o.y + ROMON_HEIGHT * o.scale,
+    faunaMargin: SOLID_MARGIN,
+  };
+}
+
 const cache = new Map<boolean, readonly Footprint[]>();
 
 /** Todas las huellas del camino para un aspecto, calculadas una vez. */
@@ -250,6 +387,13 @@ export function decorFootprints(portrait: boolean): readonly Footprint[] {
       list.push(...objectBases(o));
       if (o.item.kind === 'maqueta') list.push(trayFootprint(o));
       if (o.item.kind === 'kosatsu') list.push(kosatsuFootprint(o));
+      if (o.item.kind === 'ema') list.push(emaFootprint(o));
+      if (o.item.kind === 'romon') list.push(romonFootprint(o));
+    }
+
+    // Las galerías de toriis (6A): cada pilar para la fauna, cada hilera para la cámara.
+    for (const gallery of layout.galleries) {
+      list.push(...galleryBases(gallery), ...galleryBands(gallery));
     }
 
     // Las piedras de río al pie de faroles y postes (5B): bajas, pero sólidas.

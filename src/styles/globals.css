@@ -689,6 +689,147 @@
     max-width: 30rem;
   }
 
+  /* ── El cartel de un lugar (Fase 6A) ──────────────────────────────────
+     6.png: el monumento en la escena a un lado y, al otro, el título y lo que
+     se lee. Fushimi Inari: el rōmon a la izquierda, el texto a la derecha. */
+  .place-cartel {
+    display: grid;
+    min-height: 100dvh;
+    align-items: start;
+    justify-items: end;
+    padding-top: 16dvh;
+  }
+
+  .place-cartel[data-side='derecha'] {
+    justify-items: start;
+  }
+
+  .place-cartel__text {
+    width: min(36vw, 34rem);
+    margin-right: 8vw;
+  }
+
+  .place-cartel[data-side='derecha'] .place-cartel__text {
+    margin-right: 0;
+    margin-left: 8vw;
+  }
+
+  /* El romaji de un lugar es largo («Fushimi Inari Taisha»): un poco menor. */
+  .place-cartel .cartel-title__word {
+    font-size: min(var(--text-cartel), 6.2vw);
+  }
+
+  .place-cartel .cartel-title__kanji {
+    font-size: min(var(--text-kanji), 5.4vw);
+  }
+
+  .place-cartel__tagline {
+    margin-top: 1.1rem;
+    font-size: 1.35rem;
+  }
+
+  .place-cartel__summary {
+    margin-top: 1.25rem;
+    max-width: 30rem;
+  }
+
+  /* Sobre el monumento, en la escena (TempleCard): no se ve; al pasar por
+     encima, la mano. */
+  .landmark-hit {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+  }
+
+  .landmark-hit[data-on='off'] {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  /* La tarjeta del templo: la de lectura de los kōsatsu, con la greca de
+     6.png en la esquina y la ficha. */
+  .temple-reader .kosatsu-reader__sheet {
+    padding-right: 4.5rem;
+  }
+
+  .temple-reader__greca {
+    position: absolute;
+    top: 0.6rem;
+    right: 0.6rem;
+    width: 5.5rem;
+    height: 5.5rem;
+    fill: none;
+    stroke: var(--greca, var(--color-shu));
+    stroke-width: 3;
+    stroke-linecap: square;
+    pointer-events: none;
+  }
+
+  .temple-reader__kicker {
+    font-family: var(--font-brush);
+    opacity: 0.7;
+  }
+
+  .temple-reader .kosatsu-reader__close {
+    top: auto;
+    bottom: 0.9rem;
+  }
+
+  .temple-ficha {
+    display: grid;
+    gap: 0.35rem;
+    margin: 1.25rem 0 0;
+  }
+
+  .temple-ficha__row {
+    display: grid;
+    grid-template-columns: 7.5rem 1fr;
+    gap: 0.75rem;
+  }
+
+  .temple-ficha dt {
+    opacity: 0.65;
+  }
+
+  .temple-ficha dd {
+    margin: 0;
+  }
+
+  @media (orientation: portrait) {
+    .place-cartel {
+      justify-items: start;
+      padding-top: 9dvh;
+    }
+
+    .place-cartel__text {
+      width: min(86vw, 30rem);
+      margin: 0 0 0 6vw;
+    }
+
+    .place-cartel .cartel-title__word {
+      font-size: clamp(2.4rem, 11vw, 3.6rem);
+    }
+
+    .place-cartel .cartel-title__kanji {
+      font-size: clamp(2rem, 10vw, 3rem);
+    }
+
+    /* El resumen y el botón, abajo: en medio queda el monumento. */
+    .place-cartel__details {
+      margin-top: 38dvh;
+    }
+
+    .temple-ficha__row {
+      grid-template-columns: 6rem 1fr;
+      gap: 0.5rem;
+    }
+  }
+
   /* El título de cartel de una estación (`CartelTitle`): el romaji grande y,
      debajo, el kanji dibujado. Ambos con el color de la estación. */
   .cartel-title {

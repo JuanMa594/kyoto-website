@@ -12,6 +12,7 @@ import { cardStopD } from '@/animation/journeyScroll';
 import {
   JOURNEY,
   type DecorArea,
+  type DecorGallery,
   type DecorGrove,
   type DecorItem,
   type DecorSusuki,
@@ -20,11 +21,14 @@ import {
   type StationSlug,
 } from '@/config/journey';
 import { createRig, snapRig } from '@/scene/camera/pathRig';
+import { EMA_SIZE, emaPosts } from '@/scene/objects/ema/ema';
 import { boardWidth, KOSATSU_POST_Z, KOSATSU_SCALE, KOSATSU_SIZE, kosatsuPosts } from '@/scene/objects/kosatsu/kosatsu';
 import type { QualityTier } from '@/scene/quality/tiers';
 import { pathX, STATION_DEPTHS } from '@/scene/path/journeyPath';
 import { stoneLayout, type StoneInstance } from '@/scene/path/stones';
 import { groundY } from '@/scene/systems/elevation';
+
+import { placeGallery, type PlacedGallery } from './gallery';
 
 /** Cuánta decoración instanciada (cañas, hojas) por tier. */
 export const DECOR_DENSITY: Record<QualityTier, number> = { high: 1, medium: 0.6, low: 0.35 };
@@ -51,7 +55,19 @@ export interface KosatsuItem {
   readonly map?: OldMap;
 }
 
-export type DecorObject = Exclude<DecorItem, DecorGrove | DecorSusuki> | KosatsuItem;
+/**
+ * Una ema del tramo (Fase 6A): su ema-kake, con la ema grande donde se escribe
+ * la tarjeta. Como el kōsatsu, no se declara en `decor`: la deriva
+ * `stationDecorLayout` de cada tarjeta con `sign.board: 'ema'`.
+ */
+export interface EmaItem {
+  readonly kind: 'ema';
+  readonly station: StationSlug;
+  readonly card: number;
+  readonly side: Side;
+}
+
+export type DecorObject = Exclude<DecorItem, DecorGrove | DecorSusuki | DecorGallery> | KosatsuItem | EmaItem;
 
 export interface PlacedObject {
   readonly item: DecorObject;
@@ -81,6 +97,8 @@ export interface DecorLayout {
   readonly objects: readonly PlacedObject[];
   readonly groves: readonly PlacedGrove[];
   readonly susuki: readonly PlacedSusuki[];
+  /** Las galerías de toriis (Fase 6A), con sus toriis ya colocados. */
+  readonly galleries: readonly PlacedGallery[];
 }
 
 export function isGrove(item: DecorItem): item is DecorGrove {
@@ -91,13 +109,20 @@ export function isGrove(item: DecorItem): item is DecorGrove {
 export function stationDecorLayout(index: number, portrait: boolean): DecorLayout {
   const station = JOURNEY[index];
   const stationD = STATION_DEPTHS[index];
-  if (!station || stationD === undefined) return { objects: [], groves: [], susuki: [] };
+  if (!station || stationD === undefined) return { objects: [], groves: [], susuki: [], galleries: [] };
 
   const objects: PlacedObject[] = [];
   const groves: PlacedGrove[] = [];
   const susuki: PlacedSusuki[] = [];
+  const galleries: PlacedGallery[] = [];
 
   for (const item of station.environment.decor) {
+    if (item.kind === 'galeria') {
+      // Se coloca sola, desde las paradas: igual en vertical.
+      const gallery = placeGallery(index, item);
+      if (gallery) galleries.push(gallery);
+      continue;
+    }
     if (item.kind === 'susuki') {
       const area = portrait && item.portrait !== undefined ? item.portrait : item.area;
       if (area) susuki.push({ item, area, stationD });
@@ -117,7 +142,8 @@ export function stationDecorLayout(index: number, portrait: boolean): DecorLayou
     // Al otro lado del camino el objeto se da la vuelta: lo que se extiende
     // (las vigas de un torii) se aleja siempre del camino. La maqueta y la roca
     // pintada no: miran siempre a la cámara.
-    const flip = at.u < 0 && item.kind !== 'maqueta' && item.kind !== 'roca' ? Math.PI : 0;
+    // El rōmon tampoco: se planta con su giro, en tres cuartos.
+    const flip = at.u < 0 && item.kind !== 'maqueta' && item.kind !== 'roca' && item.kind !== 'romon' ? Math.PI : 0;
     objects.push({
       item,
       x,
@@ -129,13 +155,18 @@ export function stationDecorLayout(index: number, portrait: boolean): DecorLayou
     });
   }
 
-  // Los kōsatsu del tramo: uno por tarjeta con cartel, a `depthFromCamera`
-  // por delante de la cámara de su parada, en su lado y de frente a ella. Se
-  // colocan igual en vertical: allí son escenario y el texto va en la tarjeta.
+  // Los tableros del tramo —kōsatsu y ema—: uno por tarjeta con cartel, a
+  // `depthFromCamera` por delante de la cámara de su parada, en su lado y de
+  // frente a ella. Se colocan igual en vertical: allí son escenario y el texto
+  // va en la tarjeta.
   const rig = createRig();
   station.tramo.cards.forEach((card, index) => {
     if (!card.sign) return;
     snapRig(rig, cardStopD(station.slug, index));
+    if (card.sign.board === 'ema') {
+      objects.push(placeEma(station.slug, index, card.side, rig));
+      return;
+    }
     const d = -rig.camera.z + KOSATSU_SIZE.depthFromCamera;
     const sign = card.side === 'izquierda' ? -1 : 1;
     const z = -d;
@@ -165,7 +196,67 @@ export function stationDecorLayout(index: number, portrait: boolean): DecorLayou
     });
   });
 
-  return { objects, groves, susuki };
+  return { objects, groves, susuki, galleries };
+}
+
+/**
+ * Un ema-kake delante de la cámara de su parada (Fase 6A), como un kōsatsu:
+ * paralelo a la imagen, con la esquina de su tejadillo más cercana al camino
+ * en `innerU` y sus postes lejos de las piedras.
+ */
+function placeEma(station: StationSlug, card: number, side: Side, rig: ReturnType<typeof createRig>): PlacedObject {
+  const d = -rig.camera.z + EMA_SIZE.depthFromCamera;
+  const sign = side === 'izquierda' ? -1 : 1;
+  const z = -d;
+  const yaw = rig.yaw;
+  const hx = EMA_SIZE.frameWidth / 2 + EMA_SIZE.roofOverhang;
+  const hz = EMA_SIZE.roofDepth / 2;
+  let x = pathX(d) + sign * (EMA_SIZE.innerU + hx);
+  x += sign * (EMA_SIZE.innerU - nearestRectU({ x, z, yaw, scale: 1 }, sign, hx, hz));
+  for (let pass = 0; pass < 3; pass += 1) {
+    const gap = postGap({ x, z, yaw, scale: 1 }, d, emaPosts(), 0, EMA_SIZE.postSize, EMA_SIZE.frameWidth);
+    if (gap >= STONE_CLEAR) break;
+    x += sign * (STONE_CLEAR - gap + 0.01);
+  }
+  return { item: { kind: 'ema', station, card, side }, x, y: groundY(x, z), z, yaw, scale: 1 };
+}
+
+/** Lo más cerca que queda una piedra del borde de unos postes (x locales en `posts`, a la z local `postZ`). */
+function postGap(
+  o: { x: number; z: number; yaw: number; scale: number },
+  d: number,
+  posts: readonly number[],
+  postZ: number,
+  postSize: number,
+  reach: number,
+): number {
+  stones ??= stoneLayout();
+  const post = { x: 0, z: 0 };
+  let gap = Number.POSITIVE_INFINITY;
+  for (const lx of posts) {
+    objectToWorld(o, lx, postZ, post);
+    for (const stone of stones) {
+      if (Math.abs(-stone.z - d) > reach * o.scale) continue;
+      gap = Math.min(gap, Math.hypot(stone.x - post.x, stone.z - post.z) - postSize * o.scale);
+    }
+  }
+  return gap;
+}
+
+/** La |u| de la esquina de un rectángulo en planta (medio ancho `hx`, medio fondo `hz`) más cercana al eje. */
+function nearestRectU(o: { x: number; z: number; yaw: number; scale: number }, sign: number, hx: number, hz: number): number {
+  const corner = { x: 0, z: 0 };
+  let nearest = Number.POSITIVE_INFINITY;
+  for (const [lx, lz] of [
+    [hx, hz],
+    [hx, -hz],
+    [-hx, hz],
+    [-hx, -hz],
+  ] as const) {
+    objectToWorld(o, lx, lz, corner);
+    nearest = Math.min(nearest, sign * (corner.x - pathX(-corner.z)));
+  }
+  return nearest;
 }
 
 /** Radio de una piedra con su escala máxima, más un margen: lo que cada poste deja libre. */

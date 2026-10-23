@@ -102,6 +102,32 @@
       }
     }
   },
+  "lugares": {
+    "greca": "Vermilion lightning fret (raimon)",
+    "fushimi-inari": {
+      "romaji": "Fushimi Inari Taisha",
+      "srTitle": "Fushimi Inari Taisha",
+      "tagline": "Ten thousand torii uphill",
+      "summary": "The shrine of Inari, deity of harvest and rice, at the foot of the mountain that bears its name. At the top of the steps, the Rōmon guards the entrance.",
+      "behold": "Behold the Rōmon",
+      "beholdLabel": "Behold the Rōmon: open the temple card",
+      "close": "Close",
+      "temple": {
+        "kicker": "楼門 · the Rōmon",
+        "title": "The Rōmon",
+        "body": "The two-storey gate that guards the entrance was raised by Toyotomi Hideyoshi in 1589, as an offering for his mother's recovery. Behind it begins the shrine that heads every Inari shrine in the country.",
+        "fichaLabel": "Fushimi Inari in figures",
+        "ficha": {
+          "fundacion": { "label": "Founded", "value": "711, by the Hata clan" },
+          "deidad": { "label": "Deity", "value": "Inari Ōkami: rice, harvest, prosperity and commerce" },
+          "toriis": { "label": "Torii", "value": "Some 10,000" },
+          "santuarios": { "label": "Shrines", "value": "Head shrine of some 30,000 Inari shrines in Japan" },
+          "romon": { "label": "The Rōmon", "value": "Donated by Toyotomi Hideyoshi in 1589" },
+          "monte": { "label": "The mountain", "value": "Mount Inari, 233 m" }
+        }
+      }
+    }
+  },
   "tramo": {
     "label": "Path to {station}",
     "continue": "Continue the path",
@@ -133,6 +159,20 @@
       "kyoto": {
         "title": "From Heian-kyō to Kyoto",
         "body": "Over the centuries the city came to be called simply Kyoto, 京都, “the capital”. In 1868 the emperor moved to Tokyo, but the city kept what it had gathered: more than 1,600 temples, some 400 shrines and seventeen World Heritage monuments. The ancient and the everyday still share the same street."
+      }
+    },
+    "eventos": {
+      "inari": {
+        "title": "The rice that became a bird",
+        "body": "The Yamashiro chronicle tells how Hata no Irogu, rich in rice, used a mochi cake as a target. When struck, the cake turned into a white bird that flew to this mountain, and where it landed rice sprang up: ine-nari, “the rice grows”. In 711 his clan raised the Inari shrine here."
+      },
+      "kitsune": {
+        "title": "The messengers",
+        "body": "The foxes are not Inari: they are Inari’s messengers. That is why the stone guardians hold something in their mouths —the key to the rice granary, a jewel, an ear of rice— and wear a red bib placed by the faithful. The ema here are fox-shaped: each visitor draws its face and writes a wish on the back."
+      },
+      "toriis": {
+        "title": "Senbon torii, one per promise",
+        "body": "Since the Edo period, whoever sees a wish come true —or hopes to— donates a torii. Their name and date are written on the back of a pillar, readable only on the way down. They are called “the thousand torii”, yet some ten thousand line the trail to the 233-metre summit. The vermilion wards off evil and protects the wood."
       }
     }
   },
